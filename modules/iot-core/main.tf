@@ -50,3 +50,5 @@ resource "aws_iot_thing_principal_attachment" "thing_cert_attach" {
   principal   = aws_iot_certificate.cert.arn
 }
 
+
+data "aws_iot_endpoint" "this" {}
