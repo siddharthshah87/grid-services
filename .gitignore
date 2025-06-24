@@ -1,0 +1,3 @@
+envs/dev/.terraform/**
+envs/dev/.terraform*
+envs/dev/.terraform/modules/modules.json
