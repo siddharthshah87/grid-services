@@ -1,17 +1,5 @@
 # modules/ecs-service-openadr/main.tf
 
-variable "name" {}
-variable "cluster_id" {}
-variable "subnet_ids" { type = list(string) }
-variable "security_group_id" {}
-variable "execution_role_arn" {}
-variable "task_role_arn" {}
-variable "image" {}
-variable "mqtt_topic" {}
-variable "iot_endpoint" {}
-variable "target_group_arn" {}
-variable "cpu" { default = "256"}
-variable "memory" {default = "512"}
 
 resource "aws_ecs_task_definition" "this" {
   family                   = var.name
