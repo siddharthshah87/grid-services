@@ -1,8 +1,8 @@
 # envs/dev/outputs.tf
 
-output "alb_dns_name" {
+output "openleadr_alb_dns_name" {
   description = "Public DNS of the OpenADR ALB"
-  value       = module.alb.dns_name
+  value       = module.openadr_alb.dns_name
 }
 
 output "iot_endpoint" {
