@@ -1,4 +1,5 @@
-terraform init   # pulls backend + provider
+AWS_PROFILE=AdministratorAccess-923675928909 terraform init -reconfigure
+terraform workspace select dev || terraform workspace new dev
 terraform plan
 terraform apply
 

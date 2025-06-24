@@ -6,6 +6,22 @@ module "vpc" {
   tags = {
     Project = "hems-demo"
     Env     = "dev"
+ }
+}
+module "ecr_openleadr" {
+  source = "../../modules/ecr-repo"
+  name   = "openleadr-vtn"
+  tags = {
+    Project = "grid-services"
+    Component = "OpenADR"
   }
 }
 
+module "ecr_volttron" {
+  source = "../../modules/ecr-repo"
+  name   = "volttron-ven"
+  tags = {
+    Project = "grid-services"
+    Component = "VOLTTRON"
+  }
+}
