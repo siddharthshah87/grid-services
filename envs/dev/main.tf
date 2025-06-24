@@ -25,3 +25,67 @@ module "ecr_volttron" {
     Component = "VOLTTRON"
   }
 }
+
+module "iot_core" {
+  source         = "../../modules/iot-core"
+  prefix         = "volttron"
+  enable_logging = false  # set to true if S3 logging desired
+}
+
+module "ecs_cluster" {
+  source = "../../modules/ecs-cluster"
+  name   = "hems-ecs-cluster"
+  tags = {
+    Project = "grid-services"
+  }
+}
+
+module "ecs_security_group" {
+  source     = "../../modules/security-group"
+  name       = "ecs-tasks-sg"
+  vpc_id     = module.vpc.vpc_id
+  allow_http = true   # Allow port 8080 or 80 for VTN inbound
+}
+
+module "ecs_task_roles" {
+  source = "../../modules/iam-roles/ecs_task_roles"
+  name_prefix = "grid-sim"
+}
+
+module "openadr_alb" {
+  source            = "../../modules/alb"
+  name              = "openadr-vtn-alb"
+  vpc_id            = module.vpc.vpc_id
+  public_subnets    = module.vpc.public_subnets
+  listener_port     = 80
+  target_port       = 8080
+  health_check_path = "/health"  # adjust if needed
+}
+
+module "ecs_service_openadr" {
+  source              = "../../modules/ecs-service-openadr"
+  name                = "openleadr-vtn"
+  cluster_id          = module.ecs_cluster.id
+  subnet_ids          = module.vpc.public_subnets
+  security_group_id   = module.ecs_security_group.id
+  execution_role_arn  = module.ecs_task_roles.execution
+  task_role_arn       = module.ecs_task_roles.iot_mqtt
+  image               = "${module.ecr_openleadr.repository_url}:latest"
+  mqtt_topic          = "oadr/event/ven1"
+  iot_endpoint        = "your-iot-endpoint.amazonaws.com"
+  target_group_arn    = module.openadr_alb.target_group_arn
+}
+
+module "ecs_service_volttron" {
+  source              = "../../modules/ecs-service-volttron"
+  name                = "volttron-ven"
+  cluster_id          = module.ecs_cluster.id
+  subnet_ids          = module.vpc.public_subnets
+  security_group_id   = module.ecs_security_group.id
+  execution_role_arn  = module.ecs_task_roles.execution
+  task_role_arn       = module.ecs_task_roles.iot_mqtt
+  image               = "${module.ecr_volttron.repository_url}:latest"
+  mqtt_topic          = "oadr/event/ven1"
+  iot_endpoint        = "your-iot-endpoint.amazonaws.com"
+}
+
