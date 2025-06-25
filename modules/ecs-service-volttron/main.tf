@@ -7,7 +7,9 @@ variable "security_group_id" {}
 variable "execution_role_arn" {}
 variable "task_role_arn" {}
 variable "image" {}
-variable "mqtt_topic" {}
+variable "mqtt_topic_status" {}
+variable "mqtt_topic_events" {}
+variable "mqtt_topic_responses" {}
 variable "iot_endpoint" {}
 variable "cpu" { default = "256" }
 variable "memory" { default = "512" }
@@ -27,7 +29,9 @@ resource "aws_ecs_task_definition" "this" {
       image     = var.image
       essential = true
       environment = [
-        { name = "MQTT_TOPIC", value = var.mqtt_topic },
+        { name = "MQTT_TOPIC_STATUS", value = var.mqtt_topic_status },
+        { name = "MQTT_TOPIC_EVENTS", value = var.mqtt_topic_events },
+        { name = "MQTT_TOPIC_RESPONSES", value = var.mqtt_topic_responses },
         { name = "IOT_ENDPOINT", value = var.iot_endpoint }
       ]
     }
