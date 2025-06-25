@@ -8,6 +8,7 @@ variable "execution_role_arn" {}
 variable "task_role_arn" {}
 variable "image" {}
 variable "mqtt_topic" {}
+variable "mqtt_topic_metering" {}
 variable "iot_endpoint" {}
 variable "target_group_arn" {}
 variable "cpu" { default = "256"}
@@ -35,6 +36,7 @@ resource "aws_ecs_task_definition" "this" {
       ]
       environment = [
         { name = "MQTT_TOPIC", value = var.mqtt_topic },
+        { name = "MQTT_TOPIC_METERING", value = var.mqtt_topic_metering },
         { name = "IOT_ENDPOINT", value = var.iot_endpoint }
       ]
     }
