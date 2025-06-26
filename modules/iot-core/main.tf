@@ -51,4 +51,6 @@ resource "aws_iot_thing_principal_attachment" "thing_cert_attach" {
 }
 
 
-data "aws_iot_endpoint" "this" {}
+data "aws_iot_endpoint" "endpoint" {
+  endpoint_type = "iot:Data-ATS"
+}

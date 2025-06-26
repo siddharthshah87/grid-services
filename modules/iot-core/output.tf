@@ -18,8 +18,7 @@ output "policy_name" {
   value = aws_iot_policy.allow_publish_subscribe.name
 }
 
-
 output "endpoint" {
-  value = data.aws_iot_endpoint.this.endpoint
+  value = data.aws_iot_endpoint.endpoint.endpoint_address
 }
 

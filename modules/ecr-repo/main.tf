@@ -1,11 +1,11 @@
+variable "name" {}
+
 resource "aws_ecr_repository" "this" {
-  name                 = var.name
-  image_tag_mutability = "MUTABLE"
-
-  encryption_configuration {
-    encryption_type = "AES256"
-  }
-
+  name = var.name
   tags = var.tags
+}
+
+output "repository_url" {
+  value = aws_ecr_repository.this.repository_url
 }
 
