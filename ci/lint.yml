@@ -11,4 +11,6 @@ jobs:
         with:
           terraform_version: 1.8.0
       - run: terraform fmt -recursive -check
+      - run: terraform validate
+        working-directory: envs/dev
 
