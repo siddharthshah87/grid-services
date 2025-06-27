@@ -73,7 +73,7 @@ module "ecs_service_openadr" {
   image               = "${module.ecr_openleadr.repository_url}:latest"
   mqtt_topic          = "oadr/event/ven1"
   mqtt_topic_metering = "oadr/meter/ven1"
-  iot_endpoint        = "your-iot-endpoint.amazonaws.com"
+  iot_endpoint        = module.iot_core.endpoint
   target_group_arn    = module.openadr_alb.target_group_arn
 }
 
@@ -88,6 +88,6 @@ module "ecs_service_volttron" {
   image               = "${module.ecr_volttron.repository_url}:latest"
   mqtt_topic          = "oadr/event/ven1"
   mqtt_topic_metering = "oadr/meter/ven1"
-  iot_endpoint        = "your-iot-endpoint.amazonaws.com"
+  iot_endpoint        = module.iot_core.endpoint
 }
 
