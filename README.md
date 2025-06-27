@@ -1,3 +1,4 @@
+
 # Grid Services Infrastructure
 
 This repository contains Terraform modules and Dockerized applications to deploy an OpenADR VTN server and a Volttron VEN agent on AWS. It provides example configurations for a development environment and helper scripts for setting up prerequisites.
@@ -91,4 +92,15 @@ Run this inside the `envs/dev` directory with the same workspace selected.
 - The Terraform configuration requires version `>= 1.8.0` and the AWS provider `~> 5.40` as defined in `envs/dev/versions.tf`.
 - GitHub Actions workflows under `ci/` will format Terraform code and perform planning on pull requests.
 - The container applications are minimal examples. Customize `openleadr/vtn_server.py` and `volttron/ven_agent.py` for your use case.
+
+## OpenADR VTN
+
+The `openleadr/vtn_server.py` script provides a minimal VTN for testing. The
+server listens on port `8080` for OpenADR traffic. It now tracks the VENs that
+register with it and exposes a simple HTTP endpoint to list them.
+
+### Listing active VENs
+
+Run the server and then access `http://localhost:8081/vens` to retrieve a JSON
+array of currently registered VEN IDs.
 
