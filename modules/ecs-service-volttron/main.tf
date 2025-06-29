@@ -13,6 +13,12 @@ variable "iot_endpoint" {}
 variable "cpu" { default = "256" }
 variable "memory" { default = "512" }
 
+data "aws_region" "current" {}
+
+resource "aws_cloudwatch_log_group" "this" {
+  name = "/ecs/${var.name}"
+}
+
 resource "aws_ecs_task_definition" "this" {
   family                   = var.name
   network_mode             = "awsvpc"
@@ -34,6 +40,14 @@ resource "aws_ecs_task_definition" "this" {
         { name = "MQTT_TOPIC_STATUS", value = var.mqtt_topic_status },
         { name = "IOT_ENDPOINT", value = var.iot_endpoint }
       ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.this.name
+          awslogs-region        = data.aws_region.current.name
+          awslogs-stream-prefix = var.name
+        }
+      }
     }
   ])
 }
@@ -58,4 +72,8 @@ resource "aws_ecs_service" "this" {
 
 output "name" {
   value = aws_ecs_service.this.name
+}
+
+output "log_group_name" {
+  value = aws_cloudwatch_log_group.this.name
 }
