@@ -28,6 +28,11 @@ resource "aws_security_group" "alb_sg" {
   tags = {
     Name = "${var.name}-sg"
   }
+
+  lifecycle {
+    create_before_destroy = true
+    prevent_destroy = false
+  }
 }
 
 resource "aws_lb" "this" {

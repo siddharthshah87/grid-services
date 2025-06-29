@@ -59,7 +59,11 @@ resource "aws_ecs_service" "this" {
     container_port   = 8080
   }
 
-  desired_count = 1  
+  desired_count = 1 
+
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
 }
 
 output "name" {

@@ -97,31 +97,29 @@ fi
 
 ### ECS Services
 echo "🧩 Importing ECS services..."
-openleadr_service_arn=$(aws ecs describe-services \
-  --cluster "$CLUSTER_NAME" \
-  --services openleadr-vtn \
-  --region "$REGION" \
-  --query "services[0].serviceArn" \
-  --output text || echo "")
 
-volttron_service_arn=$(aws ecs describe-services \
-  --cluster "$CLUSTER_NAME" \
-  --services volttron-ven \
-  --region "$REGION" \
-  --query "services[0].serviceArn" \
-  --output text || echo "")
-
-if [[ -n "$openleadr_service_arn" ]] && ! is_imported "module.ecs_service_openadr.aws_ecs_service.this"; then
-  terraform import module.ecs_service_openadr.aws_ecs_service.this "$openleadr_service_arn"
+if aws ecs describe-services --cluster "$CLUSTER_NAME" --services openleadr-vtn --region "$REGION" \
+  | grep -q "\"status\": \"ACTIVE\""; then
+  if ! is_imported "module.ecs_service_openadr.aws_ecs_service.this"; then
+    terraform import module.ecs_service_openadr.aws_ecs_service.this "${CLUSTER_NAME}/openleadr-vtn"
+  else
+    echo "✅ openleadr ECS service already imported"
+  fi
 else
-  echo "✅ openleadr ECS service already imported or missing"
+  echo "⚠️  openleadr-vtn service not found or inactive"
 fi
 
-if [[ -n "$volttron_service_arn" ]] && ! is_imported "module.ecs_service_volttron.aws_ecs_service.this"; then
-  terraform import module.ecs_service_volttron.aws_ecs_service.this "$volttron_service_arn"
+if aws ecs describe-services --cluster "$CLUSTER_NAME" --services volttron-ven --region "$REGION" \
+  | grep -q "\"status\": \"ACTIVE\""; then
+  if ! is_imported "module.ecs_service_volttron.aws_ecs_service.this"; then
+    terraform import module.ecs_service_volttron.aws_ecs_service.this "${CLUSTER_NAME}/volttron-ven"
+  else
+    echo "✅ volttron ECS service already imported"
+  fi
 else
-  echo "✅ volttron ECS service already imported or missing"
+  echo "⚠️  volttron-ven service not found or inactive"
 fi
+
 
 echo "✅ All necessary resources imported or already managed."
 

@@ -47,6 +47,9 @@ resource "aws_ecs_service" "this" {
   }
 
   desired_count = 1
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
 }
 
 output "name" {
