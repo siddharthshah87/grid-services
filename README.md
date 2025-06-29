@@ -29,7 +29,7 @@ Before applying Terraform, create an S3 bucket and DynamoDB table for remote sta
 ./scripts/bootstrap_state.sh
 ```
 
-This script uses your current AWS credentials to create a bucket named `tf-state-<account-id>` and a DynamoDB table named `tf-lock-<account-id>` in `us-west-2`.
+This script uses your current AWS credentials to create a bucket named `tf-state-<account-id>` and a DynamoDB table named `tf-lock-<account-id>` in region `us-west-2` by default. Set `AWS_REGION` to override the target region.
 
 ## Building and Pushing Docker Images
 

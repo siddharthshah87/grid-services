@@ -1,7 +1,7 @@
 # Use the profile that holds your SSO creds
 export AWS_PROFILE=AdministratorAccess-923675928909
 export BUCKET=tf-state-grid-services-923675928909   # or your chosen name
-export REGION=us-west-1
+export REGION=${AWS_REGION:-us-west-2}
 
 aws s3api create-bucket \
   --bucket "$BUCKET" \
