@@ -72,7 +72,8 @@ module "ecs_service_openadr" {
   execution_role_arn   = module.ecs_task_roles.execution
   task_role_arn        = module.ecs_task_roles.iot_mqtt
   image                = "${module.ecr_openleadr.repository_url}:latest"
-  mqtt_topic           = "oadr/event/ven1"
+  mqtt_topic_events    = "oadr/event/ven1"
+  mqtt_topic_responses = "oadr/response/ven1"
   mqtt_topic_metering  = "oadr/meter/ven1"
   iot_endpoint         = module.iot_core.endpoint
   target_group_arn     = module.openadr_alb.target_group_arn
@@ -89,7 +90,9 @@ module "ecs_service_volttron" {
   execution_role_arn   = module.ecs_task_roles.execution
   task_role_arn        = module.ecs_task_roles.iot_mqtt
   image                = "${module.ecr_volttron.repository_url}:latest"
-  mqtt_topic           = "oadr/event/ven1"
+  mqtt_topic_events    = "oadr/event/ven1"
+  mqtt_topic_responses = "oadr/response/ven1"
   mqtt_topic_metering  = "oadr/meter/ven1"
+  mqtt_topic_status    = "ven/status/ven1"
   iot_endpoint         = module.iot_core.endpoint
 }
