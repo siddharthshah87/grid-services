@@ -87,6 +87,28 @@ terraform destroy
 
 Run this inside the `envs/dev` directory with the same workspace selected.
 
+### Using `scripts/cleanup.sh`
+
+If you only want to remove the running containers and other high-cost
+resources while keeping the VPC, ECR repositories and IAM roles, use the
+`scripts/cleanup.sh` helper.
+
+**Prerequisites**
+
+- The `dev` environment has been deployed (e.g. via `./terraform_init.sh`).
+- You are inside the `envs/dev` directory so Terraform can find its state.
+- The correct workspace (such as `dev`) is selected.
+
+Run the script whenever you are done testing and want to stop incurring
+compute costs but may redeploy later:
+
+```bash
+cd envs/dev
+../../scripts/cleanup.sh
+```
+
+Re-running `terraform apply` will recreate the services when needed.
+
 ## Additional Notes
 
 - The Terraform configuration requires version `>= 1.8.0` and the AWS provider `~> 5.40` as defined in `envs/dev/versions.tf`.
