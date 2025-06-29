@@ -87,6 +87,15 @@ terraform destroy
 
 Run this inside the `envs/dev` directory with the same workspace selected.
 
+For a quicker teardown of high-cost components (ECS services, ALB and IoT Core)
+you can execute the helper script:
+
+```bash
+./scripts/cleanup.sh
+```
+
+The script automatically switches to `envs/dev` and issues targeted `terraform destroy` commands, leaving core infrastructure such as the VPC and ECR repositories intact.
+
 ## Additional Notes
 
 - The Terraform configuration requires version `>= 1.8.0` and the AWS provider `~> 5.40` as defined in `envs/dev/versions.tf`.

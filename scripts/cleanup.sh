@@ -2,6 +2,9 @@
 
 set -e
 
+# Always run Terraform from the dev environment directory
+cd "$(dirname "$0")/../envs/dev"
+
 echo "🔻 Starting cleanup of high-cost AWS infrastructure (containers, ALB, IoT)..."
 
 # Step 1: Stop and remove ECS services
