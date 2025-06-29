@@ -95,6 +95,20 @@ else
   echo "✅ volttron task definition already imported"
 fi
 
+### ALB Security groups
+echo "🛡️  Importing ALB security group..."
+alb_sg_id=$(aws ec2 describe-security-groups \
+  --filters Name=group-name,Values=openadr-vtn-alb-sg \
+  --region "$REGION" \
+  --query "SecurityGroups[0].GroupId" \
+  --output text 2>/dev/null || echo "")
+
+if [[ -n "$alb_sg_id" ]] && ! is_imported "module.openadr_alb.aws_security_group.alb_sg"; then
+  terraform import module.openadr_alb.aws_security_group.alb_sg "$alb_sg_id"
+else
+  echo "✅ ALB security group already imported or not found"
+fi
+
 ### ECS Services
 echo "🧩 Importing ECS services..."
 
