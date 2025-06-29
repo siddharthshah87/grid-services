@@ -3,7 +3,7 @@
 set -e
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION="us-west-2"
+REGION="${AWS_REGION:-us-west-2}"
 
 STATE_BUCKET="tf-state-grid-services-${ACCOUNT_ID}"
 LOCK_TABLE="tf-lock-${ACCOUNT_ID}"
