@@ -1,0 +1,19 @@
+# Ignore Terraform files
+*.tf
+
+# Git metadata
+.git
+
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Build output
+build/
+dist/
+*.egg-info/
