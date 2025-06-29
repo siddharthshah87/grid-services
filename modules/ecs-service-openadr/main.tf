@@ -5,7 +5,8 @@ variable "security_group_id" {}
 variable "execution_role_arn" {}
 variable "task_role_arn" {}
 variable "image" {}
-variable "mqtt_topic" {}
+variable "mqtt_topic_events" {}
+variable "mqtt_topic_responses" {}
 variable "mqtt_topic_metering" {}
 variable "iot_endpoint" {}
 variable "target_group_arn" {}
@@ -14,6 +15,12 @@ variable "memory" { default = "512" }
 variable "ca_cert_secret_arn" { default = null }
 variable "client_cert_secret_arn" { default = null }
 variable "private_key_secret_arn" { default = null }
+
+data "aws_region" "current" {}
+
+resource "aws_cloudwatch_log_group" "this" {
+  name = "/ecs/${var.name}"
+}
 
 resource "aws_ecs_task_definition" "this" {
   family                   = var.name
@@ -36,7 +43,8 @@ resource "aws_ecs_task_definition" "this" {
         }
       ]
       environment = [
-        { name = "MQTT_TOPIC", value = var.mqtt_topic },
+        { name = "MQTT_TOPIC_EVENTS", value = var.mqtt_topic_events },
+        { name = "MQTT_TOPIC_RESPONSES", value = var.mqtt_topic_responses },
         { name = "MQTT_TOPIC_METERING", value = var.mqtt_topic_metering },
         { name = "IOT_ENDPOINT", value = var.iot_endpoint }
       ]
@@ -45,6 +53,14 @@ resource "aws_ecs_task_definition" "this" {
         var.client_cert_secret_arn != null ? [{ name = "CLIENT_CERT", valueFrom = var.client_cert_secret_arn }] : [],
         var.private_key_secret_arn != null ? [{ name = "PRIVATE_KEY", valueFrom = var.private_key_secret_arn }] : []
       )
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.this.name
+          awslogs-region        = data.aws_region.current.name
+          awslogs-stream-prefix = var.name
+        }
+      }
     }
   ])
 }
@@ -76,5 +92,9 @@ resource "aws_ecs_service" "this" {
 
 output "name" {
   value = aws_ecs_service.this.name
+}
+
+output "log_group_name" {
+  value = aws_cloudwatch_log_group.this.name
 }
 

@@ -127,6 +127,28 @@ Run the server and then access `http://localhost:8081/vens` to retrieve a JSON
 array of currently registered VEN IDs.
 
 
+## Demo
+
+Two helper scripts allow quick testing of the MQTT topics used by the VTN and
+VEN examples. Set `IOT_ENDPOINT` to the hostname of your MQTT broker (defaults
+to `localhost`).
+
+1. Start monitoring responses for a VEN:
+
+```bash
+python scripts/monitor_ven.py ven123
+```
+
+2. In another terminal send a test event:
+
+```bash
+python scripts/send_event.py ven123
+```
+
+The monitor subscribes to `grid/response/ven123` and prints any messages. The
+sender publishes a simple event to `grid/event/ven123`.
+
+
 # AWS-VAULT
 On ubuntu 
 sudo apt install aws-vault

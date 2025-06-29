@@ -95,6 +95,11 @@ class VensHandler(BaseHTTPRequestHandler):
             self.end_headers()
             payload = json.dumps(sorted(list(active_vens))).encode()
             self.wfile.write(payload)
+        elif self.path == "/health":
+            # Simple health check endpoint for the ALB
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
         else:
             self.send_response(404)
             self.end_headers()
