@@ -74,7 +74,7 @@ This environment creates:
 - An ECS cluster and related IAM roles
 - Fargate services for the VTN and VEN containers
 - An Application Load Balancer exposing the VTN on port 80
-
+ 
 Adjust variables and module parameters in `envs/dev/main.tf` as needed (e.g., MQTT topic or IoT endpoint).
 
 ## Cleaning Up
@@ -112,7 +112,7 @@ Re-running `terraform apply` will recreate the services when needed.
 ## Additional Notes
 
 - The Terraform configuration requires version `>= 1.8.0` and the AWS provider `~> 5.40` as defined in `envs/dev/versions.tf`.
-- GitHub Actions workflows under `ci/` will format Terraform code and perform planning on pull requests.
+- GitHub Actions workflows under `ci/` will format Terraform code and perform planning on pull requests.ds
 - The container applications are minimal examples. Customize `openleadr/vtn_server.py` and `volttron/ven_agent.py` for your use case.
 
 ## OpenADR VTN
@@ -125,4 +125,11 @@ register with it and exposes a simple HTTP endpoint to list them.
 
 Run the server and then access `http://localhost:8081/vens` to retrieve a JSON
 array of currently registered VEN IDs.
+
+
+# AWS-VAULT
+On ubuntu 
+sudo apt install aws-vault
+
+aws-vault exec AdministratorAccess-923675928909 -- ./terraform_init.sh
 
