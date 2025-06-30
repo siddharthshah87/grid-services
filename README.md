@@ -74,8 +74,30 @@ This environment creates:
 - An ECS cluster and related IAM roles
 - Fargate services for the VTN and VEN containers
 - An Application Load Balancer exposing the VTN on port 80
- 
+
 Adjust variables and module parameters in `envs/dev/main.tf` as needed (e.g., MQTT topic or IoT endpoint).
+
+### Capturing IoT Certificates
+
+The IoT Core module outputs the certificate and key needed for MQTT TLS. After
+`terraform apply` run:
+
+```bash
+terraform output -raw certificate_pem > client.crt
+terraform output -raw private_key > client.key
+```
+
+Use these outputs directly when setting the environment variables for the
+VTN and VEN services:
+
+```bash
+export CLIENT_CERT=$(terraform output -raw certificate_pem)
+export PRIVATE_KEY=$(terraform output -raw private_key)
+export CA_CERT=$CLIENT_CERT
+```
+
+OpenSSL is not required as AWS IoT generates the certificate and private key
+for you.
 
 ## Cleaning Up
 
