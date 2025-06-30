@@ -1,0 +1,37 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  TF_VERSION: 1.8.0
+  AWS_REGION: us-west-2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login to Amazon ECR
+        run: |
+          REGION="${AWS_REGION:-us-west-2}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "Logging in to ECR for account $ACCOUNT_ID in region $REGION..."
+          aws ecr get-login-password --region "$REGION" | \
+            docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+      - name: Build and push openleadr image
+        run: ./openleadr/build_and_push.sh
+      - name: Build and push volttron image
+        run: ./volttron/build_and_push.sh
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - run: terraform init -input=false
+        working-directory: envs/dev
+      - run: terraform apply -auto-approve
+        working-directory: envs/dev
