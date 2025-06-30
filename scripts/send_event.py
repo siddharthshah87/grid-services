@@ -21,6 +21,9 @@ def main() -> None:
     parser.add_argument(
         "--port", type=int, default=1883, help="MQTT broker port"
     )
+    ca_cert = os.getenv("CA_CERT")
+    client_cert = os.getenv("CLIENT_CERT")
+    private_key = os.getenv("PRIVATE_KEY")
     args = parser.parse_args()
 
     event = {
@@ -34,6 +37,8 @@ def main() -> None:
     }
 
     client = mqtt.Client()
+    if ca_cert and client_cert and private_key:
+        client.tls_set(ca_certs=ca_cert, certfile=client_cert, keyfile=private_key)
     client.connect(args.host, args.port, 60)
     topic = f"grid/event/{args.ven_id}"
     payload = json.dumps(event)

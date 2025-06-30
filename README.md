@@ -112,7 +112,11 @@ Re-running `terraform apply` will recreate the services when needed.
 ## Additional Notes
 
 - The Terraform configuration requires version `>= 1.8.0` and the AWS provider `~> 5.40` as defined in `envs/dev/versions.tf`.
-- GitHub Actions workflows under `ci/` will format Terraform code and perform planning on pull requests.ds
+- GitHub Actions workflows under `ci/` will format Terraform code and perform planning on pull requests.
+- The container applications connect to MQTT on port `8883` by default. Set
+  the environment variables `CA_CERT`, `CLIENT_CERT`, and `PRIVATE_KEY` with the
+  paths to your broker's certificate authority, client certificate and key to
+  enable TLS.
 - The container applications are minimal examples. Customize `openleadr/vtn_server.py` and `volttron/ven_agent.py` for your use case.
 
 ## OpenADR VTN
@@ -132,6 +136,10 @@ array of currently registered VEN IDs.
 Two helper scripts allow quick testing of the MQTT topics used by the VTN and
 VEN examples. Set `IOT_ENDPOINT` to the hostname of your MQTT broker (defaults
 to `localhost`).
+
+To use TLS when publishing or subscribing, pass `--port 8883` and set the
+environment variables `CA_CERT`, `CLIENT_CERT` and `PRIVATE_KEY` to point to
+your certificate files.
 
 1. Start monitoring responses for a VEN:
 
