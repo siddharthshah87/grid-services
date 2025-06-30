@@ -3,3 +3,6 @@ envs/dev/.terraform*
 envs/dev/.terraform/modules/modules.json
 .terraform/
 terraform.tfstate
+terraform.tfstate.*
+*.tfvars
+.env
