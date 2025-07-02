@@ -2,6 +2,7 @@
 """Subscribe to VEN responses via MQTT and print them."""
 import argparse
 import os
+import sys
 import paho.mqtt.client as mqtt
 
 
@@ -32,7 +33,11 @@ def main() -> None:
         print(f"{msg.topic}: {msg.payload.decode()}")
 
     client.on_message = on_message
-    client.connect(args.host, args.port, 60)
+    try:
+        client.connect(args.host, args.port, 60)
+    except Exception as e:
+        print(f"❌ Failed to connect to MQTT broker at {args.host}:{args.port}: {e}")
+        sys.exit(1)
     client.subscribe(topic)
     print(f"\U0001F50D Subscribed to {topic}. Press Ctrl+C to exit.")
     try:

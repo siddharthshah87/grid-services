@@ -4,6 +4,7 @@ import json
 import random
 import os
 import paho.mqtt.client as mqtt
+import sys
 
 # MQTT topics and endpoint from environment variables
 MQTT_TOPIC_STATUS = os.getenv("MQTT_TOPIC_STATUS", "volttron/dev")
@@ -19,7 +20,11 @@ PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 client = mqtt.Client()
 if CA_CERT and CLIENT_CERT and PRIVATE_KEY:
     client.tls_set(ca_certs=CA_CERT, certfile=CLIENT_CERT, keyfile=PRIVATE_KEY)
-client.connect(IOT_ENDPOINT, 8883, 60)
+try:
+    client.connect(IOT_ENDPOINT, 8883, 60)
+except Exception as e:
+    print(f"❌ Failed to connect to MQTT broker at {IOT_ENDPOINT}: {e}")
+    sys.exit(1)
 client.loop_start()
 
 # Event handler for incoming OpenADR events
