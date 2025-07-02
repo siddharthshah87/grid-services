@@ -11,6 +11,7 @@ MQTT_TOPIC_EVENTS = os.getenv("MQTT_TOPIC_EVENTS", "openadr/event")
 MQTT_TOPIC_RESPONSES = os.getenv("MQTT_TOPIC_RESPONSES", "openadr/response")
 MQTT_TOPIC_METERING = os.getenv("MQTT_TOPIC_METERING", "volttron/metering")
 IOT_ENDPOINT = os.getenv("IOT_ENDPOINT", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "8883"))
 CA_CERT = os.getenv("CA_CERT")
 CLIENT_CERT = os.getenv("CLIENT_CERT")
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
@@ -19,7 +20,7 @@ PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 client = mqtt.Client()
 if CA_CERT and CLIENT_CERT and PRIVATE_KEY:
     client.tls_set(ca_certs=CA_CERT, certfile=CLIENT_CERT, keyfile=PRIVATE_KEY)
-client.connect(IOT_ENDPOINT, 8883, 60)
+client.connect(IOT_ENDPOINT, MQTT_PORT, 60)
 client.loop_start()
 
 # Event handler for incoming OpenADR events
