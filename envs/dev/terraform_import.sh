@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export AWS_PROFILE=AdministratorAccess-923675928909
-REGION="us-west-2"
+: "${AWS_PROFILE?Must set AWS_PROFILE to your AWS profile name}"
+REGION="${AWS_REGION:-us-west-2}"
 CLUSTER_NAME="hems-ecs-cluster"
 
 echo "📦 Importing existing AWS resources into Terraform..."

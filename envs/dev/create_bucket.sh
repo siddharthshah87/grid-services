@@ -1,7 +1,8 @@
-# Use the profile that holds your SSO creds
-export AWS_PROFILE=AdministratorAccess-923675928909
-export BUCKET=tf-state-grid-services-923675928909   # or your chosen name
-export REGION=${AWS_REGION:-us-west-2}
+
+# Ensure required environment variables are set
+: "${AWS_PROFILE?Must set AWS_PROFILE to your AWS profile name}"
+: "${BUCKET?Must set BUCKET to the S3 bucket name for Terraform state}"
+REGION="${AWS_REGION:-us-west-2}"
 
 aws s3api create-bucket \
   --bucket "$BUCKET" \
