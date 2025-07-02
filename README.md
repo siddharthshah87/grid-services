@@ -9,7 +9,7 @@ This repository contains Terraform modules and Dockerized applications to deploy
 - `modules/` – Reusable Terraform modules (VPC, ECS cluster, ECR repositories, security groups, IAM roles, IoT Core and more).
 - `openleadr/` – Source code and Dockerfile for the [OpenLEADR](https://github.com/OpenLEADR/openleadr) VTN server.
 - `volttron/` – Source code and Dockerfile for a simple Volttron VEN agent.
-- `scripts/` – Helper scripts to install dependencies, authenticate to AWS, create Terraform backend resources and push Docker images.
+- `scripts/` – Helper scripts to install dependencies, authenticate to AWS, create Terraform backend resources, push Docker images, and verify Terraform formatting.
 - `ci/` – GitHub Actions workflows for formatting and planning Terraform changes.
 
 ## Prerequisites
@@ -135,6 +135,7 @@ Re-running `terraform apply` will recreate the services when needed.
 
 - The Terraform configuration requires version `>= 1.8.0` and the AWS provider `~> 5.40` as defined in `envs/dev/versions.tf`.
 - GitHub Actions workflows under `ci/` will format Terraform code and perform planning on pull requests.
+- Run `scripts/check_terraform.sh` before committing to ensure Terraform files are formatted and valid.
 - The container applications connect to MQTT on port `8883` by default. Set
   the environment variables `CA_CERT`, `CLIENT_CERT`, and `PRIVATE_KEY` with the
   paths to your broker's certificate authority, client certificate and key to
