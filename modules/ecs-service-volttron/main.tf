@@ -10,6 +10,7 @@ variable "mqtt_topic_responses" {}
 variable "mqtt_topic_metering" {}
 variable "mqtt_topic_status" {}
 variable "iot_endpoint" {}
+variable "mqtt_port" { default = "8883" }
 variable "cpu" { default = "256" }
 variable "memory" { default = "512" }
 variable "ca_cert_secret_arn" { default = null }
@@ -41,7 +42,8 @@ resource "aws_ecs_task_definition" "this" {
         { name = "MQTT_TOPIC_RESPONSES", value = var.mqtt_topic_responses },
         { name = "MQTT_TOPIC_METERING", value = var.mqtt_topic_metering },
         { name = "MQTT_TOPIC_STATUS", value = var.mqtt_topic_status },
-        { name = "IOT_ENDPOINT", value = var.iot_endpoint }
+        { name = "IOT_ENDPOINT", value = var.iot_endpoint },
+        { name = "MQTT_PORT", value = var.mqtt_port }
       ]
       secrets = concat(
         var.ca_cert_secret_arn != null ? [{ name = "CA_CERT", valueFrom = var.ca_cert_secret_arn }] : [],

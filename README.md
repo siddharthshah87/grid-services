@@ -135,10 +135,10 @@ Re-running `terraform apply` will recreate the services when needed.
 
 - The Terraform configuration requires version `>= 1.8.0` and the AWS provider `~> 5.40` as defined in `envs/dev/versions.tf`.
 - GitHub Actions workflows under `ci/` will format Terraform code and perform planning on pull requests.
-- The container applications connect to MQTT on port `8883` by default. Set
-  the environment variables `CA_CERT`, `CLIENT_CERT`, and `PRIVATE_KEY` with the
-  paths to your broker's certificate authority, client certificate and key to
-  enable TLS.
+- The container applications connect to MQTT on the port specified by
+  `MQTT_PORT` (defaults to `8883`). Set the environment variables `CA_CERT`,
+  `CLIENT_CERT`, and `PRIVATE_KEY` with the paths to your broker's certificate
+  authority, client certificate and key to enable TLS.
 - The container applications are minimal examples. Customize `openleadr/vtn_server.py` and `volttron/ven_agent.py` for your use case.
 
 ## OpenADR VTN
