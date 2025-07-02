@@ -156,23 +156,29 @@ array of currently registered VEN IDs.
 ## Demo
 
 Two helper scripts allow quick testing of the MQTT topics used by the VTN and
-VEN examples. Set `IOT_ENDPOINT` to the hostname of your MQTT broker (defaults
-to `localhost`).
+VEN examples. Set the environment variables before running them:
 
-To use TLS when publishing or subscribing, pass `--port 8883` and set the
-environment variables `CA_CERT`, `CLIENT_CERT` and `PRIVATE_KEY` to point to
-your certificate files.
+```bash
+export IOT_ENDPOINT=<broker-host>
+# For MQTT over TLS also set the certificate paths
+export CA_CERT=/path/to/ca.pem
+export CLIENT_CERT=/path/to/client.crt
+export PRIVATE_KEY=/path/to/client.key
+```
+
+Use `--port 8883` when connecting with TLS (otherwise the default `1883` is
+used).
 
 1. Start monitoring responses for a VEN:
 
 ```bash
-python scripts/monitor_ven.py ven123
+python scripts/monitor_ven.py ven123 --port 8883
 ```
 
 2. In another terminal send a test event:
 
 ```bash
-python scripts/send_event.py ven123
+python scripts/send_event.py ven123 --port 8883
 ```
 
 The monitor subscribes to `grid/response/ven123` and prints any messages. The
@@ -184,4 +190,3 @@ On ubuntu
 sudo apt install aws-vault
 
 aws-vault exec AdministratorAccess-923675928909 -- ./terraform_init.sh
-
