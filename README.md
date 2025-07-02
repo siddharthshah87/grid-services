@@ -178,6 +178,29 @@ python scripts/send_event.py ven123
 The monitor subscribes to `grid/response/ven123` and prints any messages. The
 sender publishes a simple event to `grid/event/ven123`.
 
+## Running Locally with Docker Compose
+
+You can bring up the VTN and VEN containers without deploying any AWS
+infrastructure. Place your MQTT/TLS certificates in a `certs/` directory at the
+repository root:
+
+```
+certs/
+  ca.crt
+  client.crt
+  client.key
+```
+
+Set the required environment variables for your broker endpoint and topics (or
+create a `.env` file) and then start the stack:
+
+```bash
+docker compose up
+```
+
+The OpenADR VTN will be available on port `8080` with the VEN listing endpoint on
+`8081`.
+
 
 # AWS-VAULT
 On ubuntu 
