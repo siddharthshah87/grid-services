@@ -146,12 +146,15 @@ Re-running `terraform apply` will recreate the services when needed.
 
 The `openleadr/vtn_server.py` script provides a minimal VTN for testing. The
 server listens on port `8080` for OpenADR traffic. It now tracks the VENs that
-register with it and exposes a simple HTTP endpoint to list them.
+register with it and exposes a simple HTTP endpoint to list them. The
+listing server's port can be configured via the `VENS_PORT` environment
+variable (default `8081`).
 
 ### Listing active VENs
 
-Run the server and then access `http://localhost:8081/vens` to retrieve a JSON
-array of currently registered VEN IDs.
+Run the server and then access `http://localhost:8081/vens` (or the port you
+set in `VENS_PORT`) to retrieve a JSON array of currently registered VEN
+IDs.
 
 
 ## Demo
