@@ -10,6 +10,7 @@ import json
 import threading
 import os
 import paho.mqtt.client as mqtt
+import sys
 from datetime import datetime
 
 # MQTT topics and endpoint
@@ -29,6 +30,11 @@ active_vens = set()
 mqtt_client = mqtt.Client()
 if CA_CERT and CLIENT_CERT and PRIVATE_KEY:
     mqtt_client.tls_set(ca_certs=CA_CERT, certfile=CLIENT_CERT, keyfile=PRIVATE_KEY)
+try:
+    mqtt_client.connect(IOT_ENDPOINT, 8883, 60)
+except Exception as e:
+    print(f"❌ Failed to connect to MQTT broker at {IOT_ENDPOINT}: {e}")
+    sys.exit(1)
 
 def on_metering_data(client, userdata, msg):
     payload = msg.payload.decode()
@@ -41,7 +47,6 @@ def on_metering_data(client, userdata, msg):
 def on_response(client, userdata, msg):
     print(f"📩 Response received on {msg.topic}: {msg.payload.decode()}")
 
-mqtt_client.connect(IOT_ENDPOINT, 8883, 60)
 mqtt_client.subscribe(MQTT_TOPIC_METERING)
 mqtt_client.subscribe(MQTT_TOPIC_RESPONSES)
 mqtt_client.on_message = on_metering_data

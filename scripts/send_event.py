@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import sys
 from datetime import datetime
 
 import paho.mqtt.client as mqtt
@@ -39,7 +40,13 @@ def main() -> None:
     client = mqtt.Client()
     if ca_cert and client_cert and private_key:
         client.tls_set(ca_certs=ca_cert, certfile=client_cert, keyfile=private_key)
-    client.connect(args.host, args.port, 60)
+    try:
+        client.connect(args.host, args.port, 60)
+    except Exception as e:
+        print(
+            f"❌ Failed to connect to MQTT broker at {args.host}:{args.port}: {e}"
+        )
+        sys.exit(1)
     topic = f"grid/event/{args.ven_id}"
     payload = json.dumps(event)
     client.publish(topic, payload)
