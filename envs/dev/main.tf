@@ -76,6 +76,7 @@ module "ecs_service_openadr" {
   mqtt_topic_responses = "oadr/response/ven1"
   mqtt_topic_metering  = "oadr/meter/ven1"
   iot_endpoint         = module.iot_core.endpoint
+  vens_port            = 8081
   target_group_arn     = module.openadr_alb.target_group_arn
   # 👇 Add this to delay until the listener exists
   depends_on = [module.openadr_alb]

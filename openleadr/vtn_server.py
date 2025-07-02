@@ -1,7 +1,8 @@
 """Simple VTN server example used for development.
 
 This file keeps track of all VENs that register with the VTN and exposes
-an additional HTTP endpoint on port 8081 that lists those active VENs.
+an additional HTTP endpoint on a configurable port (`VENS_PORT`, default
+8081) that lists those active VENs.
 """
 
 from openleadr import OpenADRServer
@@ -87,6 +88,9 @@ def handle_event_request(ven_id, request):
     return [event]
 
 # Extra HTTP server to list active VENs
+VENS_PORT = int(os.getenv("VENS_PORT", "8081"))
+
+
 class VensHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/vens":
@@ -105,8 +109,8 @@ class VensHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
 def run_vens_server():
-    httpd = HTTPServer(("0.0.0.0", 8081), VensHandler)
-    print("🔎 VEN listing server started on port 8081")
+    httpd = HTTPServer(("0.0.0.0", VENS_PORT), VensHandler)
+    print(f"🔎 VEN listing server started on port {VENS_PORT}")
     httpd.serve_forever()
 
 if __name__ == "__main__":
