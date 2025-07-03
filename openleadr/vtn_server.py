@@ -13,24 +13,62 @@ import os
 import paho.mqtt.client as mqtt
 import sys
 from datetime import datetime
+import tempfile
+import atexit
+
 
 # MQTT topics and endpoint
 MQTT_TOPIC_METERING = os.getenv("MQTT_TOPIC_METERING", "volttron/metering")
 MQTT_TOPIC_EVENTS = os.getenv("MQTT_TOPIC_EVENTS", "openadr/event")
 MQTT_TOPIC_RESPONSES = os.getenv("MQTT_TOPIC_RESPONSES", "openadr/response")
 IOT_ENDPOINT = os.getenv("IOT_ENDPOINT", "localhost")
-CA_CERT = os.getenv("CA_CERT")
-CLIENT_CERT = os.getenv("CLIENT_CERT")
-PRIVATE_KEY = os.getenv("PRIVATE_KEY")
+CERT_BUNDLE_JSON = os.getenv("CERT_BUNDLE_JSON")
+
+if not CERT_BUNDLE_JSON:
+    print("❌ CERT_BUNDLE_JSON env var not set.")
+    sys.exit(1)
+
+try:
+    bundle = json.loads(CERT_BUNDLE_JSON)
+    CA_CERT = bundle["ca.crt"]
+    CLIENT_CERT = bundle["client.crt"]
+    PRIVATE_KEY = bundle["private.key"]
+except Exception as e:
+    print(f"❌ Failed to parse CERT_BUNDLE_JSON: {e}")
+    sys.exit(1)
 
 # In-memory storage
 metering_data = []
 active_vens = set()
 
+def write_temp_file(contents, suffix):
+    if not contents or not contents.strip():
+        raise ValueError(f"Attempted to write empty content to temp file with suffix {suffix}")
+    temp_file = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=suffix)
+    temp_file.write(contents)
+    temp_file.close()
+    return temp_file.name
+
 # MQTT setup
 mqtt_client = mqtt.Client()
-if CA_CERT and CLIENT_CERT and PRIVATE_KEY:
-    mqtt_client.tls_set(ca_certs=CA_CERT, certfile=CLIENT_CERT, keyfile=PRIVATE_KEY)
+
+ca_cert_path = write_temp_file(CA_CERT, ".crt")
+client_cert_path = write_temp_file(CLIENT_CERT, ".crt")
+private_key_path = write_temp_file(PRIVATE_KEY, ".key")
+
+mqtt_client.tls_set(
+        
+
+    ca_certs=ca_cert_path,
+    certfile=client_cert_path,
+    keyfile=private_key_path
+)
+
+print("📜 MQTT certs written to:")
+print(f"  - CA: {ca_cert_path}")
+print(f"  - Client: {client_cert_path}")
+print(f"  - Key: {private_key_path}")
+
 try:
     mqtt_client.connect(IOT_ENDPOINT, 8883, 60)
 except Exception as e:
@@ -120,4 +158,15 @@ def run_vens_server():
 
 if __name__ == "__main__":
     threading.Thread(target=run_vens_server, daemon=True).start()
+    
+    def cleanup_temp_certs():
+        for path in [ca_cert_path, client_cert_path, private_key_path]:
+            try:
+              os.remove(path)
+             print(f"🧹 Deleted temp cert: {path}")
+            except Exception as e:
+               print(f"⚠️ Failed to delete temp file {path}: {e}")
+
+    atexit.register(cleanup_temp_certs)
     server.run()
+

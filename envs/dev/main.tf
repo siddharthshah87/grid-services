@@ -62,7 +62,6 @@ module "openadr_alb" {
   target_port       = 8080
   health_check_path = "/health"
 }
-
 module "ecs_service_openadr" {
   source               = "../../modules/ecs-service-openadr"
   name                 = "openleadr-vtn"
@@ -78,7 +77,13 @@ module "ecs_service_openadr" {
   iot_endpoint         = module.iot_core.endpoint
   vens_port            = 8081
   target_group_arn     = module.openadr_alb.target_group_arn
-  # 👇 Add this to delay until the listener exists
+  environment_secrets = [
+    {
+      name       = "CERT_BUNDLE_JSON"
+      value_from = "arn:aws:secretsmanager:us-west-2:923675928909:secret:openleadr-iot-cert-bundle-oWaWux"
+    }
+  ]
+
   depends_on = [module.openadr_alb]
 }
 
@@ -97,3 +102,4 @@ module "ecs_service_volttron" {
   mqtt_topic_status    = "ven/status/ven1"
   iot_endpoint         = module.iot_core.endpoint
 }
+

@@ -1,3 +1,4 @@
+#modules/ecs-service-openadr
 variable "name" {}
 variable "cluster_id" {}
 variable "subnet_ids" { type = list(string) }
@@ -50,11 +51,7 @@ resource "aws_ecs_task_definition" "this" {
         { name = "IOT_ENDPOINT", value = var.iot_endpoint },
         { name = "VENS_PORT", value = tostring(var.vens_port) }
       ]
-      secrets = concat(
-        var.ca_cert_secret_arn != null ? [{ name = "CA_CERT", valueFrom = var.ca_cert_secret_arn }] : [],
-        var.client_cert_secret_arn != null ? [{ name = "CLIENT_CERT", valueFrom = var.client_cert_secret_arn }] : [],
-        var.private_key_secret_arn != null ? [{ name = "PRIVATE_KEY", valueFrom = var.private_key_secret_arn }] : []
-      )
+      secrets = var.environment_secrets
       logConfiguration = {
         logDriver = "awslogs"
         options = {
