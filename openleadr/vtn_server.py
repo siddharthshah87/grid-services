@@ -162,10 +162,10 @@ if __name__ == "__main__":
     def cleanup_temp_certs():
         for path in [ca_cert_path, client_cert_path, private_key_path]:
             try:
-              os.remove(path)
-             print(f"🧹 Deleted temp cert: {path}")
+                os.remove(path)
+                print(f"🧹 Deleted temp cert: {path}")
             except Exception as e:
-               print(f"⚠️ Failed to delete temp file {path}: {e}")
+                print(f"⚠️ Failed to delete temp file {path}: {e}")
 
     atexit.register(cleanup_temp_certs)
     server.run()
