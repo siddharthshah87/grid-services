@@ -13,4 +13,6 @@ jobs:
       - run: terraform fmt -recursive -check
       - run: terraform validate
         working-directory: envs/dev
+      - name: Compile Python files
+        run: python -m py_compile $(git ls-files '*.py')
 
