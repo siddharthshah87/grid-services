@@ -13,13 +13,8 @@ ENV MQTT_TOPIC_METERING=volttron/metering \
     IOT_ENDPOINT=localhost \
     CA_CERT=/certs/ca.crt \
     CLIENT_CERT=/certs/client.crt \
-<<<<<<< Updated upstream
     PRIVATE_KEY=/certs/client.key \
     VENS_PORT=8081
-=======
-    PRIVATE_KEY=/certs/client.key
-
->>>>>>> Stashed changes
 EXPOSE 8080
 EXPOSE 8081
 
