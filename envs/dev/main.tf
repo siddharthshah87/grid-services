@@ -80,7 +80,7 @@ module "ecs_service_openadr" {
   environment_secrets = [
     {
       name       = "CERT_BUNDLE_JSON"
-      value_from = "arn:aws:secretsmanager:us-west-2:923675928909:secret:openleadr-iot-cert-bundle-oWaWux"
+      valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:openleadr-iot-cert-bundle-oWaWux"
     }
   ]
 
