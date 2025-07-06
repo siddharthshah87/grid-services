@@ -15,7 +15,7 @@ import sys
 from datetime import datetime
 import tempfile
 import atexit
-
+import asyncio
 
 # MQTT topics and endpoint
 MQTT_TOPIC_METERING = os.getenv("MQTT_TOPIC_METERING", "volttron/metering")
@@ -23,6 +23,7 @@ MQTT_TOPIC_EVENTS = os.getenv("MQTT_TOPIC_EVENTS", "openadr/event")
 MQTT_TOPIC_RESPONSES = os.getenv("MQTT_TOPIC_RESPONSES", "openadr/response")
 IOT_ENDPOINT = os.getenv("IOT_ENDPOINT", "localhost")
 CERT_BUNDLE_JSON = os.getenv("CERT_BUNDLE_JSON")
+
 
 if not CERT_BUNDLE_JSON:
     print("❌ CERT_BUNDLE_JSON env var not set.")
@@ -55,19 +56,24 @@ mqtt_client = mqtt.Client()
 ca_cert_path = write_temp_file(CA_CERT, ".crt")
 client_cert_path = write_temp_file(CLIENT_CERT, ".crt")
 private_key_path = write_temp_file(PRIVATE_KEY, ".key")
-
-mqtt_client.tls_set(
-        
-
-    ca_certs=ca_cert_path,
-    certfile=client_cert_path,
-    keyfile=private_key_path
-)
-
 print("📜 MQTT certs written to:")
 print(f"  - CA: {ca_cert_path}")
 print(f"  - Client: {client_cert_path}")
 print(f"  - Key: {private_key_path}")
+
+try:
+    mqtt_client.tls_set(
+        ca_certs=ca_cert_path,
+        certfile=client_cert_path,
+        keyfile=private_key_path
+    )
+except ssl.SSLError as e:
+    print(f"❌ TLS setup failed: {e}")
+    print("🔎 Check that your certificates are valid PEM-encoded files and not empty or corrupted.")
+    sys.exit(1)
+except Exception as e:
+    print(f"❌ Unexpected error during TLS setup: {e}")
+    sys.exit(1)
 
 try:
     mqtt_client.connect(IOT_ENDPOINT, 8883, 60)
@@ -95,7 +101,6 @@ mqtt_client.loop_start()
 # OpenADR server
 server = OpenADRServer(vtn_id="my-vtn", http_port=8080)
 
-@server.add_handler("on_create_party_registration")
 def handle_registration(registration_info):
     ven_id = registration_info.get("ven_id", "ven123")
     active_vens.add(ven_id)
@@ -106,13 +111,14 @@ def handle_registration(registration_info):
         "poll_interval": 10
     }
 
-@server.add_handler("on_cancel_party_registration")
+server.add_handler("on_create_party_registration", handle_registration)
+
 def handle_cancel_registration(ven_id, registration_id):
     active_vens.discard(ven_id)
     print(f"❌ VEN unregistered: {ven_id}")
     return True
+server.add_handler("on_cancel_party_registration", handle_cancel_registration)
 
-@server.add_handler("on_request_event")
 def handle_event_request(ven_id, request):
     print(f"📥 Event request from {ven_id}: {request}")
     event = {
@@ -129,6 +135,7 @@ def handle_event_request(ven_id, request):
     mqtt_client.publish(MQTT_TOPIC_EVENTS, mqtt_payload)
     print(f"📡 Published OpenADR event for {ven_id} to {MQTT_TOPIC_EVENTS}")
     return [event]
+server.add_handler("on_request_event", handle_event_request)
 
 # Extra HTTP server to list active VENs
 VENS_PORT = int(os.getenv("VENS_PORT", "8081"))
@@ -168,5 +175,5 @@ if __name__ == "__main__":
                 print(f"⚠️ Failed to delete temp file {path}: {e}")
 
     atexit.register(cleanup_temp_certs)
-    server.run()
+    asyncio.run(server.run())
 
