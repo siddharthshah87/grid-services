@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "openadr-backend"
+version = "0.1.0"
+description = "OpenADR VTN Admin Backend"
+authors = ["Siddharth Shah"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.110.0"
+uvicorn = "^0.23.2"
+sqlalchemy = "^2.0"
+asyncpg = "^0.29.0"
+alembic = "^1.13.1"
+python-dotenv = "^1.0.0"
+pydantic = "^2.6.0"
+
+[tool.poetry.scripts]
+start = "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
