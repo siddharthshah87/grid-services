@@ -83,17 +83,37 @@ fi
 
 ### ECS Task Definitions
 echo "🚀 Importing ECS task definitions..."
-if ! is_imported "module.ecs_service_openadr.aws_ecs_task_definition.this"; then
-  terraform import module.ecs_service_openadr.aws_ecs_task_definition.this openleadr-vtn
-else
-  echo "✅ openleadr task definition already imported"
-fi
 
-if ! is_imported "module.ecs_service_volttron.aws_ecs_task_definition.this"; then
-  terraform import module.ecs_service_volttron.aws_ecs_task_definition.this volttron-ven
-else
-  echo "✅ volttron task definition already imported"
-fi
+get_latest_task_def_arn() {
+  local family=$1
+  aws ecs list-task-definitions \
+    --family-prefix "$family" \
+    --sort DESC \
+    --region "$REGION" \
+    --query 'taskDefinitionArns[0]' \
+    --output text
+}
+
+import_task_definition() {
+  local module_path=$1
+  local family_name=$2
+
+  if ! is_imported "$module_path"; then
+    local arn
+    arn=$(get_latest_task_def_arn "$family_name")
+    if [[ "$arn" == "None" || -z "$arn" ]]; then
+      echo "❌ Could not find a task definition for $family_name"
+      return
+    fi
+    echo "📦 Importing task definition: $arn"
+    terraform import "$module_path" "$arn"
+  else
+    echo "✅ $family_name task definition already imported"
+  fi
+}
+
+import_task_definition "module.ecs_service_openadr.aws_ecs_task_definition.this" "openleadr-vtn"
+import_task_definition "module.ecs_service_volttron.aws_ecs_task_definition.this" "volttron-ven"
 
 ### ALB Security groups
 echo "🛡️  Importing ALB security group..."
