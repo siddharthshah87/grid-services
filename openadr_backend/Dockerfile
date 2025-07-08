@@ -4,7 +4,6 @@ WORKDIR /app
 
 COPY ./app /app/app
 COPY ./pyproject.toml /app/
-COPY ./poetry.lock /app/
 
 RUN pip install --upgrade pip \
  && pip install poetry \
