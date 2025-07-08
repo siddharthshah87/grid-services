@@ -105,20 +105,14 @@ module "ecs_service_volttron" {
 
 module "aurora_postgresql" {
   source               = "../../modules/rds-postgresql"
-  name                 = "openadr-aurora"
-  engine               = "aurora-postgresql"
+  db_name              = "openadr-aurora"
   engine_version       = "15.5"
-  master_username      = "openadr_admin"
-  master_password      = "Grid2025!"  # Use Secrets Manager in production
+  username             = "openadr_admin"
+  password             = "Grid2025!"  # Use Secrets Manager in production
   vpc_id               = module.vpc.vpc_id
   subnet_ids           = module.vpc.private_subnet_ids
   security_group_ids   = [module.ecs_security_group.id]
   backup_retention     = 7
-  instances = [
-    {
-      instance_class = "db.serverless"  # Or db.r6g.large etc.
-    }
-  ]
 }
 
 output "aurora_endpoint" {
