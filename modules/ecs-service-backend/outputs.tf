@@ -18,7 +18,7 @@ output "db_name" {
 }
 
 output "db_password" {
-  value = var.password
+  value = var.db_password
   sensitive = true
 }
 
