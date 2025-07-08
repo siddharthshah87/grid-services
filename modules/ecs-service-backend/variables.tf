@@ -20,7 +20,21 @@ variable "task_role_arn" {}
 variable "aws_region" {
   default = "us-west-2"
 }
-variable "db_host" {}
-variable "db_user" {}
-variable "db_password" {}
-variable "db_name" {}
+
+variable "db_host" {
+  type = string
+}
+
+variable "db_user" {
+  type = string
+}
+
+variable "db_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "db_name" {
+  type = string
+}
+

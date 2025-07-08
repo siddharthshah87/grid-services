@@ -117,3 +117,28 @@ module "aurora_postgresql" {
   db_instance_class    = "db.t4g.medium"
 }
 
+module "ecs_service_backend" {
+  source             = "../../modules/ecs-service-backend"
+  service_name       = "fastapi-backend"
+  cluster_id         = module.ecs_cluster.cluster_id
+  image              = "your-image-url"
+  container_port     = 8000
+
+  cpu                = 256
+  memory             = 512
+
+  execution_role_arn = module.ecs_task_roles.execution_role_arn
+  task_role_arn      = module.ecs_task_roles.task_role_arn
+
+  subnet_ids         = module.vpc.private_subnet_ids
+  security_group_id  = module.ecs_security_group.this_id
+  target_group_arn   = module.backend_alb.target_group_arn
+  aws_region         = var.aws_region
+
+  # Aurora DB connection
+  db_host            = module.aurora_postgresql.db_host
+  db_user            = module.aurora_postgresql.db_user
+  db_password        = module.aurora_postgresql.db_password
+  db_name            = module.aurora_postgresql.db_name
+}
+
