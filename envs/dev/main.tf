@@ -105,6 +105,7 @@ module "ecs_service_volttron" {
 
 module "aurora_postgresql" {
   source               = "../../modules/rds-postgresql"
+  name                 = "opendar-aurora"
   db_name              = "openadr-aurora"
   engine_version       = "15.5"
   username             = "openadr_admin"
@@ -113,6 +114,7 @@ module "aurora_postgresql" {
   subnet_ids           = module.vpc.private_subnet_ids
   security_group_ids   = [module.ecs_security_group.id]
   backup_retention     = 7
+  db_instance_class    = "db.t3.micro"
 }
 
 output "aurora_endpoint" {
