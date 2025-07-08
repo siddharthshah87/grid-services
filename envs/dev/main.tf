@@ -103,3 +103,18 @@ module "ecs_service_volttron" {
   iot_endpoint         = module.iot_core.endpoint
 }
 
+module "rds_postgresql" {
+  source               = "../../modules/rds-postgresql"
+  name                 = "rds_postgresql"
+  db_name              = "openadr_db"
+  username             = "openadr_admin"
+  password             = "Grid2025!" # Replace or use secrets manager integration
+  db_instance_class    = "db.t3.micro"
+  allocated_storage    = 20
+  vpc_id               = module.vpc.vpc_id
+  subnet_ids           = module.vpc.private_subnet_ids
+  security_group_ids   = [module.security_group.db_sg_id]
+  backup_retention     = 7
+  publicly_accessible  = false
+  engine_version       = "15.5"
+}
