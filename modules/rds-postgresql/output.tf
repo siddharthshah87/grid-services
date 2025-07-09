@@ -20,4 +20,6 @@ output "db_password" {
 }
 
 output "db_name" {
-  value = var.db_name}
+  value = var.db_name
+  }
+
