@@ -72,3 +72,7 @@ output "iot_mqtt" {
   value = aws_iam_role.iot_mqtt.arn
 }
 
+output "task_role_arn" {
+  value = aws_iam_role.iot_mqtt.arn
+}
+
