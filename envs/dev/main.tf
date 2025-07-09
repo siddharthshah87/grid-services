@@ -120,14 +120,14 @@ module "aurora_postgresql" {
 module "ecs_service_backend" {
   source             = "../../modules/ecs-service-backend"
   service_name       = "fastapi-backend"
-  cluster_id         = module.ecs_cluster.cluster_id
+  cluster_id         = module.ecs_cluster.id
   image              = "your-image-url"
   container_port     = 8000
 
   cpu                = 256
   memory             = 512
 
-  execution_role_arn = module.ecs_task_roles.execution_role_arn
+  execution_role_arn = module.ecs_task_roles.execution
   task_role_arn      = module.ecs_task_roles.task_role_arn
 
   subnet_ids         = module.vpc.private_subnet_ids
