@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import ven, event, health
+from app.routers import ven, event, health
 from app.db import database
 
 app = FastAPI(
