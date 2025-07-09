@@ -142,7 +142,7 @@ module "ecs_service_backend" {
   task_role_arn      = module.ecs_task_roles.task_role_arn
 
   subnet_ids         = module.vpc.private_subnet_ids
-  security_group_id  = module.ecs_security_group.this_id
+  security_group_id  = module.ecs_security_group.id
   target_group_arn   = module.backend_alb.target_group_arn
   aws_region         = var.aws_region
 
