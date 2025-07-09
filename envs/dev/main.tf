@@ -117,6 +117,17 @@ module "aurora_postgresql" {
   db_instance_class    = "db.t4g.medium"
 }
 
+# Application load balancer for the backend service
+module "backend_alb" {
+  source            = "../../modules/alb"
+  name              = "backend-alb"
+  vpc_id            = module.vpc.vpc_id
+  public_subnets    = module.vpc.public_subnets
+  listener_port     = 80
+  target_port       = 8000
+  health_check_path = "/health"
+}
+
 module "ecs_service_backend" {
   source             = "../../modules/ecs-service-backend"
   service_name       = "fastapi-backend"

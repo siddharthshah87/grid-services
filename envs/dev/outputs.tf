@@ -30,3 +30,9 @@ output "volttron_log_group_name" {
   value       = module.ecs_service_volttron.log_group_name
 }
 
+# DNS name for the backend ALB
+output "backend_alb_dns_name" {
+  description = "Public DNS of the backend ALB"
+  value       = module.backend_alb.dns_name
+}
+
