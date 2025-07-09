@@ -6,19 +6,19 @@ output "service_arn" {
 }
 
 output "db_host" {
-  value = aws_rds_cluster.aurora_postgres.endpoint
+  value = var.db_host
 }
 
 output "db_user" {
-  value = aws_rds_cluster.aurora_postgres.username
+  value = var.db_user
 }
 
 output "db_name" {
-  value = aws_rds_cluster.aurora_postgres.db_name
+  value = var.db_name
 }
 
 output "db_password" {
-  value = var.db_password
+  value     = var.db_password
   sensitive = true
 }
 
