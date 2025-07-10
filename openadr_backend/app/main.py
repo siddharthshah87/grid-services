@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+import sys
 
-from app.routers import ven, event, health
-from app.db import database
+from app.routers import health
+from app import routes
 
 app = FastAPI(
     title="OpenADR VTN Admin API",
@@ -19,15 +21,14 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(ven.router, prefix="/vens", tags=["VENs"])
-app.include_router(event.router, prefix="/events", tags=["Events"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
+app.include_router(routes.router)
 
 # Startup/shutdown hooks
-@app.on_event("startup")
-async def startup():
-    await database.connect()
 
-@app.on_event("shutdown")
-async def shutdown():
-    await database.disconnect()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger("uvicorn")
