@@ -130,7 +130,7 @@ module "backend_alb" {
 
 module "ecs_service_backend" {
   source             = "../../modules/ecs-service-backend"
-  service_name       = "fastapi-backend"
+  service_name       = "openadr-backend"
   cluster_id         = module.ecs_cluster.id
   image              = "your-image-url"
   container_port     = 8000

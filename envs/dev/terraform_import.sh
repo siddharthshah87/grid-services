@@ -81,6 +81,39 @@ else
   echo "✅ Target Group already imported"
 fi
 
+### Backend ALB and Target Group
+echo "🌐 Fetching Backend ALB and target group ARNs..."
+backend_alb_arn=$(aws elbv2 describe-load-balancers \
+  --names backend-alb \
+  --region $REGION \
+  --query "LoadBalancers[0].LoadBalancerArn" \
+  --output text || echo "")
+
+backend_tg_arn=$(aws elbv2 describe-target-groups \
+  --names backend-alb-tg \
+  --region $REGION \
+  --query "TargetGroups[0].TargetGroupArn" \
+  --output text || echo "")
+
+if [[ -z "$backend_alb_arn" || -z "$backend_tg_arn" ]]; then
+  echo "❌ Failed to fetch Backend ALB or Target Group ARN. Aborting."
+  exit 1
+fi
+
+echo "🌍 Importing Backend ALB: $backend_alb_arn"
+if ! is_imported "module.backend_alb.aws_lb.this"; then
+  terraform import module.backend_alb.aws_lb.this "$backend_alb_arn"
+else
+  echo "✅ Backend ALB already imported"
+fi
+
+echo "🎯 Importing Backend Target Group: $backend_tg_arn"
+if ! is_imported "module.backend_alb.aws_lb_target_group.this"; then
+  terraform import module.backend_alb.aws_lb_target_group.this "$backend_tg_arn"
+else
+  echo "✅ Backend Target Group already imported"
+fi
+
 ### ECS Task Definitions
 echo "🚀 Importing ECS task definitions..."
 
@@ -114,6 +147,7 @@ import_task_definition() {
 
 import_task_definition "module.ecs_service_openadr.aws_ecs_task_definition.this" "openleadr-vtn"
 import_task_definition "module.ecs_service_volttron.aws_ecs_task_definition.this" "volttron-ven"
+import_task_definition "module.ecs_service_backend.aws_ecs_task_definition.this" "openadr-backend"
 
 ### ALB Security groups
 echo "🛡️  Importing ALB security group..."
@@ -127,6 +161,18 @@ if [[ -n "$alb_sg_id" ]] && ! is_imported "module.openadr_alb.aws_security_group
   terraform import module.openadr_alb.aws_security_group.alb_sg "$alb_sg_id"
 else
   echo "✅ ALB security group already imported or not found"
+fi
+
+backend_alb_sg_id=$(aws ec2 describe-security-groups \
+  --filters Name=group-name,Values=backend-alb-sg \
+  --region "$REGION" \
+  --query "SecurityGroups[0].GroupId" \
+  --output text 2>/dev/null || echo "")
+
+if [[ -n "$backend_alb_sg_id" ]] && ! is_imported "module.backend_alb.aws_security_group.alb_sg"; then
+  terraform import module.backend_alb.aws_security_group.alb_sg "$backend_alb_sg_id"
+else
+  echo "✅ Backend ALB security group already imported or not found"
 fi
 
 ### ECS Services
@@ -152,6 +198,17 @@ if aws ecs describe-services --cluster "$CLUSTER_NAME" --services volttron-ven -
   fi
 else
   echo "⚠️  volttron-ven service not found or inactive"
+fi
+
+if aws ecs describe-services --cluster "$CLUSTER_NAME" --services openadr-backend --region "$REGION" \
+  | grep -q "\"status\": \"ACTIVE\""; then
+  if ! is_imported "module.ecs_service_backend.aws_ecs_service.this"; then
+    terraform import module.ecs_service_backend.aws_ecs_service.this "${CLUSTER_NAME}/openadr-backend"
+  else
+    echo "✅ openadr-backend ECS service already imported"
+  fi
+else
+  echo "⚠️  openadr-backend service not found or inactive"
 fi
 
 
