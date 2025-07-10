@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 import sys
 
-from app.routers import health
+from app.routers import health, event, ven
 from app import routes
 
 app = FastAPI(
@@ -22,6 +22,8 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health.router, prefix="/health", tags=["Health"])
+app.include_router(ven.router, prefix="/vens", tags=["VENs"])
+app.include_router(event.router, prefix="/events", tags=["Events"])
 app.include_router(routes.router)
 
 # Startup/shutdown hooks
