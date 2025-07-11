@@ -9,7 +9,7 @@ echo "📦 Importing existing AWS resources into Terraform..."
 
 # Helper function to check if resource is already imported
 is_imported() {
-  terraform state list | grep -q "$1"
+  terraform state list | grep -qx "$1"
 }
 
 ### ECR Repos
