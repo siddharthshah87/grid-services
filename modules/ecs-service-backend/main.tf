@@ -1,4 +1,8 @@
 #modules/ecs-service-backend/main.tf
+resource "aws_cloudwatch_log_group" "this" {
+  name = "/ecs/${var.service_name}"
+}
+
 resource "aws_ecs_task_definition" "this" {
   family                   = var.service_name
   network_mode             = "awsvpc"
@@ -10,8 +14,8 @@ resource "aws_ecs_task_definition" "this" {
 
   container_definitions = jsonencode([
     {
-      name      = var.service_name
-      image     = var.image
+      name  = var.service_name
+      image = var.image
       portMappings = [
         {
           containerPort = var.container_port
@@ -41,7 +45,7 @@ resource "aws_ecs_task_definition" "this" {
         options = {
           awslogs-group         = aws_cloudwatch_log_group.this.name
           awslogs-region        = var.aws_region
-          awslogs-stream-prefix = var.name
+          awslogs-stream-prefix = var.service_name
         }
       }
     }
