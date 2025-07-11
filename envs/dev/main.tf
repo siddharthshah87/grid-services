@@ -128,28 +128,45 @@ module "backend_alb" {
   health_check_path = "/health"
 }
 
+module "ecr_backend" {
+  source = "../../modules/ecr-repo"
+  name   = "openadr-backend"
+  tags = {
+    Project   = "grid-services"
+    Component = "Backend"
+  }
+}
+
 module "ecs_service_backend" {
-  source             = "../../modules/ecs-service-backend"
-  service_name       = "openadr-backend"
-  cluster_id         = module.ecs_cluster.id
-  image             = "${module.ecr_backend.repository_url}:latest"
-  container_port     = 8000
+  source          = "../../modules/ecs-service-backend"
 
-  cpu                = 256
-  memory             = 512
+  # -------- names ----------
+  service_name    = "openadr-backend"
+  cluster_id      = module.ecs_cluster.id
 
-  execution_role_arn = module.ecs_task_roles.execution
-  task_role_arn      = module.ecs_task_roles.task_role_arn
+  # -------- image ----------
+  image           = "${module.ecr_backend.repository_url}:latest"
 
-  subnet_ids         = module.vpc.private_subnet_ids
+  # place in public subnet *for now* so it can reach ECR
+  subnet_ids      = module.vpc.public_subnets
   security_group_id  = module.ecs_security_group.id
   target_group_arn   = module.backend_alb.target_group_arn
-  aws_region         = var.aws_region
 
-  # Aurora DB connection
-  db_host            = module.aurora_postgresql.db_host
-  db_user            = module.aurora_postgresql.db_user
-  db_password        = module.aurora_postgresql.db_password
-  db_name            = module.aurora_postgresql.db_name
+  # resources
+  cpu             = 256
+  memory          = 512
+  container_port  = 8000
+
+  # roles
+  execution_role_arn = module.ecs_task_roles.execution
+  task_role_arn      = module.ecs_task_roles.iot_mqtt 
+
+  # DB connection env-vars
+  db_host         = module.aurora_postgresql.db_host
+  db_user         = module.aurora_postgresql.db_user
+  db_password     = module.aurora_postgresql.db_password
+  db_name         = module.aurora_postgresql.db_name
+
+  aws_region      = var.aws_region
 }
 

@@ -26,6 +26,14 @@ else
   echo "✅ volttron-ven already imported"
 fi
 
+### ECR repo for the backend
+echo "🗃️  Importing backend ECR repository..."
+if ! is_imported "module.ecr_backend.aws_ecr_repository.this"; then
+  terraform import module.ecr_backend.aws_ecr_repository.this openadr-backend
+else
+  echo "✅ openadr-backend already imported"
+fi
+
 ### IAM Roles
 echo "🔐 Importing IAM roles..."
 if ! is_imported "module.ecs_task_roles.aws_iam_role.execution"; then
