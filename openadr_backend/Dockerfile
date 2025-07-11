@@ -3,7 +3,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 COPY ./app /app/app
-COPY /alembic.ini /app/
+COPY ./alembic.ini /app/
 COPY ./alembic /app/alembic
 COPY ./pyproject.toml /app/
 COPY ./entrypoint.sh /entrypoint.sh
