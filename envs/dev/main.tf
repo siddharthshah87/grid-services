@@ -107,7 +107,7 @@ module "aurora_postgresql" {
   source               = "../../modules/rds-postgresql"
   name                 = "opendar-aurora"
   db_name              = "openadrdb"
-  engine_version       = "15.5"
+  engine_version       = "15.10"
   username             = "openadr_admin"
   password             = "Grid2025!"  # Use Secrets Manager in production
   vpc_id               = module.vpc.vpc_id
