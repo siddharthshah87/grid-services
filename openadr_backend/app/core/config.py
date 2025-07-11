@@ -1,4 +1,5 @@
-from pydantic import BaseSettings
+# BaseSettings moved to the pydantic-settings package in Pydantic v2
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     db_host: str
