@@ -1,4 +1,4 @@
 #!/bin/sh
 set -e
-alembic -c /app/alembic upgrade head
+alembic -c /app/alembic.ini upgrade head
 exec "$@"
