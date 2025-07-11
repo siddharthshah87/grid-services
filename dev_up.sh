@@ -23,5 +23,19 @@ cd "$REPO_DIR/envs/dev"
 # Initialize and apply the infra
 ./terraform_init.sh
 
+# Force ECS services to pick up latest images
+AWS_PROFILE="AdministratorAccess-923675928909"
+REGION="us-west-2"
+CLUSTER="hems-ecs-cluster"
+for svc in openadr-backend openleadr-vtn volttron-ven; do
+  echo "🔁 Forcing redeploy of $svc"
+  aws ecs update-service \
+    --cluster "$CLUSTER" \
+    --service "$svc" \
+    --force-new-deployment \
+    --region "$REGION" \
+    --profile "$AWS_PROFILE" || true
+done
+
 echo "✅ Environment is up. All services should be running."
 
