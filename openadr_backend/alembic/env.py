@@ -4,6 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from alembic import context
 from sqlmodel import SQLModel
 
+import os
+import sys
+
+# Ensure the "app" package is importable when running Alembic directly
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from app.db.database import engine
 
 config = context.config
