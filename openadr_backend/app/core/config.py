@@ -7,6 +7,12 @@ class Settings(BaseSettings):
     db_password: str
     db_name: str
 
+
+    model_config = {
+        "env_prefix": "POSTGRES_",
+        "case_sensitive": False,
+    }
+
     @property
     def sqlalchemy_database_uri(self) -> str:
         return (

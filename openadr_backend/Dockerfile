@@ -2,6 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ENV PYTHOBPATH=/app
+
 COPY ./app /app/app
 COPY ./alembic.ini /app/
 COPY ./alembic /app/alembic
