@@ -55,7 +55,8 @@ This script uses your current AWS credentials to create a bucket named `tf-state
    cd ..
    ```
 
-The scripts obtain your AWS account ID automatically and push the `latest` tag to ECR.
+The scripts obtain your AWS account ID automatically and push the `latest` tag to ECR. Set
+`AWS_PROFILE` to use a different credentials profile (defaults to `AdministratorAccess-923675928909`).
 
 ## Deploying the Development Environment
 

@@ -2,8 +2,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROFILE="AdministratorAccess-923675928909"
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+# Optional: override AWS profile used for AWS CLI commands.
+# Usage: AWS_PROFILE=my-profile ./build_and_push.sh
+PROFILE="${AWS_PROFILE:-AdministratorAccess-923675928909}"
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text --profile "$PROFILE")
 REGION="${AWS_REGION:-us-west-2}"
 REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/openleadr-vtn"
 
