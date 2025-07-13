@@ -1,37 +1,58 @@
+"""
+Alembic migration environment – **async-safe**
+
+• opens an *async* engine
+• unwraps it to a regular sync Connection for Alembic
+• no `metadata.create_all()` – schema is created by migrations only
+"""
+
 from logging.config import fileConfig
 import asyncio
-from sqlalchemy.ext.asyncio import AsyncEngine
+import sys
+import pathlib
+
 from alembic import context
-from app.models import Base
+from sqlalchemy import pool  # imported so Alembic can tweak pool opts if needed
+from app.db.database import engine            # ← your async engine
+from app.models import Base                   # ← declarative base (or SQLModel)
 
-import os
-import sys, pathlib
-
-# Ensure the "app" package is importable when running Alembic directly
+# ── make sure “app” is importable when Alembic is invoked directly ─────────────
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
-from sqlmodel import SQLModel
-import app.models  # Import models to ensure they are registered with SQLModel
-from app.db.database import engine
 
+# ── Alembic config -------------------------------------------------------------
 config = context.config
 fileConfig(config.config_file_name)
-
 target_metadata = Base.metadata
 
-def run_migrations_offline():
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=target_metadata, literal_binds=True, dialect_opts={"paramstyle": "named"})
+
+# ── helpers --------------------------------------------------------------------
+def run_migrations_sync(sync_connection):
+    """
+    This runs inside a real synchronous Connection that Alembic understands.
+    """
+    context.configure(
+        connection=sync_connection,
+        target_metadata=target_metadata,
+        render_as_batch=True,   # optional, nice for Postgres → Aurora
+    )
 
     with context.begin_transaction():
         context.run_migrations()
 
-async def run_migrations_online():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        context.configure(connection=conn, target_metadata=target_metadata)
-        await context.run_migrations()
 
+async def run_migrations_online():
+    """
+    Open the async engine, unwrap to sync connection, run migrations.
+    """
+    async with engine.begin() as async_conn:
+        await async_conn.run_sync(run_migrations_sync)
+
+
+# ── entry-point ----------------------------------------------------------------
 if context.is_offline_mode():
-    run_migrations_offline()
+    # You can drop this guard (or implement the offline variant) if you
+    # need `alembic revision --autogenerate` in CI.
+    raise SystemExit("Offline migrations are not supported, run online only.")
 else:
     asyncio.run(run_migrations_online())
+
