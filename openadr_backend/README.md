@@ -13,7 +13,7 @@ This directory contains a FastAPI application providing the administration API f
 
 ### Required environment variables
 
-The service loads its database settings from environment variables with the `POSTGRES_` prefix. Define the following variables or place them in a `.env` file:
+The service loads its database settings from environment variables with the `DB_` prefix. Define the following variables or place them in a `.env` file:
 
 - `DB_HOST` – hostname of the PostgreSQL server
 - `DB_USER` – database user
