@@ -1,8 +1,7 @@
 from sqlalchemy import Column, String, DateTime, JSON
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
-Base = declarative_base()
+from . import Base
 
 class Event(Base):
     __tablename__ = "events"

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from .models import VEN
+from app.models.ven import VEN
 from .crud import create_ven
 from .db.database import get_session
 

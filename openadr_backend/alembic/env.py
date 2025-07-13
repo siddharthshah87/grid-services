@@ -2,7 +2,7 @@ from logging.config import fileConfig
 import asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine
 from alembic import context
-from sqlmodel import SQLModel
+from app.models import Base
 
 import os
 import sys
@@ -15,7 +15,7 @@ from app.db.database import engine
 config = context.config
 fileConfig(config.config_file_name)
 
-target_metadata = SQLModel.metadata
+target_metadata = Base.metadata
 
 def run_migrations_offline():
     url = config.get_main_option("sqlalchemy.url")
@@ -26,7 +26,7 @@ def run_migrations_offline():
 
 async def run_migrations_online():
     async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        await conn.run_sync(Base.metadata.create_all)
         context.configure(connection=conn, target_metadata=target_metadata)
         await context.run_migrations()
 
