@@ -29,3 +29,6 @@ services:
       PRIVATE_KEY: /certs/client.key
     volumes:
       - ./certs:/certs:ro
+    command: ["python", "ven_agent.py"]
+    ports:
+      - "8082:8080"
