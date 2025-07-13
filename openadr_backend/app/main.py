@@ -4,7 +4,6 @@ import logging
 import sys
 
 from app.routers import health, event, ven
-from app import routes
 
 app = FastAPI(
     title="OpenADR VTN Admin API",
@@ -24,7 +23,6 @@ app.add_middleware(
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(ven.router, prefix="/vens", tags=["VENs"])
 app.include_router(event.router, prefix="/events", tags=["Events"])
-app.include_router(routes.router)
 
 # Startup/shutdown hooks
 
