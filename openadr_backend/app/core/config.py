@@ -7,10 +7,12 @@ class Settings(BaseSettings):
     db_password: str
     db_name: str
 
-
+    # accept *either* DB_ or POSTGRES_ so nothing explodes while you migrate
     model_config = {
-        "env_prefix": "POSTGRES_",
+        "env_prefix": "",                         # read raw names
         "case_sensitive": False,
+        "extra": "ignore",                        # ignore stray vars
+        "env_nested_delimiter": "__",
     }
 
     @property

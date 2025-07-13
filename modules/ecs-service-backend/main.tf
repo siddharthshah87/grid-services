@@ -24,19 +24,19 @@ resource "aws_ecs_task_definition" "this" {
       ]
       environment = [
         {
-          name  = "POSTGRES_HOST"
+          name  = "DB_HOST"
           value = var.db_host
         },
         {
-          name  = "POSTGRES_USER"
+          name  = "DB_USER"
           value = var.db_user
         },
         {
-          name  = "POSTGRES_PASSWORD"
+          name  = "DB_PASSWORD"
           value = var.db_password
         },
         {
-          name  = "POSTGRES_DB"
+          name  = "DB_NAME"
           value = var.db_name
         }
       ]

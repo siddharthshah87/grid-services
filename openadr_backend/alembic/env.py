@@ -5,11 +5,12 @@ from alembic import context
 from app.models import Base
 
 import os
-import sys
+import sys, pathlib
 
 # Ensure the "app" package is importable when running Alembic directly
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
+from sqlmodel import SQLModel
+import app.models  # Import models to ensure they are registered with SQLModel
 from app.db.database import engine
 
 config = context.config

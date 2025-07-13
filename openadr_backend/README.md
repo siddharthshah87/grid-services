@@ -15,10 +15,10 @@ This directory contains a FastAPI application providing the administration API f
 
 The service loads its database settings from environment variables with the `POSTGRES_` prefix. Define the following variables or place them in a `.env` file:
 
-- `POSTGRES_DB_HOST` – hostname of the PostgreSQL server
-- `POSTGRES_DB_USER` – database user
-- `POSTGRES_DB_PASSWORD` – user's password
-- `POSTGRES_DB_NAME` – database name
+- `DB_HOST` – hostname of the PostgreSQL server
+- `DB_USER` – database user
+- `DB_PASSWORD` – user's password
+- `DB_NAME` – database name
 
 The application connects on port `5432` by default.
 
@@ -37,10 +37,10 @@ Build the image with the provided `Dockerfile` and pass the database settings wh
 ```bash
 docker build -t openadr-backend .
 docker run -p 8000:8000 \
-  -e POSTGRES_DB_HOST=<db-host> \
-  -e POSTGRES_DB_USER=<db-user> \
-  -e POSTGRES_DB_PASSWORD=<db-password> \
-  -e POSTGRES_DB_NAME=<db-name> \
+  -e DB_HOST=<db-host> \
+  -e DB_USER=<db-user> \
+  -e DB_PASSWORD=<db-password> \
+  -e DB_NAME=<db-name> \
   openadr-backend
 ```
 
