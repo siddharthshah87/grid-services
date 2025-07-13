@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-ENV PYTHOBPATH=/app
+ENV PYTHONPATH=/app
 
 COPY ./app /app/app
 COPY ./alembic.ini /app/
