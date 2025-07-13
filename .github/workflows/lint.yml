@@ -16,3 +16,15 @@ jobs:
       - name: Compile Python files
         run: python -m py_compile $(git ls-files '*.py')
 
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install fastapi uvicorn sqlalchemy asyncpg alembic python-dotenv pydantic pydantic-settings sqlmodel pytest httpx
+      - name: Run tests
+        run: pytest openadr_backend/tests
+
