@@ -12,6 +12,7 @@ import threading
 import os
 import paho.mqtt.client as mqtt
 import sys
+import ssl
 from datetime import datetime
 import tempfile
 import atexit
