@@ -10,3 +10,4 @@ __pycache__/
 ecs-frontend/node_modules/
 ecs-frontend/build/
 
+ecs-frontend/package-lock.json
