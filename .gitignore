@@ -7,4 +7,6 @@ terraform.tfstate.*
 *.tfvars
 .env
 __pycache__/
+ecs-frontend/node_modules/
+ecs-frontend/build/
 
