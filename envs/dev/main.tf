@@ -79,7 +79,7 @@ module "ecs_service_openadr" {
   target_group_arn     = module.openadr_alb.target_group_arn
   environment_secrets = [
     {
-      name       = "CERT_BUNDLE_JSON"
+      name      = "CERT_BUNDLE_JSON"
       valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:openleadr-iot-cert-bundle-oWaWux"
     }
   ]
@@ -104,17 +104,17 @@ module "ecs_service_volttron" {
 }
 
 module "aurora_postgresql" {
-  source               = "../../modules/rds-postgresql"
-  name                 = "opendar-aurora"
-  db_name              = "openadrdb"
-  engine_version       = "15.10"
-  username             = "openadr_admin"
-  password             = "Grid2025!"  # Use Secrets Manager in production
-  vpc_id               = module.vpc.vpc_id
-  subnet_ids           = module.vpc.private_subnet_ids
-  security_group_ids   = [module.ecs_security_group.id]
-  backup_retention     = 7
-  db_instance_class    = "db.t4g.medium"
+  source             = "../../modules/rds-postgresql"
+  name               = "opendar-aurora"
+  db_name            = "openadrdb"
+  engine_version     = "15.10"
+  username           = "openadr_admin"
+  password           = "Grid2025!" # Use Secrets Manager in production
+  vpc_id             = module.vpc.vpc_id
+  subnet_ids         = module.vpc.private_subnet_ids
+  security_group_ids = [module.ecs_security_group.id]
+  backup_retention   = 7
+  db_instance_class  = "db.t4g.medium"
 }
 
 # Application load balancer for the backend service
@@ -138,36 +138,36 @@ module "ecr_backend" {
 }
 
 module "ecs_service_backend" {
-  source          = "../../modules/ecs-service-backend"
+  source = "../../modules/ecs-service-backend"
 
   # -------- names ----------
-  service_name    = "openadr-backend"
-  cluster_id      = module.ecs_cluster.id
+  service_name = "openadr-backend"
+  cluster_id   = module.ecs_cluster.id
 
   # -------- image ----------
-  image           = "${module.ecr_backend.repository_url}:latest"
+  image = "${module.ecr_backend.repository_url}:latest"
 
   # place in public subnet *for now* so it can reach ECR
-  subnet_ids      = module.vpc.public_subnets
-  security_group_id  = module.ecs_security_group.id
-  target_group_arn   = module.backend_alb.target_group_arn
+  subnet_ids        = module.vpc.public_subnets
+  security_group_id = module.ecs_security_group.id
+  target_group_arn  = module.backend_alb.target_group_arn
 
   # resources
-  cpu             = 256
-  memory          = 512
-  container_port  = 8000
+  cpu            = 256
+  memory         = 512
+  container_port = 8000
 
   # roles
   execution_role_arn = module.ecs_task_roles.execution
-  task_role_arn      = module.ecs_task_roles.iot_mqtt 
+  task_role_arn      = module.ecs_task_roles.iot_mqtt
 
   # DB connection env-vars
-  db_host         = module.aurora_postgresql.db_host
-  db_user         = module.aurora_postgresql.db_user
-  db_password     = module.aurora_postgresql.db_password
-  db_name         = module.aurora_postgresql.db_name
+  db_host     = module.aurora_postgresql.db_host
+  db_user     = module.aurora_postgresql.db_user
+  db_password = module.aurora_postgresql.db_password
+  db_name     = module.aurora_postgresql.db_name
 
-  aws_region      = var.aws_region
+  aws_region = var.aws_region
 }
 
 
@@ -192,23 +192,23 @@ module "ecr_frontend" {
 }
 
 module "ecs_service_frontend" {
-  source            = "../../modules/ecs-service-frontend"
+  source = "../../modules/ecs-service-frontend"
 
-  service_name      = "ecs-frontend"
-  cluster_id        = module.ecs_cluster.id
-  image             = "${module.ecr_frontend.repository_url}:latest"
+  service_name = "ecs-frontend"
+  cluster_id   = module.ecs_cluster.id
+  image        = "${module.ecr_frontend.repository_url}:latest"
 
   subnet_ids        = module.vpc.public_subnets
   security_group_id = module.ecs_security_group.id
   target_group_arn  = module.frontend_alb.target_group_arn
 
-  cpu               = 256
-  memory            = 512
-  container_port    = 80
+  cpu            = 256
+  memory         = 512
+  container_port = 80
 
   execution_role_arn = module.ecs_task_roles.execution
   task_role_arn      = module.ecs_task_roles.execution
 
-  backend_api_url   = "http://${module.backend_alb.dns_name}"
-  aws_region        = var.aws_region
+  backend_api_url = "http://${module.backend_alb.dns_name}"
+  aws_region      = var.aws_region
 }
