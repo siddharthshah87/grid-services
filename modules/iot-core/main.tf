@@ -1,9 +1,9 @@
 resource "aws_iot_topic_rule" "forward_to_s3" {
-  count        = var.enable_logging ? 1 : 0
-  name         = "${var.prefix}_mqtt_log"
-  enabled      = true
-  sql          = "SELECT * FROM 'oadr/#'"
-  sql_version  = "2016-03-23"
+  count       = var.enable_logging ? 1 : 0
+  name        = "${var.prefix}_mqtt_log"
+  enabled     = true
+  sql         = "SELECT * FROM 'oadr/#'"
+  sql_version = "2016-03-23"
 
   s3 {
     bucket_name = var.s3_bucket
@@ -46,8 +46,8 @@ resource "aws_iot_policy_attachment" "attach" {
 }
 
 resource "aws_iot_thing_principal_attachment" "thing_cert_attach" {
-  thing       = aws_iot_thing.device_sim.name
-  principal   = aws_iot_certificate.cert.arn
+  thing     = aws_iot_thing.device_sim.name
+  principal = aws_iot_certificate.cert.arn
 }
 
 
