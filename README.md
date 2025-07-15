@@ -218,3 +218,19 @@ On ubuntu
 sudo apt install aws-vault
 
 aws-vault exec AdministratorAccess-923675928909 -- ./terraform_init.sh
+
+## Running Tests
+
+To run the unit tests locally install the required Python packages and execute
+`pytest`. Terraform must also be installed so that `scripts/check_terraform.sh`
+can validate the configuration.
+
+```bash
+pip install -r openleadr/requirements.txt -r volttron/requirements.txt \
+  fastapi uvicorn sqlalchemy asyncpg alembic python-dotenv \
+  pydantic pydantic-settings sqlmodel httpx pytest pytest-asyncio \
+  aiosqlite paho-mqtt pyOpenSSL==22.1.0
+export PYTHONPATH=openadr_backend
+./scripts/check_terraform.sh
+pytest
+```

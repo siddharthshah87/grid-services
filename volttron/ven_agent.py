@@ -37,16 +37,33 @@ def on_event(client, userdata, msg):
     }
     client.publish(MQTT_TOPIC_RESPONSES, json.dumps(response))
 
-client.subscribe(MQTT_TOPIC_EVENTS)
-client.on_message = on_event
+def main(iterations: int | None = None) -> None:
+    """Start the VEN agent and publish status/metering data."""
+    client.subscribe(MQTT_TOPIC_EVENTS)
+    client.on_message = on_event
 
-# Main loop: publish status and metering data every 10s
-while True:
-    client.publish(MQTT_TOPIC_STATUS, payload=json.dumps({"ven": "ready"}), qos=1)
-    meter_payload = {
-        "timestamp": int(time.time()),
-        "power_kw": round(random.uniform(0.5, 2.0), 2)
-    }
-    client.publish(MQTT_TOPIC_METERING, payload=json.dumps(meter_payload), qos=1)
-    print("Published VEN status and metering data to MQTT")
-    time.sleep(10)
+    count = 0
+    while True:
+        client.publish(
+            MQTT_TOPIC_STATUS,
+            payload=json.dumps({"ven": "ready"}),
+            qos=1,
+        )
+        meter_payload = {
+            "timestamp": int(time.time()),
+            "power_kw": round(random.uniform(0.5, 2.0), 2),
+        }
+        client.publish(
+            MQTT_TOPIC_METERING,
+            payload=json.dumps(meter_payload),
+            qos=1,
+        )
+        print("Published VEN status and metering data to MQTT")
+        count += 1
+        if iterations is not None and count >= iterations:
+            break
+        time.sleep(10)
+
+
+if __name__ == "__main__":
+    main()
