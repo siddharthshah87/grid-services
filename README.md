@@ -149,7 +149,13 @@ The `openleadr/vtn_server.py` script provides a minimal VTN for testing. The
 server listens on port `8080` for OpenADR traffic. It now tracks the VENs that
 register with it and exposes a simple HTTP endpoint to list them. The
 listing server's port can be configured via the `VENS_PORT` environment
-variable (default `8081`).
+variable (default `8081`). The VTN can also publish events automatically when
+incoming metering data exceeds a threshold. Configure this behaviour with the
+following environment variables:
+
+- `KW_THRESHOLD` – kW level that triggers an event (default `1.5`)
+- `SIGNAL_LEVEL` – value sent in the event signal (default `1`)
+- `CHECK_INTERVAL` – how often to evaluate metering data in seconds (default `5`)
 
 ### Listing active VENs
 

@@ -10,6 +10,11 @@ async def health_check():
     return {"status": "ok"}
 
 
+@router.get("/health")
+async def health_alias():
+    return await health_check()
+
+
 @router.get("/db-check")
 async def db_check():
     try:
