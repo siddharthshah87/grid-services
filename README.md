@@ -55,6 +55,14 @@ This script uses your current AWS credentials to create a bucket named `tf-state
    cd ..
    ```
 
+4. Build and push the frontend dashboard image:
+
+   ```bash
+   cd ecs-frontend
+   ./build_and_push.sh
+   cd ..
+   ```
+
 The scripts obtain your AWS account ID automatically and push the `latest` tag to ECR. Set
 `AWS_PROFILE` to use a different credentials profile (defaults to `AdministratorAccess-923675928909`).
 

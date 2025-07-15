@@ -8,14 +8,14 @@ resource "aws_security_group" "this" {
   name        = var.name
   description = "Security group for ECS tasks"
   vpc_id      = var.vpc_id
-  
+
   ingress {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    self = true
+    self        = true
     description = "PostgreSQL access from ECS tasks and Aurora"
-    }
+  }
 
   egress {
     from_port   = 0
