@@ -75,6 +75,7 @@ This environment creates:
 - An ECS cluster and related IAM roles
 - Fargate services for the VTN and VEN containers
 - An Application Load Balancer exposing the VTN on port 80
+- An IoT topic rule logging messages to S3 bucket `mqtt-forward-mqtt-logs` and Kinesis stream `mqtt-forward-mqtt-stream`
 
 Adjust variables and module parameters in `envs/dev/main.tf` as needed (e.g., MQTT topic or IoT endpoint).
 
@@ -99,6 +100,34 @@ export CA_CERT=$CLIENT_CERT
 
 OpenSSL is not required as AWS IoT generates the certificate and private key
 for you.
+
+### Querying MQTT Logs
+
+After applying Terraform, the rule outputs the S3 bucket and Kinesis stream
+used for message capture. Retrieve their names with:
+
+```bash
+terraform output log_bucket_name
+terraform output log_stream_name
+```
+
+To inspect the S3 objects:
+
+```bash
+aws s3 ls s3://$(terraform output -raw log_bucket_name)/ --recursive
+```
+
+To read records from the Kinesis stream:
+
+```bash
+aws kinesis get-records \
+  --shard-iterator $(aws kinesis get-shard-iterator \
+    --stream-name $(terraform output -raw log_stream_name) \
+    --shard-id shardId-000000000000 \
+    --shard-iterator-type TRIM_HORIZON \
+    --query ShardIterator --output text) \
+  --limit 10
+```
 
 ## Cleaning Up
 
