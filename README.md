@@ -55,10 +55,13 @@ This script uses your current AWS credentials to create a bucket named `tf-state
    cd ..
    ```
 
-4. Build and push the frontend dashboard image:
+4. Build and push the frontend dashboard image from the
+   [`openadr-dashboard-view`](https://github.com/umitsharip/openadr-dashboard-view)
+   repository:
 
    ```bash
-   cd ecs-frontend
+   git clone https://github.com/umitsharip/openadr-dashboard-view.git
+   cd openadr-dashboard-view
    ./build_and_push.sh
    cd ..
    ```
