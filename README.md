@@ -29,7 +29,7 @@ Before applying Terraform, create an S3 bucket and DynamoDB table for remote sta
 ./scripts/bootstrap_state.sh
 ```
 
-This script uses your current AWS credentials to create a bucket named `tf-state-<account-id>` and a DynamoDB table named `tf-lock-<account-id>` in region `us-west-2` by default. Set `AWS_REGION` to override the target region.
+This script uses your current AWS credentials to create a bucket named `tf-state-<account-id>` and a DynamoDB table named `tf-lock-<account-id>` in region `us-west-2` by default. Set `AWS_REGION` to override the target region. Note the bucket name and export it as `TF_STATE_BUCKET` before running Terraform.
 
 ## Building and Pushing Docker Images
 
@@ -64,6 +64,8 @@ From the repository root:
 
 ```bash
 cd envs/dev
+export AWS_PROFILE=<your-profile>
+export TF_STATE_BUCKET=<your-tf-state-bucket>
 ./terraform_init.sh        # initializes the workspace and applies the configuration
 ```
 
@@ -214,10 +216,11 @@ The OpenADR VTN will be available on port `8080` with the VEN listing endpoint o
 
 
 # AWS-VAULT
-On ubuntu 
-sudo apt install aws-vault
+On Ubuntu install the `aws-vault` package and run:
 
-aws-vault exec AdministratorAccess-923675928909 -- ./terraform_init.sh
+```bash
+aws-vault exec <your-profile> -- env TF_STATE_BUCKET=<your-tf-state-bucket> ./terraform_init.sh
+```
 
 ## Running Tests
 

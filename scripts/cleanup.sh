@@ -4,7 +4,7 @@ set -euo pipefail
 
 echo "🔻 Starting cleanup of high-cost AWS infrastructure (ECS, ALB, IoT)..."
 
-export AWS_PROFILE=AdministratorAccess-923675928909
+: "${AWS_PROFILE?Must set AWS_PROFILE to your AWS profile name}"
 
 # Optional safety check
 read -p "⚠️  Are you sure you want to destroy ECS services and ALBs? (yes/no): " CONFIRM

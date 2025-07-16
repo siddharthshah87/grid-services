@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export AWS_PROFILE=AdministratorAccess-923675928909
+: "${AWS_PROFILE?Must set AWS_PROFILE to your AWS profile name}"
 CLUSTER_NAME="hems-ecs-cluster"
 WORKSPACE="dev"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
