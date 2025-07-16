@@ -5,7 +5,7 @@ REGION=us-west-2
 CLUSTER=hems-ecs-cluster
 
 echo "▶️  Scaling ECS services to 0"
-for svc in openleadr-vtn volttron-ven openadr-backend; do
+for svc in openleadr-vtn volttron-ven openadr-backend ecs_frontend; do
   aws ecs update-service --cluster "$CLUSTER" --service "$svc" \
        --desired-count 0 --region "$REGION"
 done

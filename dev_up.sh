@@ -10,6 +10,9 @@ cd "$REPO_DIR/openleadr"
 cd "$REPO_DIR/openadr_backend"
 ./build_and_push.sh
 
+cd "$REPO_DIR/ecs_frontend"
+./build_and_push.sh
+
 cd "$REPO_DIR/volttron"
 ./build_and_push.sh
 
