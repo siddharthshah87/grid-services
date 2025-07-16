@@ -7,7 +7,7 @@ output "reader_endpoint" {
 }
 
 output "db_host" {
-  value     = aws_rds_cluster.aurora_postgres.endpoint
+  value = aws_rds_cluster.aurora_postgres.endpoint
 }
 
 output "db_user" {
@@ -21,5 +21,5 @@ output "db_password" {
 
 output "db_name" {
   value = var.db_name
-  }
+}
 

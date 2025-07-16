@@ -7,4 +7,7 @@ terraform.tfstate.*
 *.tfvars
 .env
 __pycache__/
-
+ecs-frontend/bun.lockb
+ecs-frontend/public/favicon.ico
+ecs-frontend/node_modules/
+ecs-frontend/dist/
