@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.event import EventCreate, EventRead
 from app.models.event import Event
 from app.db.database import get_session
+from app.core.security import get_current_user
 
 router = APIRouter()
 
@@ -12,6 +13,7 @@ router = APIRouter()
 async def create_event(
     event: EventCreate,
     session: AsyncSession = Depends(get_session),
+    user: str = Depends(get_current_user),
 ):
     db_event = Event(**event.dict())
     session.add(db_event)
@@ -20,7 +22,10 @@ async def create_event(
     return db_event
 
 @router.get("/", response_model=list[EventRead])
-async def list_events(session: AsyncSession = Depends(get_session)):
+async def list_events(
+    session: AsyncSession = Depends(get_session),
+    user: str = Depends(get_current_user),
+):
     result = await session.execute(select(Event))
     return result.scalars().all()
 
@@ -29,6 +34,7 @@ async def list_events(session: AsyncSession = Depends(get_session)):
 async def list_events_by_ven(
     ven_id: str,
     session: AsyncSession = Depends(get_session),
+    user: str = Depends(get_current_user),
 ):
     result = await session.execute(select(Event).where(Event.ven_id == ven_id))
     return result.scalars().all()
@@ -38,6 +44,7 @@ async def list_events_by_ven(
 async def get_event(
     event_id: str,
     session: AsyncSession = Depends(get_session),
+    user: str = Depends(get_current_user),
 ):
     result = await session.execute(select(Event).where(Event.event_id == event_id))
     row = result.scalars().first()

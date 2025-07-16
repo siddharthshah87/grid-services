@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     db_user: str
     db_password: str
     db_name: str
+    admin_username: str | None = None
+    admin_password_hash: str | None = None
+    jwt_secret: str | None = None
+    access_token_expire_minutes: int = 60
 
     # accept *either* DB_ or POSTGRES_ so nothing explodes while you migrate
     model_config = {
