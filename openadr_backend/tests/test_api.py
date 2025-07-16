@@ -68,6 +68,14 @@ async def test_ven_endpoints(async_client):
     assert resp.status_code == 200
     assert any(v["ven_id"] == ven_payload["ven_id"] for v in resp.json())
 
+
+@pytest.mark.asyncio
+async def test_ven_registration_id_conflict(async_client):
+    payload = {"ven_id": "ven456", "registration_id": "reg123"}
+    resp = await async_client.post("/vens/", json=payload)
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "registration_id already exists"
+
 @pytest.mark.asyncio
 async def test_event_endpoints(async_client):
     event_payload = {
