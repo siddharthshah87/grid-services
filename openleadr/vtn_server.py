@@ -80,8 +80,7 @@ app = web.Application()
 @app.get("/health")
 async def _health(_: web.Request):
     return web.json_response({"ok": True})
-
-vtn.app.add_routes(app.router.routes())
+vtn.app.add_get("/health", _health)
 
 # ── VEN listing HTTP server (separate port) ------------------------------
 class VenHandler(BaseHTTPRequestHandler):
