@@ -82,7 +82,7 @@ check_service() {
                  --profile "$PROFILE" \
                  --query 'taskDefinition.containerDefinitions[0].logConfiguration.options."awslogs-group"' \
                  --output text)
-    aws logs tail "$log_group" --since 10m --profile "$PROFILE" --max-items "$LOG_LINES"
+    aws logs tail "$log_group" --since 10m --profile "$PROFILE"
     echo
   fi
 }

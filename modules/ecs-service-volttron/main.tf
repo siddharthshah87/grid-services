@@ -43,12 +43,20 @@ resource "aws_ecs_task_definition" "this" {
         { name = "MQTT_TOPIC_STATUS", value = var.mqtt_topic_status },
         { name = "IOT_ENDPOINT", value = var.iot_endpoint }
       ]
-      secrets = concat(
-        var.ca_cert_secret_arn != null ? [{ name = "CA_CERT", valueFrom = var.ca_cert_secret_arn }] : [],
-        var.client_cert_secret_arn != null ? [{ name = "CLIENT_CERT", valueFrom = var.client_cert_secret_arn }] : [],
-        var.private_key_secret_arn != null ? [{ name = "PRIVATE_KEY", valueFrom = var.private_key_secret_arn }] : []
-      )
-
+    secrets = [
+        {
+            name      = "CA_CERT_PEM"
+            valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:ca_cert::"
+        },
+        {
+            name      = "CLIENT_CERT_PEM"
+            valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:client_cert::"
+        },
+        {
+            name      = "PRIVATE_KEY_PEM"
+            valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:private_key::"
+        }
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {

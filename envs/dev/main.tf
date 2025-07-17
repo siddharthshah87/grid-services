@@ -101,6 +101,9 @@ module "ecs_service_volttron" {
   mqtt_topic_metering  = "oadr/meter/ven1"
   mqtt_topic_status    = "ven/status/ven1"
   iot_endpoint         = module.iot_core.endpoint
+  ca_cert_secret_arn     = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:ca_cert::"
+  client_cert_secret_arn = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:client_cert::"
+  private_key_secret_arn = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:private_key::"
 }
 
 module "aurora_postgresql" {
