@@ -132,6 +132,15 @@ cd envs/dev
 
 Re-running `terraform apply` will recreate the services when needed.
 
+
+## CloudWatch Dashboards
+
+After deploying the `dev` environment Terraform creates a CloudWatch dashboard named `grid-services`.
+
+1. Open the AWS CloudWatch console.
+2. Navigate to **Dashboards** and select `grid-services`.
+
+The dashboard graphs device status updates, OpenADR event counts and any error messages from the VTN and VEN services.
 ## Additional Notes
 
 - The Terraform configuration requires version `>= 1.8.0` and the AWS provider `~> 5.40` as defined in `envs/dev/versions.tf`.
