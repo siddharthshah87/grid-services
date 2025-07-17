@@ -1,180 +1,106 @@
 """Simple VTN server example used for development.
 
-This file keeps track of all VENs that register with the VTN and exposes
-an additional HTTP endpoint on a configurable port (`VENS_PORT`, default
-8081) that lists those active VENs.
+* Binds the OpenADR server to 0.0.0.0 so it is reachable from the ALB.
+* Exposes /health on the same port so the ALB can mark targets healthy.
+* Parses CERT_BUNDLE_JSON (3 PEM strings) and materialises them to files.
 """
-
-from openleadr import OpenADRServer
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import json
-import threading
-import os
-import paho.mqtt.client as mqtt
-import sys
-import ssl
+from __future__ import annotations
+import json, os, sys, ssl, tempfile, threading, asyncio
 from datetime import datetime
-import tempfile
-import atexit
-import asyncio
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# MQTT topics and endpoint
-MQTT_TOPIC_METERING = os.getenv("MQTT_TOPIC_METERING", "volttron/metering")
-MQTT_TOPIC_EVENTS = os.getenv("MQTT_TOPIC_EVENTS", "openadr/event")
-MQTT_TOPIC_RESPONSES = os.getenv("MQTT_TOPIC_RESPONSES", "openadr/response")
-IOT_ENDPOINT = os.getenv("IOT_ENDPOINT", "localhost")
-CERT_BUNDLE_JSON = os.getenv("CERT_BUNDLE_JSON")
+import paho.mqtt.client as mqtt
+from openleadr import OpenADRServer
 
+# ── ENV ------------------------------------------------------------------
+MQTT_TOPIC_METERING  = os.getenv("MQTT_TOPIC_METERING", "volttron/metering")
+MQTT_TOPIC_EVENTS    = os.getenv("MQTT_TOPIC_EVENTS",   "openadr/event")
+MQTT_TOPIC_RESPONSES = os.getenv("MQTT_TOPIC_RESPONSES","openadr/response")
+IOT_ENDPOINT         = os.getenv("IOT_ENDPOINT",        "localhost")
+VENS_PORT            = int(os.getenv("VENS_PORT", 8081))
 
-if not CERT_BUNDLE_JSON:
-    print("❌ CERT_BUNDLE_JSON env var not set.")
+bundle_json = os.getenv("CERT_BUNDLE_JSON")
+if bundle_json is None:
+    print("❌ CERT_BUNDLE_JSON env var not set.", file=sys.stderr)
     sys.exit(1)
 
 try:
-    bundle = json.loads(CERT_BUNDLE_JSON)
-    CA_CERT = bundle["ca.crt"]
-    CLIENT_CERT = bundle["client.crt"]
-    PRIVATE_KEY = bundle["private.key"]
-except Exception as e:
-    print(f"❌ Failed to parse CERT_BUNDLE_JSON: {e}")
+    bundle = json.loads(bundle_json)
+    CA_CERT_PEM     = bundle["ca.crt"]
+    CLIENT_CERT_PEM = bundle["client.crt"]
+    PRIVATE_KEY_PEM = bundle["private.key"]
+except (json.JSONDecodeError, KeyError) as e:
+    print(f"❌ Failed to parse CERT_BUNDLE_JSON: {e}", file=sys.stderr)
     sys.exit(1)
 
-# In-memory storage
-metering_data = []
-active_vens = set()
+# ── materialise PEM strings to disk -------------------------------------
+tmp_dir = tempfile.TemporaryDirectory(prefix="vtn_cert_")
+ca_path     = os.path.join(tmp_dir.name, "ca.crt")
+cert_path   = os.path.join(tmp_dir.name, "client.crt")
+key_path    = os.path.join(tmp_dir.name, "client.key")
 
-def write_temp_file(contents, suffix):
-    if not contents or not contents.strip():
-        raise ValueError(f"Attempted to write empty content to temp file with suffix {suffix}")
-    temp_file = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=suffix)
-    temp_file.write(contents)
-    temp_file.close()
-    return temp_file.name
+for content, path in [(CA_CERT_PEM, ca_path),
+                      (CLIENT_CERT_PEM, cert_path),
+                      (PRIVATE_KEY_PEM, key_path)]:
+    with open(path, "w") as f:
+        f.write(content)
 
-# MQTT setup
-mqtt_client = mqtt.Client()
-
-ca_cert_path = write_temp_file(CA_CERT, ".crt")
-client_cert_path = write_temp_file(CLIENT_CERT, ".crt")
-private_key_path = write_temp_file(PRIVATE_KEY, ".key")
 print("📜 MQTT certs written to:")
-print(f"  - CA: {ca_cert_path}")
-print(f"  - Client: {client_cert_path}")
-print(f"  - Key: {private_key_path}")
+for p in (ca_path, cert_path, key_path):
+    print(f"  - {p}")
 
-try:
-    mqtt_client.tls_set(
-        ca_certs=ca_cert_path,
-        certfile=client_cert_path,
-        keyfile=private_key_path
-    )
-except ssl.SSLError as e:
-    print(f"❌ TLS setup failed: {e}")
-    print("🔎 Check that your certificates are valid PEM-encoded files and not empty or corrupted.")
-    sys.exit(1)
-except Exception as e:
-    print(f"❌ Unexpected error during TLS setup: {e}")
-    sys.exit(1)
+# Clean up temp files at exit
+import atexit, pathlib
+@atexit.register
+def _cleanup():
+    for p in pathlib.Path(tmp_dir.name).glob("*"):
+        p.unlink(missing_ok=True)
+        print(f"🧹 Deleted temp cert: {p}")
+    tmp_dir.cleanup()
 
-try:
-    mqtt_client.connect(IOT_ENDPOINT, 8883, 60)
-except Exception as e:
-    print(f"❌ Failed to connect to MQTT broker at {IOT_ENDPOINT}: {e}")
-    sys.exit(1)
+# ── MQTT client ----------------------------------------------------------
+mqttc = mqtt.Client(protocol=mqtt.MQTTv5)
+mqttc.tls_set(ca_certs=ca_path, certfile=cert_path, keyfile=key_path)
+mqttc.connect(IOT_ENDPOINT, 8883, keepalive=60)
+mqttc.loop_start()
 
-def on_metering_data(client, userdata, msg):
-    payload = msg.payload.decode()
-    print(f"📊 Received metering data: {payload}")
-    try:
-        metering_data.append(json.loads(payload))
-    except json.JSONDecodeError:
-        print("⚠️ Invalid JSON received in metering topic.")
+# ── Track registered VENs -----------------------------------------------
+active_vens: set[str] = set()
 
-def on_response(client, userdata, msg):
-    print(f"📩 Response received on {msg.topic}: {msg.payload.decode()}")
+async def ven_lookup(ven_id: str) -> bool:
+    """Used by OpenADR to decide if a VEN is allowed to register."""
+    return ven_id in active_vens
 
-mqtt_client.subscribe(MQTT_TOPIC_METERING)
-mqtt_client.subscribe(MQTT_TOPIC_RESPONSES)
-mqtt_client.on_message = on_metering_data
-mqtt_client.message_callback_add(MQTT_TOPIC_RESPONSES, on_response)
-mqtt_client.loop_start()
+# ── Start OpenADR server -------------------------------------------------
+vtn = OpenADRServer(vtn_id="myVtn", http_port=8080, ven_lookup=ven_lookup)
 
-# OpenADR server
-server = OpenADRServer(vtn_id="my-vtn", http_port=8080)
+# ── Simple /health endpoint (same port 8080) -----------------------------
+from aiohttp import web
+app = web.Application()
+@app.get("/health")
+async def _health(_: web.Request):
+    return web.json_response({"ok": True})
 
-def handle_registration(registration_info):
-    ven_id = registration_info.get("ven_id", "ven123")
-    active_vens.add(ven_id)
-    print(f"✅ VEN registered: {ven_id}")
-    return {
-        "ven_id": ven_id,
-        "registration_id": "reg123",
-        "poll_interval": 10
-    }
+vtn.app.add_routes(app.router.routes())
 
-server.add_handler("on_create_party_registration", handle_registration)
-
-def handle_cancel_registration(ven_id, registration_id):
-    active_vens.discard(ven_id)
-    print(f"❌ VEN unregistered: {ven_id}")
-    return True
-server.add_handler("on_cancel_party_registration", handle_cancel_registration)
-
-def handle_event_request(ven_id, request):
-    print(f"📥 Event request from {ven_id}: {request}")
-    event = {
-        "event_id": "event1",
-        "start_time": datetime.utcnow().isoformat(),
-        "signal_name": "simple",
-        "signal_type": "level",
-        "signal_payload": 1,
-        "targets": {"ven_id": ven_id},
-        "response_required": "always",
-    }
-
-    mqtt_payload = json.dumps({"ven_id": ven_id, "event": event})
-    mqtt_client.publish(MQTT_TOPIC_EVENTS, mqtt_payload)
-    print(f"📡 Published OpenADR event for {ven_id} to {MQTT_TOPIC_EVENTS}")
-    return [event]
-server.add_handler("on_request_event", handle_event_request)
-
-# Extra HTTP server to list active VENs
-VENS_PORT = int(os.getenv("VENS_PORT", "8081"))
-
-
-class VensHandler(BaseHTTPRequestHandler):
+# ── VEN listing HTTP server (separate port) ------------------------------
+class VenHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/vens":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            payload = json.dumps(sorted(list(active_vens))).encode()
-            self.wfile.write(payload)
-        elif self.path == "/health":
-            # Simple health check endpoint for the ALB
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"ok")
-        else:
-            self.send_response(404)
-            self.end_headers()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps(sorted(active_vens)).encode())
 
-def run_vens_server():
-    httpd = HTTPServer(("0.0.0.0", VENS_PORT), VensHandler)
-    print(f"🔎 VEN listing server started on port {VENS_PORT}")
-    httpd.serve_forever()
+def _start_ven_listing_server():
+    HTTPServer(("0.0.0.0", VENS_PORT), VenHandler).serve_forever()
 
+threading.Thread(target=_start_ven_listing_server, daemon=True).start()
+print(f"🔎 VEN listing server started on port {VENS_PORT}")
+
+# ── Main entry -----------------------------------------------------------
 if __name__ == "__main__":
-    threading.Thread(target=run_vens_server, daemon=True).start()
-    
-    def cleanup_temp_certs():
-        for path in [ca_cert_path, client_cert_path, private_key_path]:
-            try:
-                os.remove(path)
-                print(f"🧹 Deleted temp cert: {path}")
-            except Exception as e:
-                print(f"⚠️ Failed to delete temp file {path}: {e}")
-
-    atexit.register(cleanup_temp_certs)
-    asyncio.run(server.run())
+    print("********************************************************************************")
+    print(" Starting VTN ‣ http://0.0.0.0:8080/OpenADR2/Simple/2.0b")
+    print("********************************************************************************")
+    asyncio.run(vtn.run(host="0.0.0.0"))   # <-- key change: bind to 0.0.0.0
 
