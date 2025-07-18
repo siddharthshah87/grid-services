@@ -28,12 +28,12 @@ jobs:
 
   tests:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}   # add this
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install dependencies
-        run: pip install fastapi uvicorn sqlalchemy asyncpg alembic python-dotenv pydantic pydantic-settings sqlmodel pytest httpx
-      - name: Run tests
-        run: pytest openadr_backend/tests
+      - run: pip install -r requirements.txt  # or the long list you have
+      - run: pytest openadr_backend/tests
