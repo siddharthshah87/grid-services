@@ -171,5 +171,10 @@ module "ecs_service_backend" {
   db_name         = module.aurora_postgresql.db_name
 
   aws_region      = var.aws_region
+
+  depends_on = [
+    module.backend_alb,
+    module.aurora_postgresql
+  ]
 }
 
