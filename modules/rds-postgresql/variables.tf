@@ -61,6 +61,6 @@ variable "engine_version" {
 }
 
 variable "instance_count" {
-  type        = number
-  default     = 1
+  type    = number
+  default = 1
 }
