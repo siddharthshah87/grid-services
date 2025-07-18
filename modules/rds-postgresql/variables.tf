@@ -46,21 +46,21 @@ variable "security_group_ids" {
 }
 
 variable "backup_retention" {
-  type        = number
-  default     = 7
+  type    = number
+  default = 7
 }
 
 variable "publicly_accessible" {
-  type        = bool
-  default     = false
+  type    = bool
+  default = false
 }
 
 variable "engine_version" {
-  type        = string
-  default     = "15.4"
+  type    = string
+  default = "15.4"
 }
 
 variable "instance_count" {
-  type        = number
-  default     = 1
+  type    = number
+  default = 1
 }
