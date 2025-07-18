@@ -13,12 +13,12 @@ resource "aws_rds_cluster" "aurora_postgres" {
 }
 
 resource "aws_rds_cluster_instance" "aurora_postgres_instances" {
-  count              = var.instance_count
-  identifier         = "${var.name}-instance-${count.index + 1}"
-  cluster_identifier = aws_rds_cluster.aurora_postgres.id
-  instance_class     = var.db_instance_class
-  engine             = aws_rds_cluster.aurora_postgres.engine
-  engine_version     = aws_rds_cluster.aurora_postgres.engine_version
+  count               = var.instance_count
+  identifier          = "${var.name}-instance-${count.index + 1}"
+  cluster_identifier  = aws_rds_cluster.aurora_postgres.id
+  instance_class      = var.db_instance_class
+  engine              = aws_rds_cluster.aurora_postgres.engine
+  engine_version      = aws_rds_cluster.aurora_postgres.engine_version
   publicly_accessible = var.publicly_accessible
 }
 
