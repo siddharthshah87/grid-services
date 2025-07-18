@@ -33,11 +33,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install dependencies
-        run: pip install paho aiosqlite fastapi uvicorn sqlalchemy asyncpg alembic python-dotenv pydantic pydantic-settings sqlmodel pytest httpx pytest_asyncio
+      - name: Install dependencies for openadr_backend
+        run: pip install -r openadr_backend/requirements.txt
       - name: Run openadr_backend tests
         run: pytest openadr_backend/tests
+      
+      - name: Install dependencies for openleadr 
+        run: pip install -r openleadr/requirements.txt
       - name: Run openleadr tests
         run: pytest openleadr/tests
+
+      - name: Install dependencies for volttron
+        run: pip install -r volttron/requirements.txt
       - name: Run volttron tests
         run: pytest volttron/tests
