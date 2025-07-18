@@ -10,9 +10,19 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.8.0
+      # ── initialise the root so fmt/validate can find modules
+      - name: Terraform init (root)
+        run: terraform init -backend=false -input=false
       - run: terraform fmt -recursive -check
+
+      # ── init the envs/dev workspace and then validate
+      - name: Terraform init (envs/dev)
+        run: terraform init -backend=false -input=false
+        working-directory: envs/dev
+
       - run: terraform validate
         working-directory: envs/dev
+
       - name: Compile Python files
         run: python -m py_compile $(git ls-files '*.py')
 
@@ -27,4 +37,3 @@ jobs:
         run: pip install fastapi uvicorn sqlalchemy asyncpg alembic python-dotenv pydantic pydantic-settings sqlmodel pytest httpx
       - name: Run tests
         run: pytest openadr_backend/tests
-
