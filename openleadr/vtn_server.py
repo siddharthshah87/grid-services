@@ -12,6 +12,22 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import paho.mqtt.client as mqtt
 from openleadr import OpenADRServer
 
+# Helper functions -------------------------------------------------------
+def write_temp_file(data: str, suffix: str) -> str:
+    """Write data to a temporary file and return its path."""
+    if not data:
+        raise ValueError("data must not be empty")
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    tmp.write(data.encode())
+    tmp.close()
+    return tmp.name
+
+def handle_event_request(ven_id: str, payload: dict):
+    """Publish an event message and return a minimal OpenADR event."""
+    message = {"ven_id": ven_id, **payload}
+    mqttc.publish(MQTT_TOPIC_EVENTS, json.dumps(message))
+    return [{"targets": {"ven_id": ven_id}, **payload}]
+
 # ── ENV ------------------------------------------------------------------
 MQTT_TOPIC_METERING  = os.getenv("MQTT_TOPIC_METERING", "volttron/metering")
 MQTT_TOPIC_EVENTS    = os.getenv("MQTT_TOPIC_EVENTS",   "openadr/event")
@@ -77,10 +93,12 @@ vtn = OpenADRServer(vtn_id="myVtn", http_port=8080, ven_lookup=ven_lookup)
 # ── Simple /health endpoint (same port 8080) -----------------------------
 from aiohttp import web
 app = web.Application()
-@app.get("/health")
+
 async def _health(_: web.Request):
     return web.json_response({"ok": True})
-vtn.app.add_get("/health", _health)
+
+app.router.add_get("/health", _health)
+vtn.app.router.add_get("/health", _health)
 
 # ── VEN listing HTTP server (separate port) ------------------------------
 class VenHandler(BaseHTTPRequestHandler):
