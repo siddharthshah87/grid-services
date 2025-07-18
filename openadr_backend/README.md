@@ -44,4 +44,6 @@ docker run -p 8000:8000 \
   openadr-backend
 ```
 
-The container's entrypoint runs database migrations via Alembic before starting the server.
+The container's entrypoint runs database migrations via Alembic before starting
+the server. It now retries the upgrade a few times to handle cases where the
+database is still coming online.
