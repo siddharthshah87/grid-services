@@ -13,7 +13,7 @@ async def create_event(
     event: EventCreate,
     session: AsyncSession = Depends(get_session),
 ):
-    db_event = Event(**event.dict())
+    db_event = Event(**event.model_dump())
     session.add(db_event)
     await session.commit()
     await session.refresh(db_event)

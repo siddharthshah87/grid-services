@@ -13,7 +13,7 @@ async def register_ven(
     ven: VENCreate,
     session: AsyncSession = Depends(get_session),
 ):
-    db_ven = VEN(**ven.dict())
+    db_ven = VEN(**ven.model_dump())
     session.add(db_ven)
     await session.commit()
     await session.refresh(db_ven)
