@@ -34,16 +34,17 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies for openadr_backend
-        run: pip install -r openadr_backend/requirements.txt
+        run: pip install -r ./openadr_backend/requirements.txt
       - name: Run openadr_backend tests
         run: pytest openadr_backend/tests
       
       - name: Install dependencies for openleadr 
-        run: pip install -r openleadr/requirements.txt
+        run: pip install -r ./openleadr/requirements.txt
       - name: Run openleadr tests
         run: pytest openleadr/tests
 
       - name: Install dependencies for volttron
-        run: pip install -r volttron/requirements.txt
+        run: pip install -r ./volttron/requirements.txt
       - name: Run volttron tests
         run: pytest volttron/tests
+  
