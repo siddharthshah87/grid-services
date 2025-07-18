@@ -1,4 +1,5 @@
 import os
+import sys
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -7,7 +8,12 @@ from sqlalchemy.orm import sessionmaker
 os.environ.setdefault("DB_HOST", "test")
 os.environ.setdefault("DB_USER", "test")
 os.environ.setdefault("DB_PASSWORD", "test")
+
 os.environ.setdefault("DB_NAME", "test")
+
+# Allow importing the `app` package when tests are executed without
+# installing the project by adding the parent directory to ``sys.path``.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from fastapi import FastAPI
 from app.routers import health, ven, event
