@@ -1,9 +1,9 @@
-variable "name"               {}
-variable "vpc_id"             {}
-variable "public_subnets"     { type = list(string) }
-variable "listener_port"      { default = 80 }        # HTTP
-variable "target_port"        { default = 8000 }      # ←  changed
-variable "health_check_path"  { default = "/health" } # ←  changed
+variable "name" {}
+variable "vpc_id" {}
+variable "public_subnets" { type = list(string) }
+variable "listener_port" { default = 80 }            # HTTP
+variable "target_port" { default = 8000 }            # ←  changed
+variable "health_check_path" { default = "/health" } # ←  changed
 
 # --- ALB security-group -----------------------------------------------------
 resource "aws_security_group" "alb_sg" {
@@ -38,13 +38,13 @@ resource "aws_lb" "this" {
 # --- Target group (port 8000) ----------------------------------------------
 resource "aws_lb_target_group" "this" {
   name        = "${var.name}-tg"
-  port        = var.target_port           # 8000
+  port        = var.target_port # 8000
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
 
   health_check {
-    path                = var.health_check_path   # /health
+    path                = var.health_check_path # /health
     protocol            = "HTTP"
     interval            = 30
     timeout             = 5
@@ -56,7 +56,7 @@ resource "aws_lb_target_group" "this" {
 # --- HTTP listener ----------------------------------------------------------
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
-  port              = var.listener_port         # 80
+  port              = var.listener_port # 80
   protocol          = "HTTP"
 
   default_action {
@@ -79,6 +79,6 @@ resource "aws_lb_listener" "http" {
 #   }
 # }
 
-output "dns_name"        { value = aws_lb.this.dns_name }
+output "dns_name" { value = aws_lb.this.dns_name }
 output "target_group_arn" { value = aws_lb_target_group.this.arn }
 
