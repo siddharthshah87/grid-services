@@ -57,7 +57,7 @@ resource "aws_iam_policy" "iot_publish" {
           "iot:Subscribe",
           "iot:Receive"
         ],
-        Resource = "*"  # You can scope to topic ARN for production
+        Resource = "*" # You can scope to topic ARN for production
       }
     ]
   })
