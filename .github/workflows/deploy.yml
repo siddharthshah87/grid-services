@@ -28,6 +28,8 @@ jobs:
         run: ./openleadr/build_and_push.sh
       - name: Build and push volttron image
         run: ./volttron/build_and_push.sh
+      - name: Build and push backend image
+        run: ./openadr_backend/build_and_push.sh
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
