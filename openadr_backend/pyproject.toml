@@ -17,6 +17,10 @@ python-dotenv = "^1.0.0"
 pydantic = "^2.6.0"
 pydantic-settings = "^2.2.1"
 sqlmodel = "^0.0.24"
+python-jose = {version = "^3.3", extras = ["cryptography"]}
+passlib = {version = "^1.7", extras = ["bcrypt"]}
+boto3 = "^1.34"
+python-multipart = "^0.0.9"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"

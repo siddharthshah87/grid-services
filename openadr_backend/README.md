@@ -22,6 +22,23 @@ The service loads its database settings from environment variables with the `DB_
 
 The application connects on port `5432` by default.
 
+### Authentication
+
+Set the following variables to enable JWT authentication:
+
+- `ADMIN_USERNAME` – username allowed to obtain tokens
+- `ADMIN_PASSWORD_HASH` – bcrypt hash of the password
+- `JWT_SECRET` – secret used to sign JWTs
+
+Request a token by posting form data to `/login`:
+
+```bash
+curl -X POST -F 'username=<user>' -F 'password=<pass>' http://localhost:8000/login
+```
+
+Use the returned token in the `Authorization: Bearer` header when calling the
+protected `/events` and `/devices` endpoints.
+
 ## Running locally
 
 Launch the API using Poetry:
