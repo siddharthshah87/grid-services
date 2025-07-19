@@ -6,6 +6,7 @@ from app.db.database import engine
 router = APIRouter()
 
 @router.get("/")
+@router.get("/health")
 async def health_check():
     return {"status": "ok"}
 
