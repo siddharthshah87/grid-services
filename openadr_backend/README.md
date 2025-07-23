@@ -49,3 +49,9 @@ docker run -p 8000:8000 \
 The container's entrypoint runs database migrations via Alembic before starting
 the server. It now retries the upgrade a few times to handle cases where the
 database is still coming online.
+
+## API Overview
+
+The service exposes REST endpoints to manage VENs and events. In addition to
+creating and listing records, the latest version adds the ability to remove
+entries using `DELETE /vens/{ven_id}` and `DELETE /events/{event_id}`.
