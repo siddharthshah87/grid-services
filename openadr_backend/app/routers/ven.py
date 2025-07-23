@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.schemas.ven import VENCreate, VENRead
 from app.models.ven import VEN
@@ -15,7 +16,13 @@ async def register_ven(
 ):
     db_ven = VEN(**ven.model_dump())
     session.add(db_ven)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as e:
+        await session.rollback()
+        if "registration_id" in str(e.orig):
+            raise HTTPException(status_code=409, detail="registration_id already exists")
+        raise
     await session.refresh(db_ven)
     return db_ven
 
