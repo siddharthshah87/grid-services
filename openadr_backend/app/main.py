@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 import sys
 
-from app.routers import health, event, ven
+from app.routers import health, event, ven, device, usage
 
 app = FastAPI(
     title="OpenADR VTN Admin API",
@@ -23,6 +23,8 @@ app.add_middleware(
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(ven.router, prefix="/vens", tags=["VENs"])
 app.include_router(event.router, prefix="/events", tags=["Events"])
+app.include_router(device.router, prefix="/devices", tags=["Devices"])
+app.include_router(usage.router, prefix="/usage", tags=["Usage"])
 
 # Startup/shutdown hooks
 
