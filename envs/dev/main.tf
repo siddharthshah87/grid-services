@@ -48,10 +48,11 @@ module "ecs_cluster" {
 }
 
 module "ecs_security_group" {
-  source     = "../../modules/security-group"
-  name       = "ecs-tasks-sg"
-  vpc_id     = module.vpc.vpc_id
-  allow_http = true
+  source            = "../../modules/security-group"
+  name              = "ecs-tasks-sg"
+  vpc_id            = module.vpc.vpc_id
+  allow_http        = true
+  alb_backend_sg_id = module.backend_alb.security_group_id
 }
 
 module "ecs_task_roles" {
