@@ -49,8 +49,11 @@ resource "aws_iam_role_policy" "actions" {
 
 # IoT rules for each topic
 resource "aws_iot_topic_rule" "forward_rules" {
-  for_each    = toset(var.topics)
-  name        = "${var.rule_name_prefix}-${replace(each.key, "/", "-")}"
+  for_each = toset(var.topics)
+  # IoT rule names only allow alphanumeric characters and underscores. Replace
+  # any disallowed characters in the prefix and topic filter to ensure
+  # validation succeeds.
+  name        = "${replace(var.rule_name_prefix, "-", "_")}_${replace(each.key, "/", "_")}"
   enabled     = true
   sql         = "SELECT * FROM '${each.key}'"
   sql_version = "2016-03-23"
