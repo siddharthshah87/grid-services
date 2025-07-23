@@ -33,6 +33,12 @@ module "iot_core" {
   enable_logging = false
 }
 
+module "iot_rule_forwarder" {
+  source           = "../../modules/iot-rule-forwarder"
+  rule_name_prefix = "mqtt-forward"
+  topics           = ["openadr/event", "volttron/metering"]
+}
+
 module "ecs_cluster" {
   source = "../../modules/ecs-cluster"
   name   = "hems-ecs-cluster"
