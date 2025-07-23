@@ -7,9 +7,15 @@
   which is handy for local testing.
 """
 from __future__ import annotations
-import json, os, sys, ssl, tempfile, threading, asyncio, time
-from datetime import datetime
+import json
+import os
+import sys
+import tempfile
+import threading
+import asyncio
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from aiohttp import web
 
 import paho.mqtt.client as mqtt
 from openleadr import OpenADRServer
@@ -73,7 +79,8 @@ if CA_CERT_PEM and CLIENT_CERT_PEM and PRIVATE_KEY_PEM:
         print(f"  - {p}")
 
     # Clean up temp files at exit
-    import atexit, pathlib
+    import atexit
+    import pathlib
 
     @atexit.register
     def _cleanup():
@@ -117,7 +124,6 @@ async def ven_lookup(ven_id: str) -> bool:
 vtn = OpenADRServer(vtn_id="myVtn", http_port=8080, ven_lookup=ven_lookup)
 
 # ── Simple /health endpoint (same port 8080) -----------------------------
-from aiohttp import web
 app = web.Application()
 
 async def _health(_: web.Request):

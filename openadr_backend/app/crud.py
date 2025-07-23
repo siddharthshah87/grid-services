@@ -1,7 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.ven import VEN
-from app.models.event import Event
 
 async def create_ven(session: AsyncSession, ven: VEN):
     session.add(ven)

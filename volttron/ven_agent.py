@@ -1,5 +1,13 @@
 # volttron/ven_agent.py
-import os, json, random, time, sys, signal, tempfile, pathlib, threading
+import os
+import json
+import random
+import time
+import sys
+import signal
+import tempfile
+import pathlib
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import paho.mqtt.client as mqtt
 

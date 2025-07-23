@@ -12,7 +12,6 @@ import sys
 import pathlib
 
 from alembic import context
-from sqlalchemy import pool  # imported so Alembic can tweak pool opts if needed
 from app.db.database import engine            # ← your async engine
 from app.models import Base                   # ← declarative base (or SQLModel)
 
