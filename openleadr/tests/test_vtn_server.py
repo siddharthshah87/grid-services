@@ -14,7 +14,10 @@ def load_module(mock_client):
             "ca.crt": "CA",
             "client.crt": "CLIENT",
             "private.key": "KEY"
-        })
+        }),
+        # Use an ephemeral port for the VEN listing server so multiple test
+        # runs don't conflict over the same port.
+        "VENS_PORT": "0",
     }
     with mock.patch.dict(os.environ, env, clear=False), \
             mock.patch("paho.mqtt.client.Client", return_value=mock_client):
