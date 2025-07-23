@@ -16,11 +16,13 @@ This directory contains a FastAPI application providing the administration API f
 The service loads its database settings from environment variables with the `DB_` prefix. Define the following variables or place them in a `.env` file:
 
 - `DB_HOST` – hostname of the PostgreSQL server
+- `DB_PORT` – port of the PostgreSQL server (default `5432`)
 - `DB_USER` – database user
 - `DB_PASSWORD` – user's password
 - `DB_NAME` – database name
+- `DB_TIMEOUT` – connection timeout in seconds (default `30`)
 
-The application connects on port `5432` by default.
+`DB_PORT` defaults to `5432` if unset.
 
 ## Running locally
 
