@@ -10,6 +10,9 @@ variable "mqtt_topic_responses" {}
 variable "mqtt_topic_metering" {}
 variable "mqtt_topic_status" {}
 variable "iot_endpoint" {}
+variable "container_port" { default = 22916 }
+variable "target_group_arn" { default = null }
+variable "assign_public_ip" { default = true }
 variable "cpu" { default = "256" }
 variable "memory" { default = "512" }
 variable "ca_cert_secret_arn" { default = null }
@@ -36,6 +39,13 @@ resource "aws_ecs_task_definition" "this" {
       name      = var.name
       image     = var.image
       essential = true
+      portMappings = [
+        {
+          containerPort = var.container_port
+          hostPort      = var.container_port
+          protocol      = "tcp"
+        }
+      ]
       environment = [
         { name = "MQTT_TOPIC_EVENTS", value = var.mqtt_topic_events },
         { name = "MQTT_TOPIC_RESPONSES", value = var.mqtt_topic_responses },
@@ -78,7 +88,16 @@ resource "aws_ecs_service" "this" {
   network_configuration {
     subnets          = var.subnet_ids
     security_groups  = [var.security_group_id]
-    assign_public_ip = true
+    assign_public_ip = var.assign_public_ip
+  }
+
+  dynamic "load_balancer" {
+    for_each = var.target_group_arn == null ? [] : [var.target_group_arn]
+    content {
+      target_group_arn = load_balancer.value
+      container_name   = var.name
+      container_port   = var.container_port
+    }
   }
 
   desired_count = 1

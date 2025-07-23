@@ -1,6 +1,21 @@
 variable "name" {}
 variable "vpc_id" {}
 variable "public_subnets" { type = list(string) }
+variable "subnet_ids" {
+  type        = list(string)
+  description = "Subnets to place the load balancer in"
+  default     = null
+}
+variable "internal" {
+  type        = bool
+  description = "Whether the ALB is internal"
+  default     = false
+}
+variable "allowed_cidrs" {
+  type        = list(string)
+  description = "CIDR blocks allowed to access the listener"
+  default     = ["0.0.0.0/0"]
+}
 variable "listener_port" { default = 80 }            # HTTP
 variable "target_port" { default = 8000 }            # ←  changed
 variable "health_check_path" { default = "/health" } # ←  changed
@@ -10,12 +25,12 @@ resource "aws_security_group" "alb_sg" {
   name   = "${var.name}-sg"
   vpc_id = var.vpc_id
 
-  # Permit internet → ALB listener
+  # Permit traffic from allowed CIDRs to the listener
   ingress {
     protocol    = "tcp"
     from_port   = var.listener_port
     to_port     = var.listener_port
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_cidrs
   }
 
   # ALB → targets (any port; SG on the tasks restricts to 8000)
@@ -31,7 +46,8 @@ resource "aws_security_group" "alb_sg" {
 resource "aws_lb" "this" {
   name               = var.name
   load_balancer_type = "application"
-  subnets            = var.public_subnets
+  internal           = var.internal
+  subnets            = var.subnet_ids != null ? var.subnet_ids : var.public_subnets
   security_groups    = [aws_security_group.alb_sg.id]
 }
 
