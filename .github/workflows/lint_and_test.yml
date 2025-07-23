@@ -37,7 +37,8 @@ jobs:
         run: pip install poetry
       
       - name: Install dependencies for openadr_backend
-        run: poetry config virtualenvs.create false && poetry install --only main --no-root
+        working-directory: openadr_backend
+        run: poetry config virtualenvs.create false && poetry install --with dev --no-root
       
       - name: Run openadr_backend tests
         run: pytest openadr_backend/tests
