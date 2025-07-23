@@ -1,5 +1,6 @@
 # volttron/ven_agent.py
-import os, json, random, time, sys, signal, tempfile, pathlib
+import os, json, random, time, sys, signal, tempfile, pathlib, threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import paho.mqtt.client as mqtt
 
 # ── helpers ────────────────────────────────────────────────────────────
@@ -32,14 +33,29 @@ PRIVATE_KEY = _materialise_pem("PRIVATE_KEY")
 client = mqtt.Client(protocol=mqtt.MQTTv5)
 
 if CA_CERT and CLIENT_CERT and PRIVATE_KEY:
-    client.tls_set(ca_certs=CA_CERT,
-                   certfile=CLIENT_CERT,
-                   keyfile=PRIVATE_KEY)
+    client.tls_set(ca_certs=CA_CERT, certfile=CLIENT_CERT, keyfile=PRIVATE_KEY)
+else:
+    if not (CA_CERT and CLIENT_CERT and PRIVATE_KEY):
+        print("⚠️ TLS certificates not provided; using insecure MQTT", file=sys.stderr)
 
-try:
-    client.connect(IOT_ENDPOINT, 8883, 60)
-except Exception as e:
-    print(f"❌ Failed to connect to MQTT broker at {IOT_ENDPOINT}: {e}", file=sys.stderr)
+connected = False
+
+def _on_connect(_client, _userdata, _flags, rc, *_args):
+    global connected
+    connected = rc == 0
+
+client.on_connect = _on_connect
+
+for attempt in range(1, 6):
+    try:
+        port = 8883 if CA_CERT and CLIENT_CERT and PRIVATE_KEY else 1883
+        client.connect(IOT_ENDPOINT, port, 60)
+        break
+    except Exception as e:
+        print(f"MQTT connect failed (try {attempt}/5): {e}", file=sys.stderr)
+        time.sleep(min(2 ** attempt, 30))
+else:
+    print("❌ Could not connect to MQTT broker", file=sys.stderr)
     sys.exit(1)
 
 # ── graceful shutdown ─────────────────────────────────────────────────
@@ -52,6 +68,23 @@ def _shutdown(signo, _frame):
 signal.signal(signal.SIGTERM, _shutdown)
 
 client.loop_start()
+
+# ── simple /health endpoint -------------------------------------------
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        status = 200 if connected else 503
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps({"ok": connected}).encode())
+
+
+def _start_health_server():
+    HTTPServer(("0.0.0.0", 8000), HealthHandler).serve_forever()
+
+
+threading.Thread(target=_start_health_server, daemon=True).start()
+print("🩺 Health server running on port 8000")
 
 # ── message handler ────────────────────────────────────────────────────
 def on_event(_client, _userdata, msg):

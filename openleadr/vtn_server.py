@@ -2,10 +2,12 @@
 
 * Binds the OpenADR server to 0.0.0.0 so it is reachable from the ALB.
 * Exposes /health on the same port so the ALB can mark targets healthy.
-* Parses CERT_BUNDLE_JSON (3 PEM strings) and materialises them to files.
+* Parses CERT_BUNDLE_JSON (3 PEM strings) and materialises them to files if
+  provided. When unset the server falls back to an insecure MQTT connection,
+  which is handy for local testing.
 """
 from __future__ import annotations
-import json, os, sys, ssl, tempfile, threading, asyncio
+import json, os, sys, ssl, tempfile, threading, asyncio, time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -36,48 +38,72 @@ IOT_ENDPOINT         = os.getenv("IOT_ENDPOINT",        "localhost")
 VENS_PORT            = int(os.getenv("VENS_PORT", 8081))
 
 bundle_json = os.getenv("CERT_BUNDLE_JSON")
-if bundle_json is None:
-    print("❌ CERT_BUNDLE_JSON env var not set.", file=sys.stderr)
-    sys.exit(1)
+CA_CERT_PEM = CLIENT_CERT_PEM = PRIVATE_KEY_PEM = None
+if bundle_json:
+    try:
+        bundle = json.loads(bundle_json)
+        CA_CERT_PEM     = bundle["ca.crt"]
+        CLIENT_CERT_PEM = bundle["client.crt"]
+        PRIVATE_KEY_PEM = bundle["private.key"]
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"❌ Failed to parse CERT_BUNDLE_JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+else:
+    print("⚠️ CERT_BUNDLE_JSON not provided; using insecure MQTT connection", file=sys.stderr)
 
-try:
-    bundle = json.loads(bundle_json)
-    CA_CERT_PEM     = bundle["ca.crt"]
-    CLIENT_CERT_PEM = bundle["client.crt"]
-    PRIVATE_KEY_PEM = bundle["private.key"]
-except (json.JSONDecodeError, KeyError) as e:
-    print(f"❌ Failed to parse CERT_BUNDLE_JSON: {e}", file=sys.stderr)
-    sys.exit(1)
+mqttc = mqtt.Client(protocol=mqtt.MQTTv5)
 
-# ── materialise PEM strings to disk -------------------------------------
-tmp_dir = tempfile.TemporaryDirectory(prefix="vtn_cert_")
-ca_path     = os.path.join(tmp_dir.name, "ca.crt")
-cert_path   = os.path.join(tmp_dir.name, "client.crt")
-key_path    = os.path.join(tmp_dir.name, "client.key")
+if CA_CERT_PEM and CLIENT_CERT_PEM and PRIVATE_KEY_PEM:
+    # ── materialise PEM strings to disk ---------------------------------
+    tmp_dir = tempfile.TemporaryDirectory(prefix="vtn_cert_")
+    ca_path     = os.path.join(tmp_dir.name, "ca.crt")
+    cert_path   = os.path.join(tmp_dir.name, "client.crt")
+    key_path    = os.path.join(tmp_dir.name, "client.key")
 
-for content, path in [(CA_CERT_PEM, ca_path),
-                      (CLIENT_CERT_PEM, cert_path),
-                      (PRIVATE_KEY_PEM, key_path)]:
-    with open(path, "w") as f:
-        f.write(content)
+    for content, path in [
+        (CA_CERT_PEM, ca_path),
+        (CLIENT_CERT_PEM, cert_path),
+        (PRIVATE_KEY_PEM, key_path),
+    ]:
+        with open(path, "w") as f:
+            f.write(content)
 
-print("📜 MQTT certs written to:")
-for p in (ca_path, cert_path, key_path):
-    print(f"  - {p}")
+    print("📜 MQTT certs written to:")
+    for p in (ca_path, cert_path, key_path):
+        print(f"  - {p}")
 
-# Clean up temp files at exit
-import atexit, pathlib
-@atexit.register
-def _cleanup():
-    for p in pathlib.Path(tmp_dir.name).glob("*"):
-        p.unlink(missing_ok=True)
-        print(f"🧹 Deleted temp cert: {p}")
-    tmp_dir.cleanup()
+    # Clean up temp files at exit
+    import atexit, pathlib
+
+    @atexit.register
+    def _cleanup():
+        for p in pathlib.Path(tmp_dir.name).glob("*"):
+            p.unlink(missing_ok=True)
+            print(f"🧹 Deleted temp cert: {p}")
+        tmp_dir.cleanup()
+
+    mqttc.tls_set(ca_certs=ca_path, certfile=cert_path, keyfile=key_path)
+    MQTT_PORT = 8883
+else:
+    MQTT_PORT = 1883
 
 # ── MQTT client ----------------------------------------------------------
-mqttc = mqtt.Client(protocol=mqtt.MQTTv5)
-mqttc.tls_set(ca_certs=ca_path, certfile=cert_path, keyfile=key_path)
-mqttc.connect(IOT_ENDPOINT, 8883, keepalive=60)
+mqtt_connected = False
+
+def _on_connect(_client, _userdata, _flags, rc, *_args):
+    global mqtt_connected
+    mqtt_connected = rc == 0
+
+mqttc.on_connect = _on_connect
+
+for attempt in range(1, 6):
+    try:
+        mqttc.connect(IOT_ENDPOINT, MQTT_PORT, keepalive=60)
+        break
+    except Exception as e:
+        print(f"MQTT connect failed (try {attempt}/5): {e}", file=sys.stderr)
+        time.sleep(min(2 ** attempt, 30))
+mqttc.loop_start()
 mqttc.loop_start()
 
 # ── Track registered VENs -----------------------------------------------
@@ -95,7 +121,7 @@ from aiohttp import web
 app = web.Application()
 
 async def _health(_: web.Request):
-    return web.json_response({"ok": True})
+    return web.json_response({"ok": mqtt_connected})
 
 app.router.add_get("/health", _health)
 vtn.app.router.add_get("/health", _health)

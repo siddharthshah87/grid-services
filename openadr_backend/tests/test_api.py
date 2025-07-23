@@ -6,8 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 os.environ.setdefault("DB_HOST", "test")
+os.environ.setdefault("DB_PORT", "5432")
 os.environ.setdefault("DB_USER", "test")
 os.environ.setdefault("DB_PASSWORD", "test")
+os.environ.setdefault("DB_TIMEOUT", "30")
 
 os.environ.setdefault("DB_NAME", "test")
 
