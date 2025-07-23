@@ -1,0 +1,31 @@
+name: Terraform Plan
+
+on: [pull_request]
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }}
+          aws-region: us-west-2
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.0
+      - name: Terraform init
+        run: terraform init -input=false
+        working-directory: envs/dev
+      - name: Terraform plan
+        run: terraform plan -no-color | tee plan.txt
+        working-directory: envs/dev
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plan
+          path: plan.txt
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-file: plan.txt
