@@ -48,11 +48,14 @@ module "ecs_cluster" {
 }
 
 module "ecs_security_group" {
-  source            = "../../modules/security-group"
-  name              = "ecs-tasks-sg"
-  vpc_id            = module.vpc.vpc_id
-  allow_http        = true
-  alb_backend_sg_id = module.backend_alb.security_group_id
+  source             = "../../modules/security-group"
+  name               = "ecs-tasks-sg"
+  vpc_id             = module.vpc.vpc_id
+  allow_http         = false
+  alb_backend_sg_id  = module.backend_alb.security_group_id
+  alb_vtn_sg_id      = module.openadr_alb.security_group_id
+  alb_volttron_sg_id = module.volttron_alb.security_group_id
+  volttron_port      = 8000
 }
 
 module "ecs_task_roles" {
@@ -98,7 +101,8 @@ module "ecs_service_volttron" {
   source                 = "../../modules/ecs-service-volttron"
   name                   = "volttron-ven"
   cluster_id             = module.ecs_cluster.id
-  subnet_ids             = module.vpc.public_subnets
+  subnet_ids             = module.vpc.private_subnet_ids
+  assign_public_ip       = false
   security_group_id      = module.ecs_security_group.id
   execution_role_arn     = module.ecs_task_roles.execution
   task_role_arn          = module.ecs_task_roles.iot_mqtt
@@ -111,6 +115,8 @@ module "ecs_service_volttron" {
   ca_cert_secret_arn     = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:ca_cert::"
   client_cert_secret_arn = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:client_cert::"
   private_key_secret_arn = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:private_key::"
+  container_port         = 8000
+  target_group_arn       = module.volttron_alb.target_group_arn
 }
 
 module "aurora_postgresql" {
@@ -138,6 +144,18 @@ module "backend_alb" {
   health_check_path = "/health"
 }
 
+module "volttron_alb" {
+  source            = "../../modules/alb"
+  name              = "volttron-alb"
+  vpc_id            = module.vpc.vpc_id
+  subnet_ids        = module.vpc.private_subnet_ids
+  internal          = true
+  allowed_cidrs     = [module.vpc.cidr_block]
+  listener_port     = 80
+  target_port       = 8000
+  health_check_path = "/health"
+}
+
 module "ecr_backend" {
   source = "../../modules/ecr-repo"
   name   = "openadr-backend"
@@ -157,8 +175,8 @@ module "ecs_service_backend" {
   # -------- image ----------
   image = "${module.ecr_backend.repository_url}:latest"
 
-  # place in public subnet *for now* so it can reach ECR
-  subnet_ids        = module.vpc.public_subnets
+  subnet_ids        = module.vpc.private_subnet_ids
+  assign_public_ip  = false
   security_group_id = module.ecs_security_group.id
   target_group_arn  = module.backend_alb.target_group_arn
 

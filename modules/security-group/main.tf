@@ -15,6 +15,18 @@ variable "alb_vtn_sg_id" {
   default     = null
 }
 
+variable "alb_volttron_sg_id" {
+  type        = string
+  description = "SG ID of the Volttron ALB"
+  default     = null
+}
+
+variable "volttron_port" {
+  type        = number
+  description = "Port used by the Volttron VEN health check"
+  default     = 22916
+}
+
 resource "aws_security_group" "this" {
   name        = var.name
   description = "Security group for ECS tasks"
@@ -67,6 +79,16 @@ resource "aws_security_group_rule" "from_alb_vtn" {
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
   source_security_group_id = var.alb_vtn_sg_id
+}
+
+resource "aws_security_group_rule" "from_alb_volttron" {
+  count                    = var.alb_volttron_sg_id == null ? 0 : 1
+  type                     = "ingress"
+  from_port                = var.volttron_port
+  to_port                  = var.volttron_port
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.this.id
+  source_security_group_id = var.alb_volttron_sg_id
 }
 
 output "id" {

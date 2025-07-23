@@ -6,6 +6,7 @@ variable "subnet_ids" {
 }
 variable "security_group_id" {}
 variable "target_group_arn" {}
+variable "assign_public_ip" { default = true }
 variable "container_port" {
   default = 8000
 }
