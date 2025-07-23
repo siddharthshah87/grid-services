@@ -104,3 +104,22 @@ async def test_event_endpoints(async_client):
     assert resp.status_code == 200
     assert any(e["event_id"] == event_payload["event_id"] for e in resp.json())
 
+    resp = await async_client.delete(f"/events/{event_payload['event_id']}")
+    assert resp.status_code == 204
+
+    resp = await async_client.get(f"/events/{event_payload['event_id']}")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_ven(async_client):
+    ven_payload = {"ven_id": "ven_del", "registration_id": "reg_del"}
+    resp = await async_client.post("/vens/", json=ven_payload)
+    assert resp.status_code == 200
+
+    resp = await async_client.delete(f"/vens/{ven_payload['ven_id']}")
+    assert resp.status_code == 204
+
+    resp = await async_client.get("/vens/")
+    assert all(v["ven_id"] != ven_payload["ven_id"] for v in resp.json())
+
