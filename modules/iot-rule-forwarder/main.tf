@@ -1,8 +1,5 @@
 # modules/iot-rule-forwarder/main.tf
 
-variable "rule_name_prefix" {}
-variable "topics" { type = list(string) }
-
 # S3 bucket for captured messages
 resource "aws_s3_bucket" "log_bucket" {
   bucket        = "${var.rule_name_prefix}-mqtt-logs"
@@ -22,9 +19,9 @@ resource "aws_iam_role" "rule_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
-      Effect = "Allow",
+      Effect    = "Allow",
       Principal = { Service = "iot.amazonaws.com" },
-      Action = "sts:AssumeRole"
+      Action    = "sts:AssumeRole"
     }]
   })
 }
@@ -65,8 +62,8 @@ resource "aws_iot_topic_rule" "forward_rules" {
   }
 
   kinesis {
-    role_arn     = aws_iam_role.rule_role.arn
-    stream_name  = aws_kinesis_stream.log_stream.name
+    role_arn      = aws_iam_role.rule_role.arn
+    stream_name   = aws_kinesis_stream.log_stream.name
     partition_key = "iot"
   }
 }
