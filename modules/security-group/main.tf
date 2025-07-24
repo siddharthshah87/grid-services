@@ -21,6 +21,12 @@ variable "alb_volttron_sg_id" {
   default     = null
 }
 
+variable "enable_alb_volttron_rule" {
+  type        = bool
+  description = "Whether to create the Volttron ALB ingress rule"
+  default     = false
+}
+
 variable "volttron_port" {
   type        = number
   description = "Port used by the Volttron VEN health check"
@@ -82,7 +88,7 @@ resource "aws_security_group_rule" "from_alb_vtn" {
 }
 
 resource "aws_security_group_rule" "from_alb_volttron" {
-  count                    = var.alb_volttron_sg_id == null ? 0 : 1
+  count                    = var.enable_alb_volttron_rule ? 1 : 0
   type                     = "ingress"
   from_port                = var.volttron_port
   to_port                  = var.volttron_port

@@ -48,14 +48,15 @@ module "ecs_cluster" {
 }
 
 module "ecs_security_group" {
-  source             = "../../modules/security-group"
-  name               = "ecs-tasks-sg"
-  vpc_id             = module.vpc.vpc_id
-  allow_http         = false
-  alb_backend_sg_id  = module.backend_alb.security_group_id
-  alb_vtn_sg_id      = module.openadr_alb.security_group_id
-  alb_volttron_sg_id = module.volttron_alb.security_group_id
-  volttron_port      = 8000
+  source                   = "../../modules/security-group"
+  name                     = "ecs-tasks-sg"
+  vpc_id                   = module.vpc.vpc_id
+  allow_http               = false
+  alb_backend_sg_id        = module.backend_alb.security_group_id
+  alb_vtn_sg_id            = module.openadr_alb.security_group_id
+  alb_volttron_sg_id       = module.volttron_alb.security_group_id
+  enable_alb_volttron_rule = true
+  volttron_port            = 8000
 }
 
 module "ecs_task_roles" {
