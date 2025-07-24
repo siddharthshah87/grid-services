@@ -4,6 +4,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
+import pytest_asyncio
 
 os.environ.setdefault("DB_HOST", "test")
 os.environ.setdefault("DB_PORT", "5432")
@@ -33,8 +34,6 @@ def create_app() -> FastAPI:
 app = create_app()
 
 DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-import pytest_asyncio
 
 
 @pytest_asyncio.fixture(scope="module")
