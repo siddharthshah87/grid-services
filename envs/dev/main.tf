@@ -148,6 +148,7 @@ module "volttron_alb" {
   source            = "../../modules/alb"
   name              = "volttron-alb"
   vpc_id            = module.vpc.vpc_id
+  public_subnets    = module.vpc.public_subnets
   subnet_ids        = module.vpc.private_subnet_ids
   internal          = true
   allowed_cidrs     = [module.vpc.cidr_block]
