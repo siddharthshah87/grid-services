@@ -150,9 +150,10 @@ module "volttron_alb" {
   name              = "volttron-alb"
   vpc_id            = module.vpc.vpc_id
   public_subnets    = module.vpc.public_subnets
-  subnet_ids        = module.vpc.private_subnet_ids
-  internal          = true
-  allowed_cidrs     = [module.vpc.cidr_block]
+  # Expose the Volttron service publicly for easier debugging
+  # by placing the ALB in the public subnets and making it
+  # internet-facing. The default `internal` value is false
+  # and `allowed_cidrs` defaults to ["0.0.0.0/0"].
   listener_port     = 80
   target_port       = 8000
   health_check_path = "/health"
