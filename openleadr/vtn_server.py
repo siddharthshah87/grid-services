@@ -125,7 +125,10 @@ vtn = OpenADRServer(vtn_id="myVtn", http_port=8080, ven_lookup=ven_lookup)
 # ── Simple /health endpoint (same port 8080) -----------------------------
 app = web.Application()
 
-async def _health(_: web.Request):
+# Avoid runtime annotation errors on older Python versions by omitting the
+# Request type hint here. The handler simply returns a JSON payload
+# indicating whether the MQTT connection succeeded.
+async def _health(_):
     return web.json_response({"ok": mqtt_connected})
 
 app.router.add_get("/health", _health)
