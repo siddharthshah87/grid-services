@@ -1,103 +1,101 @@
 #!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# ECS + ALB one‑shot health snapshot
+#   • Prints desired/running counts, target‑group health, last logs per service
+#   • Never hangs: every AWS CLI call is wrapped in timeout & short CLI time‑outs
+#   • Works with either static or dynamic port mappings (uses target‑group API)
+#   • Requires: bash 4+, coreutils (timeout), jq, AWS CLI v2
+# -----------------------------------------------------------------------------
 set -Eeuo pipefail
 
-# -------------- CONFIG  -------------------------------------------------
-CLUSTERS=("hems-ecs-cluster")        # add more clusters if needed
-HEALTH_PATH="/health"               # path to curl on the ALB
-LOG_LINES=40                        # how many log lines to show when failing
-PROFILE="AdministratorAccess-923675928909"  # AWS profile
-REGION=$(aws configure get region --profile "$PROFILE")
-DATE_STR=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-echo "─── ECS and ALB Health check ───"
+# ─── Config (override via env vars or CLI args) ───────────────────────────────
+REGION="${AWS_REGION:-us-west-2}"
+PROFILE="${AWS_PROFILE:-default}"
+CLUSTER="${1:-hems-ecs-cluster}"
+LOG_LINES="${LOG_LINES:-40}"
+TIMEOUT="${TIMEOUT:-20s}"        # timeout per AWS call
 
-# -------------- FUNCTIONS  ----------------------------------------------
+# ─── AWS CLI base flags ———————————————————————————————————————————————
+AWS_BASE=(aws --region "$REGION" --profile "$PROFILE" \
+              --cli-connect-timeout 5 --cli-read-timeout 30 --no-paginate)
 
-json() { jq -r "$@" ; }
+# helper: AWS call with global timeout
+timeout_cmd() { timeout -k 5 "$TIMEOUT" "${AWS_BASE[@]}" "$@"; }
 
+# ANSI colors
+GREEN=$(tput setaf 2); RED=$(tput setaf 1); YEL=$(tput setaf 3); RESET=$(tput sgr0)
+
+# ─── Per‑service check ————————————————————————————————————————————————
 check_service() {
-  echo "─── ECS and ALB Health check Service ───"
-  local cluster="$1" service="$2"
+  local svc_arn="$1" svc_name="${svc_arn##*/}"
 
-  # --- Basic service status --------------------------------------------
+  # describe the service
   local svc_json
-  svc_json=$(aws ecs describe-services --cluster "$cluster" \
-               --services "$service" --profile "$PROFILE" --output json)
+  if ! svc_json=$(timeout_cmd ecs describe-services --cluster "$CLUSTER" \
+                    --services "$svc_arn" --output json 2>/dev/null); then
+    echo -e "${RED}$svc_name    ✖ describe-services failed${RESET}"
+    return
+  fi
 
-  local desired running pending taskDef
-  desired=$(echo "$svc_json" | json '.services[0].desiredCount')
-  running=$(echo "$svc_json" | json '.services[0].runningCount')
-  pending=$(echo "$svc_json" | json '.services[0].pendingCount')
-  taskDef=$(echo "$svc_json" | json '.services[0].taskDefinition')
+  local desired running tg_arn
+  desired=$(jq -r '.services[0].desiredCount' <<<"$svc_json")
+  running=$(jq -r '.services[0].runningCount' <<<"$svc_json")
+  tg_arn=$(jq -r '.services[0].loadBalancers[0].targetGroupArn // empty' <<<"$svc_json")
 
-  # --- Load balancer details -------------------------------------------
-  local tg_arn alb_arn
-  local alb_dns=""                       #— give it a default
+  # default summary line
+  local summary="$svc_name    desired=$desired running=$running"
 
-  tg_arn=$(echo "$svc_json" | json '.services[0].loadBalancers[0].targetGroupArn // empty')
-
+  # if a target group is attached, fetch its first target health
   if [[ -n "$tg_arn" ]]; then
-    alb_arn=$(aws elbv2 describe-target-groups --target-group-arns "$tg_arn" \
-              --query 'TargetGroups[0].LoadBalancerArns[0]' --output text \
-              --profile "$PROFILE" 2>/dev/null | tr -d '\r')
-
-    if [[ -n "$alb_arn" && "$alb_arn" != "None" ]]; then
-      alb_dns=$(aws elbv2 describe-load-balancers --load-balancer-arns "$alb_arn" \
-                --query 'LoadBalancers[0].DNSName' --output text \
-                --profile "$PROFILE" 2>/dev/null | tr -d '\r')
+    local th_json state reason
+    if th_json=$(timeout_cmd elbv2 describe-target-health --target-group-arn "$tg_arn" --output json 2>/dev/null); then
+      state=$(jq -r '.TargetHealthDescriptions[0].TargetHealth.State' <<<"$th_json")
+      reason=$(jq -r '.TargetHealthDescriptions[0].TargetHealth.Reason // ""' <<<"$th_json")
+      summary+="  tg=$state $reason"
+    else
+      summary+="  tg=unknown"
     fi
-  fi
-
-  # --- Target health ----------------------------------------------------
-  local target_state
-  if [[ -n "$tg_arn" ]]; then
-    target_state=$(aws elbv2 describe-target-health \
-                     --target-group-arn "$tg_arn" \
-                     --query 'TargetHealthDescriptions[*].TargetHealth.State' \
-                     --output text --profile "$PROFILE" 2>/dev/null | sort -u | tr '\n' ',' | sed 's/,$//')
   else
-    target_state="no-target-group"
+    summary+="  (no target‑group)"
   fi
 
-  # --- ALB curl check ---------------------------------------------------
-  local http_code curl_msg
-  if [[ -n "$alb_dns" ]]; then
-    http_code=$(curl -s -o /dev/null -w '%{http_code}' "http://$alb_dns${HEALTH_PATH}")
-    curl_msg="HTTP $http_code"
-  else
-    curl_msg="no-alb"
+  # colorize state
+  local color="$GREEN"
+  if [[ "$desired" -eq 0 ]]; then
+    color="$YEL"
+  elif [[ "$running" -lt "$desired" ]]; then
+    color="$RED"
   fi
+  echo -e "${color}${summary}${RESET}"
 
-  # --- Decide OK / FAIL -------------------------------------------------
-  local status="OK"
-  [[ "$desired" -ne "$running" || "$target_state" != "healthy"* || "$curl_msg" != "HTTP 200" ]] && status="FAIL"
-
-  printf "%-25s %-8s desired=%s running=%s tgt=%s curl=%s\n" \
-         "$service" "$status" "$desired" "$running" "$target_state" "$curl_msg"
-
-  # --- Fetch logs if failing -------------------------------------------
-  if [[ "$status" == "FAIL" ]]; then
-    echo "─── Logs (last $LOG_LINES lines) ───"
-    local log_group
-    log_group=$(aws ecs describe-task-definition --task-definition "$taskDef" \
-                 --profile "$PROFILE" \
-                 --query 'taskDefinition.containerDefinitions[0].logConfiguration.options."awslogs-group"' \
-                 --output text)
-    aws logs tail "$log_group" --since 10m --profile "$PROFILE"
-    echo
+  # recent logs (if group exists)
+  local log_group="/ecs/$svc_name"
+  if timeout_cmd logs describe-log-groups --log-group-name-prefix "$log_group" \
+        --query 'logGroups[0]' --output text 2>/dev/null | grep -q "$log_group"; then
+    echo "── Logs (last $LOG_LINES lines) ──"
+    timeout_cmd logs tail "$log_group" --since 15m --limit "$LOG_LINES" || true
   fi
+  echo
 }
 
-
-# -------------- MAIN  ---------------------------------------------------
-echo "▶︎ Health run $DATE_STR ($REGION, profile=$PROFILE)"
-echo
-
-for cluster in "${CLUSTERS[@]}"; do
-  echo "=== Cluster: $cluster ==="
-  svc_list=$(aws ecs list-services --cluster "$cluster" --profile "$PROFILE" --query 'serviceArns[*]' --output text)
-  for svc_arn in $svc_list; do
-    svc_name=$(basename "$svc_arn")
-    check_service "$cluster" "$svc_name"
-  done
+# ─── Main ————————————————————————————————————————————————————————————
+main() {
+  echo "─── ECS and ALB Health check ───"
+  echo "▶︎ Health run $(date -u '+%Y-%m-%dT%H:%M:%SZ') ($REGION, profile=$PROFILE)"
   echo
-done
+echo "=== Cluster: $CLUSTER ==="
+  
+  # fetch all services once, then iterate (throttling‑friendly)
+  local svc_arns
+  if ! svc_arns=$(timeout_cmd ecs list-services --cluster "$CLUSTER" --output text 2>/dev/null); then
+    echo -e "${RED}✖ Failed to list services for cluster $CLUSTER${RESET}"
+    exit 1
+  fi
+
+  for svc_arn in $svc_arns; do
+    check_service "$svc_arn"
+  done
+}
+
+main "$@"
+
