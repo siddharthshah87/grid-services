@@ -47,3 +47,8 @@ def test_handle_event_request_publishes():
     assert data["ven_id"] == "ven1"
     assert result[0]["targets"]["ven_id"] == "ven1"
 
+
+def test_openapi_spec_has_health():
+    module = load_module(mock.Mock())
+    assert "/health" in module.OPENAPI_SPEC["paths"]
+

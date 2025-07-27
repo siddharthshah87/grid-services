@@ -17,6 +17,49 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from aiohttp import web
 
+# ── OpenAPI spec --------------------------------------------------------
+OPENAPI_SPEC = {
+    "openapi": "3.0.0",
+    "info": {"title": "OpenLEADR VTN Server", "version": "1.0.0"},
+    "paths": {
+        "/health": {
+            "get": {
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "Service healthy",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"ok": {"type": "boolean"}},
+                                }
+                            }
+                        },
+                    }
+                },
+            }
+        }
+    },
+}
+
+SWAGGER_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+  <title>API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@4/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@4/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = () => { SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' }); };
+  </script>
+</body>
+</html>
+"""
+
 import paho.mqtt.client as mqtt
 from openleadr import OpenADRServer
 
@@ -125,11 +168,22 @@ vtn = OpenADRServer(vtn_id="myVtn", http_port=8080, ven_lookup=ven_lookup)
 # ── Simple /health endpoint (same port 8080) -----------------------------
 app = web.Application()
 
+async def _openapi(_: web.Request):
+    return web.json_response(OPENAPI_SPEC)
+
+async def _docs(_: web.Request):
+    return web.Response(text=SWAGGER_HTML, content_type="text/html")
+
 async def _health(_: web.Request):
     return web.json_response({"ok": mqtt_connected})
 
 app.router.add_get("/health", _health)
+app.router.add_get("/openapi.json", _openapi)
+app.router.add_get("/docs", _docs)
+
 vtn.app.router.add_get("/health", _health)
+vtn.app.router.add_get("/openapi.json", _openapi)
+vtn.app.router.add_get("/docs", _docs)
 
 # ── VEN listing HTTP server (separate port) ------------------------------
 class VenHandler(BaseHTTPRequestHandler):
