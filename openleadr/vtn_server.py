@@ -111,7 +111,6 @@ for attempt in range(1, 6):
         print(f"MQTT connect failed (try {attempt}/5): {e}", file=sys.stderr)
         time.sleep(min(2 ** attempt, 30))
 mqttc.loop_start()
-mqttc.loop_start()
 
 # ── Track registered VENs -----------------------------------------------
 active_vens: set[str] = set()
