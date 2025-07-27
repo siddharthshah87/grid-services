@@ -38,8 +38,8 @@ check_service() {
   fi
 
   local desired running tg_arn
-  desired=$(jq -r '.services[0].desiredCount' <<<"$svc_json")
-  running=$(jq -r '.services[0].runningCount' <<<"$svc_json")
+  desired=$(jq -r '.services[0].desiredCount // 0' <<<"$svc_json")
+  running=$(jq -r '.services[0].runningCount // 0' <<<"$svc_json")
   tg_arn=$(jq -r '.services[0].loadBalancers[0].targetGroupArn // empty' <<<"$svc_json")
 
   # default summary line
