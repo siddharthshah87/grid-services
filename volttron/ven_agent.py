@@ -11,6 +11,37 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import paho.mqtt.client as mqtt
 
+# ── OpenAPI spec --------------------------------------------------------
+OPENAPI_SPEC = {
+    "openapi": "3.0.0",
+    "info": {"title": "VOLTTRON VEN Agent", "version": "1.0.0"},
+    "paths": {
+        "/health": {
+            "get": {
+                "summary": "Health check",
+                "responses": {"200": {"description": "Service healthy"}}
+            }
+        }
+    },
+}
+
+SWAGGER_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+  <title>API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@4/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@4/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = () => { SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' }); };
+  </script>
+</body>
+</html>
+"""
+
 # ── helpers ────────────────────────────────────────────────────────────
 def _materialise_pem(var_name: str) -> str | None:
     """Return a file-path ready for paho.tls_set()."""
@@ -80,6 +111,20 @@ client.loop_start()
 # ── simple /health endpoint -------------------------------------------
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/openapi.json":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(OPENAPI_SPEC).encode())
+            return
+
+        if self.path == "/docs":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(SWAGGER_HTML.encode())
+            return
+
         status = 200 if connected else 503
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -87,12 +132,14 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps({"ok": connected}).encode())
 
 
+HEALTH_PORT = int(os.getenv("HEALTH_PORT", "8000"))
+
 def _start_health_server():
-    HTTPServer(("0.0.0.0", 8000), HealthHandler).serve_forever()
+    HTTPServer(("0.0.0.0", HEALTH_PORT), HealthHandler).serve_forever()
 
 
 threading.Thread(target=_start_health_server, daemon=True).start()
-print("🩺 Health server running on port 8000")
+print(f"🩺 Health server running on port {HEALTH_PORT}")
 
 # ── message handler ────────────────────────────────────────────────────
 def on_event(_client, _userdata, msg):

@@ -1,13 +1,16 @@
 import importlib.util
 from pathlib import Path
 from unittest import mock
+import os
 import json
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "ven_agent.py"
 
 
 def load_module(mock_client):
-    with mock.patch("paho.mqtt.client.Client", return_value=mock_client):
+    env = {"HEALTH_PORT": "0"}
+    with mock.patch.dict(os.environ, env, clear=False), \
+            mock.patch("paho.mqtt.client.Client", return_value=mock_client):
         spec = importlib.util.spec_from_file_location("ven_agent", MODULE_PATH)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -31,6 +34,11 @@ def test_main_one_iteration():
     with mock.patch("time.sleep"):
         module.main(iterations=1)
     assert mock_client.publish.call_count >= 2
+
+
+def test_openapi_spec_has_health():
+    module = load_module(mock.Mock())
+    assert "/health" in module.OPENAPI_SPEC["paths"]
 
 
 
