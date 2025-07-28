@@ -1,6 +1,7 @@
-
 #!/usr/bin/env bash
 set -euo pipefail
+
+REGION="${AWS_REGION:-us-west-2}"
 
 if [ -n "${AWS_PROFILE:-}" ]; then
   ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text --profile "$AWS_PROFILE")
