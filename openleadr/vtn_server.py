@@ -167,23 +167,22 @@ vtn = OpenADRServer(vtn_id="myVtn", http_port=8080, ven_lookup=ven_lookup)
 
 # ── Simple /health endpoint (same port 8080) -----------------------------
 app = web.Application()
+routes = web.RouteTableDef()
 
+@routes.get("/openapi.json")
 async def _openapi(_: web.Request):
     return web.json_response(OPENAPI_SPEC)
 
+@routes.get("/docs")
 async def _docs(_: web.Request):
     return web.Response(text=SWAGGER_HTML, content_type="text/html")
 
+@routes.get("/health")
 async def _health(_: web.Request):
     return web.json_response({"ok": mqtt_connected})
 
-app.router.add_get("/health", _health)
-app.router.add_get("/openapi.json", _openapi)
-app.router.add_get("/docs", _docs)
-
-vtn.app.router.add_get("/health", _health)
-vtn.app.router.add_get("/openapi.json", _openapi)
-vtn.app.router.add_get("/docs", _docs)
+app.add_routes(routes)
+vtn.app.add_routes(routes)
 
 # ── VEN listing HTTP server (separate port) ------------------------------
 class VenHandler(BaseHTTPRequestHandler):

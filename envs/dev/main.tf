@@ -146,10 +146,10 @@ module "backend_alb" {
 }
 
 module "volttron_alb" {
-  source            = "../../modules/alb"
-  name              = "volttron-alb"
-  vpc_id            = module.vpc.vpc_id
-  public_subnets    = module.vpc.public_subnets
+  source         = "../../modules/alb"
+  name           = "volttron-alb"
+  vpc_id         = module.vpc.vpc_id
+  public_subnets = module.vpc.public_subnets
   # Expose the Volttron service publicly for easier debugging
   # by placing the ALB in the public subnets and making it
   # internet-facing. The default `internal` value is false
