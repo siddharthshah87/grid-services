@@ -15,6 +15,8 @@ fi
 REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/openleadr-vtn"
 eval "$LOGIN_CMD" | docker login --username AWS --password-stdin "$REPO_URI"
 
+cd "$(dirname "$0")"
+
 echo "Building and pushing to $REPO_URI..."
 docker build -t openleadr-vtn .
 docker tag openleadr-vtn:latest "$REPO_URI:latest"
