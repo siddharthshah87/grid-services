@@ -18,6 +18,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+
     steps:
       - uses: actions/checkout@v4
 
@@ -53,4 +54,48 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply -auto-approve
+        working-directory: envs/dev
+
+      - name: Wait for ECS services to register with ALBs
+        run: sleep 30
+
+      - name: Fetch and check ALB URLs
+        run: |
+          terraform output -json > tf_output.json
+
+          get_output() {
+            jq -r ".$1.value" tf_output.json
+          }
+
+          check_url() {
+            local url="$1"
+            local name="$2"
+            local retries=5
+            local delay=10
+            echo "🔍 Checking $name at $url ..."
+            for i in $(seq 1 $retries); do
+              if curl -fsS --max-time 3 "http://$url/health" > /dev/null; then
+                echo "✅ $name is healthy."
+                return 0
+              else
+                echo "❌ Attempt $i failed. Retrying in $delay seconds..."
+                sleep $delay
+              fi
+            done
+            echo "❌ $name did not respond after $retries attempts."
+            return 1
+          }
+
+          OPENLEADR_URL=$(get_output openleadr_alb_dns_name)
+          VOLTTRON_URL=$(get_output volttron_alb_dns_name)
+          BACKEND_URL=$(get_output backend_alb_dns_name)
+
+          echo "### 🚀 Deployed Service URLs" >> $GITHUB_STEP_SUMMARY
+          echo "- OpenLEADR VTN: http://$OPENLEADR_URL" >> $GITHUB_STEP_SUMMARY
+          echo "- Volttron VEN:  http://$VOLTTRON_URL" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend API:   http://$BACKEND_URL" >> $GITHUB_STEP_SUMMARY
+
+          check_url "$OPENLEADR_URL" "OpenLEADR VTN"
+          check_url "$VOLTTRON_URL" "Volttron VEN"
+          check_url "$BACKEND_URL" "Backend API"
         working-directory: envs/dev
