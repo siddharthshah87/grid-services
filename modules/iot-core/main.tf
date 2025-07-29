@@ -49,6 +49,7 @@ resource "aws_iot_policy_attachment" "attach" {
 resource "aws_iot_thing_principal_attachment" "thing_cert_attach" {
   thing     = aws_iot_thing.device_sim.name
   principal = aws_iot_certificate.cert.arn
+  depends_on = [aws_iot_thing.device_sim, aws_iot_certificate.cert]
 }
 
 
