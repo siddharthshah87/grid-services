@@ -75,7 +75,7 @@ resource "aws_security_group_rule" "from_alb_backend" {
   to_port                  = 8000
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = each.value
+  source_security_group_id = var.alb_backend_sg_id
 }
 
 resource "aws_security_group_rule" "from_alb_vtn" {
@@ -85,7 +85,7 @@ resource "aws_security_group_rule" "from_alb_vtn" {
   to_port                  = 8080
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = each.value
+  source_security_group_id = var.alb_vtn_sg_id
 }
 
 resource "aws_security_group_rule" "from_alb_volttron" {
@@ -95,7 +95,7 @@ resource "aws_security_group_rule" "from_alb_volttron" {
   to_port                  = var.volttron_port
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = each.value
+  source_security_group_id = var.alb_volttron_sg_id
 }
 
 output "id" {
