@@ -34,6 +34,7 @@ resource "aws_iot_policy" "allow_publish_subscribe" {
 
 resource "aws_iot_thing" "device_sim" {
   name = "${var.prefix}_thing"
+  depends_on = [aws_iot_thing.device_sim, aws_iot_certificate.cert]
 }
 
 resource "aws_iot_certificate" "cert" {
