@@ -69,33 +69,42 @@ resource "aws_security_group" "this" {
 }
 
 resource "aws_security_group_rule" "from_alb_backend" {
-  count                    = try(var.alb_backend_sg_id != null, false) ? 1 : 0
+  for_each = var.alb_backend_sg_id != null ? {
+    backend = var.alb_backend_sg_id
+  } : {}
+
   type                     = "ingress"
   from_port                = 8000
   to_port                  = 8000
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = var.alb_backend_sg_id
+  source_security_group_id = each.value
 }
 
 resource "aws_security_group_rule" "from_alb_vtn" {
-  count                    = try(var.alb_vtn_sg_id != null, false) ? 1 : 0
+  for_each = var.alb_vtn_sg_id != null ? {
+    vtn = var.alb_vtn_sg_id
+  } : {}
+
   type                     = "ingress"
   from_port                = 8080
   to_port                  = 8080
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = var.alb_vtn_sg_id
+  source_security_group_id = each.value
 }
 
 resource "aws_security_group_rule" "from_alb_volttron" {
-  count                    = try(var.alb_volttron_sg_id != null, false) ? 1 : 0
+  for_each = var.alb_volttron_sg_id != null && var.enable_alb_volttron_rule ? {
+    volttron = var.alb_volttron_sg_id
+  } : {}
+
   type                     = "ingress"
   from_port                = var.volttron_port
   to_port                  = var.volttron_port
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = var.alb_volttron_sg_id
+  source_security_group_id = each.value
 }
 
 output "id" {
