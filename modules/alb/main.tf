@@ -67,7 +67,6 @@ resource "aws_lb_target_group" "this" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
   }
-  depends_on = [aws_lb_listener.http]
 }
 
 # --- HTTP listener ----------------------------------------------------------
