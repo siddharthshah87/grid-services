@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export AWS_PROFILE=AdministratorAccess-923675928909
 REGION="us-west-2"
 CLUSTER_NAME="hems-ecs-cluster"
+
+# Only set AWS_PROFILE if not running in CI
+if [[ -z "${CI:-}" ]]; then
+  export AWS_PROFILE="AdministratorAccess-923675928909"
+  echo "🔐 Using AWS_PROFILE=$AWS_PROFILE"
+else
+  unset AWS_PROFILE
+  echo "🔐 Running in CI: using AWS OIDC credentials"
+fi
 
 echo "📦 Importing existing AWS resources into Terraform..."
 
