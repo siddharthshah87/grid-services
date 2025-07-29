@@ -52,8 +52,18 @@ jobs:
         run: terraform init -input=false
         working-directory: envs/dev
 
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: envs/dev
+
       - name: Import existing resources
+        env:
+          CI: "true"
         run: ./terraform_import.sh
+        working-directory: envs/dev
+
+      - name: Terraform Plan
+        run: terraform plan -input=false
         working-directory: envs/dev
 
       - name: Terraform Apply
