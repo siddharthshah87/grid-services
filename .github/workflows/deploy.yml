@@ -52,6 +52,10 @@ jobs:
         run: terraform init -input=false
         working-directory: envs/dev
 
+      - name: Import existing resources
+        run: ./terraform_import.sh
+        working-directory: envs/dev
+
       - name: Terraform Apply
         run: terraform apply -auto-approve
         working-directory: envs/dev
