@@ -38,6 +38,7 @@ resource "aws_iot_thing" "device_sim" {
 
 resource "aws_iot_certificate" "cert" {
   active = true
+  depends_on = [aws_iot_thing.device_sim, aws_iot_certificate.cert]
 }
 
 resource "aws_iot_policy_attachment" "attach" {
