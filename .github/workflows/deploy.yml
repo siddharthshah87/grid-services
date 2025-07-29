@@ -61,6 +61,7 @@ jobs:
           CI: "true"
         run: ./terraform_import.sh
         working-directory: envs/dev
+        shell: bash
 
       - name: Terraform Plan
         run: terraform plan -input=false
