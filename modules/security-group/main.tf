@@ -1,24 +1,27 @@
 # modules/security-group/main.tf
-
 variable "name" {}
 variable "vpc_id" {}
-variable "allow_http" { default = true }
+variable "allow_http" {
+  type    = bool
+  default = true
+}
+
 variable "alb_backend_sg_id" {
   type        = string
   description = "SG ID of the backend ALB"
-  default     = null # allow the module to be used without a backend ALB
+  default     = ""
 }
 
 variable "alb_vtn_sg_id" {
   type        = string
   description = "SG ID of the VTN ALB"
-  default     = null
+  default     = ""
 }
 
 variable "alb_volttron_sg_id" {
   type        = string
   description = "SG ID of the Volttron ALB"
-  default     = null
+  default     = ""
 }
 
 variable "enable_alb_volttron_rule" {
@@ -69,42 +72,36 @@ resource "aws_security_group" "this" {
 }
 
 resource "aws_security_group_rule" "from_alb_backend" {
-  for_each = var.alb_backend_sg_id != null ? {
-    backend = var.alb_backend_sg_id
-  } : {}
+  count = var.alb_backend_sg_id != "" ? 1 : 0
 
   type                     = "ingress"
   from_port                = 8000
   to_port                  = 8000
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = each.value
+  source_security_group_id = var.alb_backend_sg_id
 }
 
 resource "aws_security_group_rule" "from_alb_vtn" {
-  for_each = var.alb_vtn_sg_id != null ? {
-    vtn = var.alb_vtn_sg_id
-  } : {}
+  count = var.alb_vtn_sg_id != "" ? 1 : 0
 
   type                     = "ingress"
   from_port                = 8080
   to_port                  = 8080
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = each.value
+  source_security_group_id = var.alb_vtn_sg_id
 }
 
 resource "aws_security_group_rule" "from_alb_volttron" {
-  for_each = var.alb_volttron_sg_id != null && var.enable_alb_volttron_rule ? {
-    volttron = var.alb_volttron_sg_id
-  } : {}
+  count = var.enable_alb_volttron_rule && var.alb_volttron_sg_id != "" ? 1 : 0
 
   type                     = "ingress"
   from_port                = var.volttron_port
   to_port                  = var.volttron_port
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = each.value
+  source_security_group_id = var.alb_volttron_sg_id
 }
 
 output "id" {
