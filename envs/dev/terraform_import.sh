@@ -18,14 +18,14 @@ echo "📦 Importing existing AWS resources into Terraform..."
 
 # Helper function to check if resource is already imported
 is_imported() {
-  terraform -chdir=envs/dev state list | grep -qx "$1"
+  terraform state list | grep -qx "$1"
 }
 
 # Safe import wrapper
 safe_import() {
   local addr=$1
   local id=$2
-  if ! terraform -chdir=envs/dev import "$addr" "$id"; then
+  if ! terraform import "$addr" "$id"; then
     echo "⚠️ Failed to import $addr. Continuing..."
   fi
 }
