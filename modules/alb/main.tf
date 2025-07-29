@@ -99,3 +99,14 @@ output "dns_name" { value = aws_lb.this.dns_name }
 output "target_group_arn" { value = aws_lb_target_group.this.arn }
 output "security_group_id" { value = aws_security_group.alb_sg.id }
 
+# Expose the listener and target group resources so that other modules can
+# explicitly depend on them. This prevents race conditions when creating
+# resources like ECS services that reference these objects via variables.
+output "listener" {
+  value = aws_lb_listener.http
+}
+
+output "target_group" {
+  value = aws_lb_target_group.this
+}
+
