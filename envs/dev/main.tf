@@ -48,15 +48,10 @@ module "ecs_cluster" {
 }
 
 module "ecs_security_group" {
-  source                   = "../../modules/security-group"
-  name                     = "ecs-tasks-sg"
-  vpc_id                   = module.vpc.vpc_id
-  allow_http               = false
-  alb_backend_sg_id        = module.backend_alb.security_group_id
-  alb_vtn_sg_id            = module.openadr_alb.security_group_id
-  alb_volttron_sg_id       = module.volttron_alb.security_group_id
-  enable_alb_volttron_rule = true
-  volttron_port            = 8000
+  source     = "../../modules/security-group"
+  name       = "ecs-tasks-sg"
+  vpc_id     = module.vpc.vpc_id
+  allow_http = false
 }
 
 module "ecs_task_roles" {
@@ -157,6 +152,35 @@ module "volttron_alb" {
   listener_port     = 80
   target_port       = 8000
   health_check_path = "/health"
+}
+
+# Ingress rules allowing traffic from the ALBs to the ECS tasks
+resource "aws_security_group_rule" "ecs_from_backend_alb" {
+  type                     = "ingress"
+  from_port                = 8000
+  to_port                  = 8000
+  protocol                 = "tcp"
+  security_group_id        = module.ecs_security_group.id
+  source_security_group_id = module.backend_alb.security_group_id
+}
+
+resource "aws_security_group_rule" "ecs_from_openadr_alb" {
+  type                     = "ingress"
+  from_port                = 8080
+  to_port                  = 8080
+  protocol                 = "tcp"
+  security_group_id        = module.ecs_security_group.id
+  source_security_group_id = module.openadr_alb.security_group_id
+}
+
+resource "aws_security_group_rule" "ecs_from_volttron_alb" {
+  count                    = var.enable_volttron_alb_rule ? 1 : 0
+  type                     = "ingress"
+  from_port                = var.volttron_port
+  to_port                  = var.volttron_port
+  protocol                 = "tcp"
+  security_group_id        = module.ecs_security_group.id
+  source_security_group_id = module.volttron_alb.security_group_id
 }
 
 module "ecr_backend" {

@@ -6,35 +6,6 @@ variable "allow_http" {
   default = true
 }
 
-variable "alb_backend_sg_id" {
-  type        = string
-  description = "SG ID of the backend ALB"
-  default     = ""
-}
-
-variable "alb_vtn_sg_id" {
-  type        = string
-  description = "SG ID of the VTN ALB"
-  default     = ""
-}
-
-variable "alb_volttron_sg_id" {
-  type        = string
-  description = "SG ID of the Volttron ALB"
-  default     = ""
-}
-
-variable "enable_alb_volttron_rule" {
-  type        = bool
-  description = "Whether to create the Volttron ALB ingress rule"
-  default     = false
-}
-
-variable "volttron_port" {
-  type        = number
-  description = "Port used by the Volttron VEN health check"
-  default     = 22916
-}
 
 resource "aws_security_group" "this" {
   name        = var.name
@@ -71,38 +42,6 @@ resource "aws_security_group" "this" {
   }
 }
 
-resource "aws_security_group_rule" "from_alb_backend" {
-  count = var.alb_backend_sg_id != "" ? 1 : 0
-
-  type                     = "ingress"
-  from_port                = 8000
-  to_port                  = 8000
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.this.id
-  source_security_group_id = var.alb_backend_sg_id
-}
-
-resource "aws_security_group_rule" "from_alb_vtn" {
-  count = var.alb_vtn_sg_id != "" ? 1 : 0
-
-  type                     = "ingress"
-  from_port                = 8080
-  to_port                  = 8080
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.this.id
-  source_security_group_id = var.alb_vtn_sg_id
-}
-
-resource "aws_security_group_rule" "from_alb_volttron" {
-  count = var.enable_alb_volttron_rule && var.alb_volttron_sg_id != "" ? 1 : 0
-
-  type                     = "ingress"
-  from_port                = var.volttron_port
-  to_port                  = var.volttron_port
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.this.id
-  source_security_group_id = var.alb_volttron_sg_id
-}
 
 output "id" {
   value = aws_security_group.this.id
