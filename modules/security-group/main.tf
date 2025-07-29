@@ -69,7 +69,7 @@ resource "aws_security_group" "this" {
 }
 
 resource "aws_security_group_rule" "from_alb_backend" {
-  for_each                 = var.alb_backend_sg_id != null ? { backend = var.alb_backend_sg_id } : {}
+  count                    = try(var.alb_backend_sg_id != null, false) ? 1 : 0
   type                     = "ingress"
   from_port                = 8000
   to_port                  = 8000
@@ -79,7 +79,7 @@ resource "aws_security_group_rule" "from_alb_backend" {
 }
 
 resource "aws_security_group_rule" "from_alb_vtn" {
-  for_each                 = var.alb_vtn_sg_id != null ? { vtn = var.alb_vtn_sg_id } : {}
+  count                    = try(var.alb_vtn_sg_id != null, false) ? 1 : 0
   type                     = "ingress"
   from_port                = 8080
   to_port                  = 8080
@@ -89,7 +89,7 @@ resource "aws_security_group_rule" "from_alb_vtn" {
 }
 
 resource "aws_security_group_rule" "from_alb_volttron" {
-  for_each                 = var.enable_alb_volttron_rule ? { volttron = var.alb_volttron_sg_id } : {}
+  count                    = try(var.alb_volttron_sg_id != null, false) ? 1 : 0
   type                     = "ingress"
   from_port                = var.volttron_port
   to_port                  = var.volttron_port
