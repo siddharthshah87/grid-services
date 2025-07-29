@@ -43,6 +43,7 @@ resource "aws_iot_certificate" "cert" {
 resource "aws_iot_policy_attachment" "attach" {
   policy = aws_iot_policy.allow_publish_subscribe.name
   target = aws_iot_certificate.cert.arn
+  depends_on = [aws_iot_certificate.cert, aws_iot_policy.allow_publish_subscribe]
 }
 
 resource "aws_iot_thing_principal_attachment" "thing_cert_attach" {
