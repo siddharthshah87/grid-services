@@ -46,13 +46,6 @@ resource "aws_security_group" "this" {
     description = "PostgreSQL access from ECS tasks and Aurora"
   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   dynamic "ingress" {
     for_each = var.allow_http ? [1] : []
     content {
@@ -63,41 +56,48 @@ resource "aws_security_group" "this" {
     }
   }
 
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   tags = {
     Name = var.name
   }
 }
+
 resource "aws_security_group_rule" "from_alb_backend" {
-  count                    = var.alb_backend_sg_id == null ? 0 : 1
+  for_each                 = var.alb_backend_sg_id != null ? { backend = var.alb_backend_sg_id } : {}
   type                     = "ingress"
   from_port                = 8000
   to_port                  = 8000
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = var.alb_backend_sg_id
+  source_security_group_id = each.value
 }
 
 resource "aws_security_group_rule" "from_alb_vtn" {
-  count                    = var.alb_vtn_sg_id == null ? 0 : 1
+  for_each                 = var.alb_vtn_sg_id != null ? { vtn = var.alb_vtn_sg_id } : {}
   type                     = "ingress"
   from_port                = 8080
   to_port                  = 8080
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = var.alb_vtn_sg_id
+  source_security_group_id = each.value
 }
 
 resource "aws_security_group_rule" "from_alb_volttron" {
-  count                    = var.enable_alb_volttron_rule ? 1 : 0
+  for_each                 = var.enable_alb_volttron_rule ? { volttron = var.alb_volttron_sg_id } : {}
   type                     = "ingress"
   from_port                = var.volttron_port
   to_port                  = var.volttron_port
   protocol                 = "tcp"
   security_group_id        = aws_security_group.this.id
-  source_security_group_id = var.alb_volttron_sg_id
+  source_security_group_id = each.value
 }
 
 output "id" {
   value = aws_security_group.this.id
 }
-
