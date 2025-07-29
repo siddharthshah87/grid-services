@@ -90,7 +90,13 @@ module "ecs_service_openadr" {
     }
   ]
 
-  depends_on = [module.openadr_alb]
+  # Ensure the ECS service waits for the ALB listener and target group to be
+  # created before attempting to register. This avoids race conditions during
+  # provisioning.
+  depends_on = [
+    module.openadr_alb.listener,
+    module.openadr_alb.target_group
+  ]
 }
 
 module "ecs_service_volttron" {
@@ -113,6 +119,12 @@ module "ecs_service_volttron" {
   private_key_secret_arn = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:private_key::"
   container_port         = 8000
   target_group_arn       = module.volttron_alb.target_group_arn
+
+  # Wait for the ALB listener and target group before creating the service.
+  depends_on = [
+    module.volttron_alb.listener,
+    module.volttron_alb.target_group
+  ]
 }
 
 module "aurora_postgresql" {
@@ -225,7 +237,10 @@ module "ecs_service_backend" {
   aws_region = var.aws_region
 
   depends_on = [
-    module.backend_alb,
+    # Ensure the backend ALB listener and target group exist before
+    # creating the ECS service to avoid provisioning race conditions.
+    module.backend_alb.listener,
+    module.backend_alb.target_group,
     module.aurora_postgresql
   ]
 }
