@@ -30,32 +30,26 @@ resource "aws_iot_policy_attachment" "attach" {
   policy = aws_iot_policy.allow_publish_subscribe.name
   target = aws_iot_certificate.cert.arn
 
-  depends_on = [aws_iot_certificate.cert, aws_iot_policy.allow_publish_subscribe]
+  depends_on = [
+    aws_iot_certificate.cert,
+    aws_iot_policy.allow_publish_subscribe
+  ]
 }
 
 resource "aws_iot_thing_principal_attachment" "thing_cert_attach" {
   thing     = aws_iot_thing.device_sim.name
   principal = aws_iot_certificate.cert.arn
 
-  depends_on = [aws_iot_certificate.cert, aws_iot_thing.device_sim]
+  depends_on = [
+    aws_iot_certificate.cert,
+    aws_iot_thing.device_sim
+  ]
 }
 
-# Important: Certificate depends on attachments to be destroyed first
-# otherwise "thing is still attached to one or more principals"
+# 🔐 Helps Terraform destroy attachments first before cert/thing
 resource "null_resource" "detach_ordering" {
   depends_on = [
     aws_iot_thing_principal_attachment.thing_cert_attach,
     aws_iot_policy_attachment.attach
   ]
-}
-
-# Optional: force ordering for destroy
-resource "aws_iot_thing" "safe_device_sim" {
-  name = aws_iot_thing.device_sim.name
-  depends_on = [null_resource.detach_ordering]
-}
-
-resource "aws_iot_certificate" "safe_cert" {
-  active = true
-  depends_on = [null_resource.detach_ordering]
 }
