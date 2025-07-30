@@ -89,11 +89,6 @@ module "ecs_service_openadr" {
       valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:openleadr-iot-cert-bundle-oWaWux"
     }
   ]
-  db_host                   = module.aurora_postgresql.db_host
-  db_user                   = module.aurora_postgresql.db_user
-  db_password               = module.aurora_postgresql.db_password
-  db_name                   = module.aurora_postgresql.db_name
-  run_migrations_on_startup = false
 
   # Ensure the ECS service waits for the ALB listener and target group to be
   # created before attempting to register. This avoids race conditions during
