@@ -47,12 +47,7 @@ resource "aws_ecs_task_definition" "this" {
         { name = "MQTT_TOPIC_RESPONSES", value = var.mqtt_topic_responses },
         { name = "MQTT_TOPIC_METERING", value = var.mqtt_topic_metering },
         { name = "IOT_ENDPOINT", value = var.iot_endpoint },
-        { name = "VENS_PORT", value = tostring(var.vens_port) },
-        { name = "DB_HOST", value = var.db_host },
-        { name = "DB_USER", value = var.db_user },
-        { name = "DB_PASSWORD", value = var.db_password },
-        { name = "DB_NAME", value = var.db_name },
-        { name = "RUN_MIGRATIONS_ON_STARTUP", value = tostring(var.run_migrations_on_startup) }
+        { name = "VENS_PORT", value = tostring(var.vens_port) }
       ]
       secrets = var.environment_secrets
       logConfiguration = {
