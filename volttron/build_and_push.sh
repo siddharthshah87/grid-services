@@ -12,7 +12,7 @@ else
   LOGIN_CMD="aws ecr get-login-password --region \"$REGION\""
 fi
 
-REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/openleadr-vtn"
+REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/volttron-ven"
 eval "$LOGIN_CMD" | docker login --username AWS --password-stdin "$REPO_URI"
 
 cd "$(dirname "$0")"
