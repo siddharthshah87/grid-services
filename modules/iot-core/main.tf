@@ -30,26 +30,50 @@ resource "aws_iot_policy_attachment" "attach" {
   policy = aws_iot_policy.allow_publish_subscribe.name
   target = aws_iot_certificate.cert.arn
 
-  depends_on = [
-    aws_iot_certificate.cert,
-    aws_iot_policy.allow_publish_subscribe
-  ]
+  depends_on = [aws_iot_certificate.cert, aws_iot_policy.allow_publish_subscribe]
 }
 
 resource "aws_iot_thing_principal_attachment" "thing_cert_attach" {
   thing     = aws_iot_thing.device_sim.name
   principal = aws_iot_certificate.cert.arn
 
-  depends_on = [
-    aws_iot_certificate.cert,
-    aws_iot_thing.device_sim
-  ]
+  depends_on = [aws_iot_certificate.cert, aws_iot_thing.device_sim]
 }
 
-# 🔐 Helps Terraform destroy attachments first before cert/thing
+resource "aws_iot_topic_rule" "forward_to_s3" {
+  count       = var.enable_logging ? 1 : 0
+  name        = "${var.prefix}_mqtt_log"
+  enabled     = true
+  sql         = "SELECT * FROM 'oadr/#'"
+  sql_version = "2016-03-23"
+
+  s3 {
+    bucket_name = var.s3_bucket
+    key         = "logs/${var.prefix}/${timestamp()}.json"
+    role_arn    = var.iot_role_arn
+  }
+}
+
+# Enforce destroy ordering to prevent "still attached to principal" errors
 resource "null_resource" "detach_ordering" {
   depends_on = [
     aws_iot_thing_principal_attachment.thing_cert_attach,
     aws_iot_policy_attachment.attach
   ]
+}
+
+# Optional: duplicate resources to block premature destroy
+resource "aws_iot_thing" "safe_device_sim" {
+  name       = aws_iot_thing.device_sim.name
+  depends_on = [null_resource.detach_ordering]
+}
+
+resource "aws_iot_certificate" "safe_cert" {
+  active     = true
+  depends_on = [null_resource.detach_ordering]
+}
+
+# ✅ Required for output
+data "aws_iot_endpoint" "endpoint" {
+  endpoint_type = "iot:Data-ATS"
 }
