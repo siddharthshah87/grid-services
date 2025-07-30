@@ -167,7 +167,7 @@ async def ven_lookup(ven_id: str) -> bool:
     return ven_id in active_vens
 
 # ── Start OpenADR server -------------------------------------------------
-vtn = OpenADRServer(vtn_id="myVtn", http_port=8080, ven_lookup=ven_lookup)
+vtn = OpenADRServer(vtn_id="myVtn", http_port=8080, http_host="0.0.0.0", ven_lookup=ven_lookup)
 
 # ── Simple /health endpoint (same port 8080) -----------------------------
 app = web.Application()
@@ -207,5 +207,5 @@ if __name__ == "__main__":
     print("********************************************************************************")
     print(" Starting VTN ‣ http://0.0.0.0:8080/OpenADR2/Simple/2.0b")
     print("********************************************************************************")
-    asyncio.run(vtn.run(host="0.0.0.0"))   # <-- key change: bind to 0.0.0.0
+    asyncio.run(vtn.run())   # <-- key change: bind to 0.0.0.0
 
