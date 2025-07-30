@@ -50,16 +50,11 @@ resource "aws_ecs_task_definition" "this" {
         { name = "VENS_PORT", value = tostring(var.vens_port) },
         { name = "DB_HOST", value = var.db_host },
         { name = "DB_USER", value = var.db_user },
+        { name = "DB_PASSWORD", value = var.db_password },
         { name = "DB_NAME", value = var.db_name },
         { name = "RUN_MIGRATIONS_ON_STARTUP", value = tostring(var.run_migrations_on_startup) }
       ]
-      secrets = concat(
-        var.environment_secrets,
-        [{
-          name      = "DB_PASSWORD"
-          valueFrom = var.db_password
-        }]
-      )
+      secrets = var.environment_secrets
       logConfiguration = {
         logDriver = "awslogs"
         options = {
