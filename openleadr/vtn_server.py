@@ -86,6 +86,13 @@ MQTT_TOPIC_RESPONSES = os.getenv("MQTT_TOPIC_RESPONSES","openadr/response")
 IOT_ENDPOINT         = os.getenv("IOT_ENDPOINT",        "localhost")
 VENS_PORT            = int(os.getenv("VENS_PORT", 8081))
 
+MQTT_PORT = int(
+    os.getenv(
+        "MQTT_PORT",
+        "8883" if IOT_ENDPOINT != "localhost" else "1883",
+    )
+)
+
 bundle_json = os.getenv("CERT_BUNDLE_JSON")
 CA_CERT_PEM = CLIENT_CERT_PEM = PRIVATE_KEY_PEM = None
 if bundle_json:
@@ -133,9 +140,6 @@ if CA_CERT_PEM and CLIENT_CERT_PEM and PRIVATE_KEY_PEM:
         tmp_dir.cleanup()
 
     mqttc.tls_set(ca_certs=ca_path, certfile=cert_path, keyfile=key_path)
-    MQTT_PORT = 8883
-else:
-    MQTT_PORT = 1883
 
 # ── MQTT client ----------------------------------------------------------
 mqtt_connected = False
