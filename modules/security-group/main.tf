@@ -37,6 +37,10 @@ resource "aws_security_group" "this" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  lifecycle {
+    prevent_destroy = true
+  }
+
   tags = {
     Name = var.name
   }

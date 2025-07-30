@@ -1,0 +1,69 @@
+name: Terraform Infra
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (e.g., dev, prod)"
+        required: true
+        default: "dev"
+
+env:
+  TF_VERSION: 1.9.0
+  AWS_REGION: us-west-2
+
+jobs:
+  infra:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+        working-directory: envs/${{ github.event.inputs.environment }}
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: envs/${{ github.event.inputs.environment }}
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -input=false -detailed-exitcode -out=tfplan
+          echo "exitcode=$?" >> $GITHUB_OUTPUT
+        working-directory: envs/${{ github.event.inputs.environment }}
+        continue-on-error: true
+
+      - name: Fail on plan errors
+        if: steps.plan.outputs.exitcode == '1'
+        run: exit 1
+
+      - name: Check for destroy actions
+        run: |
+          terraform show -no-color tfplan > plan.txt
+          if grep -q 'Destroy' plan.txt; then
+            echo '::error::Plan includes resource destruction.'
+            exit 1
+          fi
+        working-directory: envs/${{ github.event.inputs.environment }}
+
+      - name: Terraform Apply
+        if: steps.plan.outputs.exitcode == '2'
+        run: terraform apply -auto-approve tfplan
+        working-directory: envs/${{ github.event.inputs.environment }}
