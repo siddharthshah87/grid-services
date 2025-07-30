@@ -53,3 +53,21 @@ jobs:
               --force-new-deployment \
               --region $AWS_REGION
           done
+
+      - name: Verify ECS Services are Healthy
+        run: |
+          for svc in openadr-backend openleadr-vtn volttron-ven; do
+            echo "Checking service: $svc"
+            aws ecs wait services-stable \
+              --cluster $CLUSTER_NAME \
+              --services "$svc" \
+              --region $AWS_REGION
+            echo "$svc is stable ✅"
+          done
+
+      - name: Print ECR Image Summary
+        run: |
+          echo "### Images Deployed" >> $GITHUB_STEP_SUMMARY
+          for svc in openadr-backend openleadr-vtn volttron-ven; do
+            echo "- $svc deployed to ECS cluster: $CLUSTER_NAME" >> $GITHUB_STEP_SUMMARY
+          done
