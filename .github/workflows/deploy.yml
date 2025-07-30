@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment (e.g., dev, prod)'
-        required: false
-        default: 'dev'
+        description: "Target environment (e.g., dev, prod)"
+        required: true
+        default: "dev"
 
 env:
   TF_VERSION: 1.9.0
@@ -15,66 +15,69 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
     permissions:
       id-token: write
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v4
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: ☁️ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: 🔐 Login to Amazon ECR
         run: |
-          REGION="${AWS_REGION:-us-west-2}"
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "Logging in to ECR for account $ACCOUNT_ID in region $REGION..."
-          aws ecr get-login-password --region "$REGION" | \
-            docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+          aws ecr get-login-password --region $AWS_REGION | \
+            docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-      - name: Build and push openleadr image
+      - name: 🐍 Build & Push OpenLEADR VTN
         run: ./openleadr/build_and_push.sh
 
-      - name: Build and push volttron image
+      - name: ⚡ Build & Push Volttron VEN
         run: ./volttron/build_and_push.sh
 
-      - name: Build and push backend image
+      - name: 🧠 Build & Push OpenADR Backend
         run: ./openadr_backend/build_and_push.sh
 
-      - uses: hashicorp/setup-terraform@v3
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Init
+      - name: 📂 Terraform Init
         run: terraform init -input=false
-        working-directory: envs/dev
+        working-directory: envs/${{ github.event.inputs.environment }}
 
-      - name: Terraform Validate
+      - name: ✅ Terraform Validate
         run: terraform validate
-        working-directory: envs/dev
+        working-directory: envs/${{ github.event.inputs.environment }}
 
-      - name: Import existing resources
+      - name: 🔄 Terraform Import (if applicable)
         env:
           CI: "true"
         run: ./terraform_import.sh
-        working-directory: envs/dev
+        working-directory: envs/${{ github.event.inputs.environment }}
         shell: bash
 
-      - name: Terraform Plan
-        run: terraform plan -input=false
-        working-directory: envs/dev
+      - name: 📜 Terraform Plan
+        id: plan
+        run: terraform plan -input=false -out=tfplan
+        working-directory: envs/${{ github.event.inputs.environment }}
 
-      - name: Terraform Apply
-        run: terraform apply -auto-approve
-        working-directory: envs/dev
+      - name: 🚀 Terraform Apply
+        run: terraform apply -auto-approve tfplan
+        working-directory: envs/${{ github.event.inputs.environment }}
 
-      - name: Wait for ECS services to register with ALBs
+      - name: ⏳ Wait for ECS services to become healthy
         run: sleep 30
 
-      - name: Fetch and check ALB URLs
+      - name: 🔍 Fetch ALB URLs & Check Health
         run: |
           terraform output -json > tf_output.json
 
@@ -86,18 +89,18 @@ jobs:
             local url="$1"
             local name="$2"
             local retries=5
-            local delay=10
-            echo "🔍 Checking $name at $url ..."
+            local delay=15
+            echo "🔍 Checking $name at $url/health..."
             for i in $(seq 1 $retries); do
-              if curl -fsS --max-time 3 "http://$url/health" > /dev/null; then
+              if curl -fsS --max-time 5 "http://$url/health" > /dev/null; then
                 echo "✅ $name is healthy."
                 return 0
               else
-                echo "❌ Attempt $i failed. Retrying in $delay seconds..."
+                echo "❌ $name not ready (try $i/$retries)..."
                 sleep $delay
               fi
             done
-            echo "❌ $name did not respond after $retries attempts."
+            echo "❌ $name failed health check after $retries attempts."
             return 1
           }
 
@@ -105,12 +108,12 @@ jobs:
           VOLTTRON_URL=$(get_output volttron_alb_dns_name)
           BACKEND_URL=$(get_output backend_alb_dns_name)
 
-          echo "### 🚀 Deployed Service URLs" >> $GITHUB_STEP_SUMMARY
-          echo "- OpenLEADR VTN: http://$OPENLEADR_URL" >> $GITHUB_STEP_SUMMARY
-          echo "- Volttron VEN:  http://$VOLTTRON_URL" >> $GITHUB_STEP_SUMMARY
-          echo "- Backend API:   http://$BACKEND_URL" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Deployed ALB URLs" >> $GITHUB_STEP_SUMMARY
+          echo "- OpenLEADR VTN: [http://$OPENLEADR_URL](http://$OPENLEADR_URL)" >> $GITHUB_STEP_SUMMARY
+          echo "- Volttron VEN:  [http://$VOLTTRON_URL](http://$VOLTTRON_URL)" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend API:   [http://$BACKEND_URL](http://$BACKEND_URL)" >> $GITHUB_STEP_SUMMARY
 
           check_url "$OPENLEADR_URL" "OpenLEADR VTN"
           check_url "$VOLTTRON_URL" "Volttron VEN"
           check_url "$BACKEND_URL" "Backend API"
-        working-directory: envs/dev
+        working-directory: envs/${{ github.event.inputs.environment }}
