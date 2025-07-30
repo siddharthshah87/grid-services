@@ -40,6 +40,10 @@ resource "aws_security_group" "alb_sg" {
     to_port     = 0
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # --- ALB --------------------------------------------------------------------
@@ -49,6 +53,10 @@ resource "aws_lb" "this" {
   internal           = var.internal
   subnets            = var.subnet_ids != null ? var.subnet_ids : var.public_subnets
   security_groups    = [aws_security_group.alb_sg.id]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # --- Target group (port 8000) ----------------------------------------------
@@ -66,6 +74,10 @@ resource "aws_lb_target_group" "this" {
     timeout             = 5
     healthy_threshold   = 2
     unhealthy_threshold = 2
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 

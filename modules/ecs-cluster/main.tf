@@ -9,6 +9,10 @@ resource "aws_ecs_cluster" "this" {
   }
 
   tags = var.tags
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 output "id" {

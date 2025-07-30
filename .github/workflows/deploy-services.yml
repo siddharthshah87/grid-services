@@ -1,0 +1,55 @@
+name: Deploy Services
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (e.g., dev, prod)"
+        required: true
+        default: "dev"
+
+env:
+  AWS_REGION: us-west-2
+  CLUSTER_NAME: hems-ecs-cluster
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          aws ecr get-login-password --region $AWS_REGION | \
+            docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+      - name: Build & Push OpenLEADR VTN
+        run: ./openleadr/build_and_push.sh
+
+      - name: Build & Push Volttron VEN
+        run: ./volttron/build_and_push.sh
+
+      - name: Build & Push OpenADR Backend
+        run: ./openadr_backend/build_and_push.sh
+
+      - name: Force ECS Service Redeploy
+        run: |
+          for svc in openadr-backend openleadr-vtn volttron-ven; do
+            aws ecs update-service \
+              --cluster $CLUSTER_NAME \
+              --service "$svc" \
+              --force-new-deployment \
+              --region $AWS_REGION
+          done
