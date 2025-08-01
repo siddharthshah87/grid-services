@@ -3,3 +3,8 @@ variable "environment_secrets" {
   default = []
 }
 
+variable "run_migrations_on_startup" {
+  type    = bool
+  default = true
+}
+

@@ -11,11 +11,9 @@ variable "mqtt_topic_responses" {}
 variable "mqtt_topic_metering" {}
 variable "iot_endpoint" {}
 variable "target_group_arn" {}
+variable "assign_public_ip" { default = true }
 variable "cpu" { default = "256" }
 variable "memory" { default = "512" }
-variable "ca_cert_secret_arn" { default = null }
-variable "client_cert_secret_arn" { default = null }
-variable "private_key_secret_arn" { default = null }
 variable "vens_port" { default = 8081 }
 
 data "aws_region" "current" {}
@@ -73,7 +71,7 @@ resource "aws_ecs_service" "this" {
   network_configuration {
     subnets          = var.subnet_ids
     security_groups  = [var.security_group_id]
-    assign_public_ip = true
+    assign_public_ip = var.assign_public_ip
   }
 
   load_balancer {

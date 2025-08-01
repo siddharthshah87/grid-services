@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +13,7 @@ async def create_event(
     event: EventCreate,
     session: AsyncSession = Depends(get_session),
 ):
-    db_event = Event(**event.dict())
+    db_event = Event(**event.model_dump())
     session.add(db_event)
     await session.commit()
     await session.refresh(db_event)
@@ -44,3 +44,17 @@ async def get_event(
     if row:
         return row
     raise HTTPException(status_code=404, detail="Event not found")
+
+
+@router.delete("/{event_id}", status_code=204)
+async def delete_event(
+    event_id: str,
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session.execute(select(Event).where(Event.event_id == event_id))
+    event = result.scalars().first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    await session.delete(event)
+    await session.commit()
+    return Response(status_code=204)

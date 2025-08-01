@@ -1,13 +1,22 @@
 import os
+import sys
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
+import pytest_asyncio
 
 os.environ.setdefault("DB_HOST", "test")
+os.environ.setdefault("DB_PORT", "5432")
 os.environ.setdefault("DB_USER", "test")
 os.environ.setdefault("DB_PASSWORD", "test")
+os.environ.setdefault("DB_TIMEOUT", "30")
+
 os.environ.setdefault("DB_NAME", "test")
+
+# Allow importing the `app` package when tests are executed without
+# installing the project by adding the parent directory to ``sys.path``.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from fastapi import FastAPI
 from app.routers import health, ven, event
@@ -25,8 +34,6 @@ def create_app() -> FastAPI:
 app = create_app()
 
 DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-import pytest_asyncio
 
 
 @pytest_asyncio.fixture(scope="module")
@@ -52,7 +59,7 @@ async def async_client():
 
 @pytest.mark.asyncio
 async def test_health(async_client):
-    resp = await async_client.get("/health/health")
+    resp = await async_client.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
@@ -95,4 +102,23 @@ async def test_event_endpoints(async_client):
     resp = await async_client.get(f"/events/ven/{event_payload['ven_id']}")
     assert resp.status_code == 200
     assert any(e["event_id"] == event_payload["event_id"] for e in resp.json())
+
+    resp = await async_client.delete(f"/events/{event_payload['event_id']}")
+    assert resp.status_code == 204
+
+    resp = await async_client.get(f"/events/{event_payload['event_id']}")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_ven(async_client):
+    ven_payload = {"ven_id": "ven_del", "registration_id": "reg_del"}
+    resp = await async_client.post("/vens/", json=ven_payload)
+    assert resp.status_code == 200
+
+    resp = await async_client.delete(f"/vens/{ven_payload['ven_id']}")
+    assert resp.status_code == 204
+
+    resp = await async_client.get("/vens/")
+    assert all(v["ven_id"] != ven_payload["ven_id"] for v in resp.json())
 

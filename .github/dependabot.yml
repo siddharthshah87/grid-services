@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/openleadr"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/volttron"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "poetry"
+    directory: "/openadr_backend"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

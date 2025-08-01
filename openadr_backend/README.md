@@ -16,11 +16,13 @@ This directory contains a FastAPI application providing the administration API f
 The service loads its database settings from environment variables with the `DB_` prefix. Define the following variables or place them in a `.env` file:
 
 - `DB_HOST` – hostname of the PostgreSQL server
+- `DB_PORT` – port of the PostgreSQL server (default `5432`)
 - `DB_USER` – database user
 - `DB_PASSWORD` – user's password
 - `DB_NAME` – database name
+- `DB_TIMEOUT` – connection timeout in seconds (default `30`)
 
-The application connects on port `5432` by default.
+`DB_PORT` defaults to `5432` if unset.
 
 ## Running locally
 
@@ -44,4 +46,12 @@ docker run -p 8000:8000 \
   openadr-backend
 ```
 
-The container's entrypoint runs database migrations via Alembic before starting the server.
+The container's entrypoint runs database migrations via Alembic before starting
+the server. It now retries the upgrade a few times to handle cases where the
+database is still coming online.
+
+## API Overview
+
+The service exposes REST endpoints to manage VENs and events. In addition to
+creating and listing records, the latest version adds the ability to remove
+entries using `DELETE /vens/{ven_id}` and `DELETE /events/{event_id}`.

@@ -1,17 +1,21 @@
 # BaseSettings moved to the pydantic-settings package in Pydantic v2
 from pydantic_settings import BaseSettings
+from pydantic import Field
 
 class Settings(BaseSettings):
-    db_host: str
-    db_user: str
-    db_password: str
-    db_name: str
+    """Application configuration loaded from environment variables."""
 
-    # accept *either* DB_ or POSTGRES_ so nothing explodes while you migrate
+    db_host: str = Field(alias="DB_HOST")
+    db_port: int = Field(5432, alias="DB_PORT")
+    db_user: str = Field(alias="DB_USER")
+    db_password: str = Field(alias="DB_PASSWORD")
+    db_name: str = Field(alias="DB_NAME")
+    db_timeout: int = Field(30, alias="DB_TIMEOUT")
+
     model_config = {
-        "env_prefix": "",                         # read raw names
+        "env_prefix": "",
         "case_sensitive": False,
-        "extra": "ignore",                        # ignore stray vars
+        "extra": "ignore",
         "env_nested_delimiter": "__",
     }
 
@@ -19,7 +23,7 @@ class Settings(BaseSettings):
     def sqlalchemy_database_uri(self) -> str:
         return (
             f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
-            f"@{self.db_host}:5432/{self.db_name}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 
 settings = Settings()

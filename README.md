@@ -10,7 +10,7 @@ This repository contains Terraform modules and Dockerized applications to deploy
 - `openleadr/` – Source code and Dockerfile for the [OpenLEADR](https://github.com/OpenLEADR/openleadr) VTN server.
 - `volttron/` – Source code and Dockerfile for a simple Volttron VEN agent.
 - `scripts/` – Helper scripts to install dependencies, authenticate to AWS, create Terraform backend resources, push Docker images, and verify Terraform formatting.
-- `ci/` – GitHub Actions workflows for formatting and planning Terraform changes.
+- `.github/workflows/` – GitHub Actions pipelines for linting, testing, security scanning and Terraform operations.
 
 ## Prerequisites
 
@@ -84,6 +84,7 @@ This environment creates:
 - An ECS cluster and related IAM roles
 - Fargate services for the VTN and VEN containers
 - An Application Load Balancer exposing the VTN on port 80
+- An IoT topic rule logging messages to S3 bucket `mqtt-forward-mqtt-logs` and Kinesis stream `mqtt-forward-mqtt-stream`
 
 Adjust variables and module parameters in `envs/dev/main.tf` as needed (e.g., MQTT topic or IoT endpoint).
 
@@ -108,6 +109,34 @@ export CA_CERT=$CLIENT_CERT
 
 OpenSSL is not required as AWS IoT generates the certificate and private key
 for you.
+
+### Querying MQTT Logs
+
+After applying Terraform, the rule outputs the S3 bucket and Kinesis stream
+used for message capture. Retrieve their names with:
+
+```bash
+terraform output log_bucket_name
+terraform output log_stream_name
+```
+
+To inspect the S3 objects:
+
+```bash
+aws s3 ls s3://$(terraform output -raw log_bucket_name)/ --recursive
+```
+
+To read records from the Kinesis stream:
+
+```bash
+aws kinesis get-records \
+  --shard-iterator $(aws kinesis get-shard-iterator \
+    --stream-name $(terraform output -raw log_stream_name) \
+    --shard-id shardId-000000000000 \
+    --shard-iterator-type TRIM_HORIZON \
+    --query ShardIterator --output text) \
+  --limit 10
+```
 
 ## Cleaning Up
 
@@ -144,7 +173,7 @@ Re-running `terraform apply` will recreate the services when needed.
 ## Additional Notes
 
 - The Terraform configuration requires version `>= 1.8.0` and the AWS provider `~> 5.40` as defined in `envs/dev/versions.tf`.
-- GitHub Actions workflows under `ci/` will format Terraform code and perform planning on pull requests.
+- GitHub Actions workflows automatically lint, test, scan for vulnerabilities and generate Terraform plans on pull requests.
 - Run `scripts/check_terraform.sh` before committing to ensure Terraform files are formatted and valid.
 - The container applications connect to MQTT on port `8883` by default. Set
   the environment variables `CA_CERT`, `CLIENT_CERT`, and `PRIVATE_KEY` with the
@@ -227,3 +256,19 @@ On ubuntu
 sudo apt install aws-vault
 
 aws-vault exec AdministratorAccess-923675928909 -- ./terraform_init.sh
+
+## Running Tests
+
+To run the unit tests locally install the required Python packages and execute
+`pytest`. Terraform must also be installed so that `scripts/check_terraform.sh`
+can validate the configuration.
+
+```bash
+pip install -r openleadr/requirements.txt -r volttron/requirements.txt \
+  fastapi uvicorn sqlalchemy asyncpg alembic python-dotenv \
+  pydantic pydantic-settings sqlmodel httpx pytest pytest-asyncio \
+  aiosqlite paho-mqtt pyOpenSSL==22.1.0
+export PYTHONPATH=openadr_backend
+./scripts/check_terraform.sh
+pytest
+```
