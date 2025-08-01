@@ -233,8 +233,8 @@ module "ecs_service_backend" {
   # -------- image ----------
   image = "${module.ecr_backend.repository_url}:latest"
 
-  subnet_ids        = module.vpc.private_subnet_ids
-  assign_public_ip  = false
+  # place in public subnet *for now* so it can reach ECR
+  subnet_ids        = module.vpc.public_subnets
   security_group_id = module.ecs_security_group.id
   target_group_arn  = module.backend_alb.target_group_arn
 
@@ -262,5 +262,48 @@ module "ecs_service_backend" {
     module.backend_alb.target_group,
     module.aurora_postgresql
   ]
+
 }
 
+      
+
+# Application load balancer for the frontend service
+module "frontend_alb" {
+  source            = "../../modules/alb"
+  name              = "frontend-alb"
+  vpc_id            = module.vpc.vpc_id
+  public_subnets    = module.vpc.public_subnets
+  listener_port     = 80
+  target_port       = 80
+  health_check_path = "/"
+}
+
+module "ecr_frontend" {
+  source = "../../modules/ecr-repo"
+  name   = "ecs-frontend"
+  tags = {
+    Project   = "grid-services"
+    Component = "Frontend"
+  }
+  
+module "ecs_service_frontend" {
+  source = "../../modules/ecs-service-frontend"
+
+  service_name = "ecs-frontend"
+  cluster_id   = module.ecs_cluster.id
+  image        = "${module.ecr_frontend.repository_url}:latest"
+
+  subnet_ids        = module.vpc.public_subnets
+  security_group_id = module.ecs_security_group.id
+  target_group_arn  = module.frontend_alb.target_group_arn
+
+  cpu            = 256
+  memory         = 512
+  container_port = 80
+
+  execution_role_arn = module.ecs_task_roles.execution
+  task_role_arn      = module.ecs_task_roles.execution
+
+  backend_api_url = "http://${module.backend_alb.dns_name}"
+  aws_region      = var.aws_region
+}

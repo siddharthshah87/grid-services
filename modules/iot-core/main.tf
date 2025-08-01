@@ -1,45 +1,6 @@
-resource "aws_iot_policy" "allow_publish_subscribe" {
-  name = "${var.prefix}_policy"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "iot:Connect",
-          "iot:Publish",
-          "iot:Subscribe",
-          "iot:Receive"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-resource "aws_iot_certificate" "cert" {
-  active = true
-}
-
-resource "aws_iot_thing" "device_sim" {
-  name = "${var.prefix}_thing"
-}
-
-resource "aws_iot_policy_attachment" "attach" {
-  policy = aws_iot_policy.allow_publish_subscribe.name
-  target = aws_iot_certificate.cert.arn
-
-  depends_on = [aws_iot_certificate.cert, aws_iot_policy.allow_publish_subscribe]
-}
-
-resource "aws_iot_thing_principal_attachment" "thing_cert_attach" {
-  thing     = aws_iot_thing.device_sim.name
-  principal = aws_iot_certificate.cert.arn
-
-  depends_on = [aws_iot_certificate.cert, aws_iot_thing.device_sim]
-}
-
+############################################################
+#  MQTT → S3 log rule (optional)
+############################################################
 resource "aws_iot_topic_rule" "forward_to_s3" {
   count       = var.enable_logging ? 1 : 0
   name        = "${var.prefix}_mqtt_log"
@@ -49,31 +10,69 @@ resource "aws_iot_topic_rule" "forward_to_s3" {
 
   s3 {
     bucket_name = var.s3_bucket
-    key         = "logs/${var.prefix}/${timestamp()}.json"
-    role_arn    = var.iot_role_arn
+    # `${timestamp()}` is a valid IoT substitution token.
+    key      = "logs/${var.prefix}/${timestamp()}.json"
+    role_arn = var.iot_role_arn
   }
 }
 
-# Enforce destroy ordering to prevent "still attached to principal" errors
-resource "null_resource" "detach_ordering" {
-  depends_on = [
-    aws_iot_thing_principal_attachment.thing_cert_attach,
-    aws_iot_policy_attachment.attach
-  ]
+############################################################
+#  Access policy
+############################################################
+resource "aws_iot_policy" "allow_publish_subscribe" {
+  name   = "${var.prefix}_policy"
+  policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["iot:Connect","iot:Publish","iot:Subscribe","iot:Receive"]
+      Resource = "*"
+    }]
+  })
 }
 
-# Optional: duplicate resources to block premature destroy
-resource "aws_iot_thing" "safe_device_sim" {
-  name       = aws_iot_thing.device_sim.name
-  depends_on = [null_resource.detach_ordering]
+############################################################
+#  Device identity
+############################################################
+resource "aws_iot_certificate" "cert" {
+  active = true
 }
 
-resource "aws_iot_certificate" "safe_cert" {
-  active     = true
-  depends_on = [null_resource.detach_ordering]
+resource "aws_iot_thing" "device_sim" {
+  name = "${var.prefix}_thing"
 }
 
-# ✅ Required for output
+############################################################
+#  Attachments (policy → cert, cert → thing)
+############################################################
+resource "aws_iot_policy_attachment" "cert_policy" {
+  policy = aws_iot_policy.allow_publish_subscribe.name
+  target = aws_iot_certificate.cert.arn
+
+  # Prevent the destroy-before-detach race:
+  lifecycle {
+    create_before_destroy = false
+  }
+}
+
+resource "aws_iot_thing_principal_attachment" "thing_cert" {
+  thing     = aws_iot_thing.device_sim.name
+  principal = aws_iot_certificate.cert.arn
+
+  # Same ordering safeguard
+  lifecycle {
+    create_before_destroy = false
+  }
+}
+
+############################################################
+#  IoT data endpoint (output)
+############################################################
 data "aws_iot_endpoint" "endpoint" {
   endpoint_type = "iot:Data-ATS"
+}
+
+output "iot_endpoint" {
+  value       = data.aws_iot_endpoint.endpoint.endpoint_address
+  description = "Hostname for SDKs to publish/subscribe"
 }
