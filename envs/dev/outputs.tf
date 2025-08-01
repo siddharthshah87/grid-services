@@ -36,3 +36,9 @@ output "backend_alb_dns_name" {
   value       = module.backend_alb.dns_name
 }
 
+# DNS name for the frontend ALB
+output "frontend_alb_dns_name" {
+  description = "Public DNS of the frontend ALB"
+  value       = module.frontend_alb.dns_name
+}
+
