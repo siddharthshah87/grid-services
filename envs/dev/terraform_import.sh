@@ -45,6 +45,19 @@ is_imported "module.ecs_task_roles.aws_iam_role.iot_mqtt"  || safe_import "modul
 echo "🔗 Importing IoT policy..."
 is_imported "module.iot_core.aws_iot_policy.allow_publish_subscribe" || safe_import "module.iot_core.aws_iot_policy.allow_publish_subscribe" "volttron_policy"
 
+### IoT Thing & Certificate
+echo "🔧 Importing IoT thing & certificate..."
+is_imported "module.iot_core.aws_iot_thing.volttron" || safe_import "module.iot_core.aws_iot_thing.volttron" "volttron_thing"
+
+cert_arn=$(aws iot list-certificates --region "$REGION" --query 'certificates[?status==`ACTIVE`][0].certificateArn' --output text 2>/dev/null || echo "")
+if [[ -n "$cert_arn" ]]; then
+  echo "🔐 Importing IoT certificate: $cert_arn"
+  is_imported "module.iot_core.aws_iot_certificate.volttron" || safe_import "module.iot_core.aws_iot_certificate.volttron" "$cert_arn"
+  is_imported "module.iot_core.aws_iot_thing_principal_attachment.volttron" || safe_import "module.iot_core.aws_iot_thing_principal_attachment.volttron" "volttron_thing|$cert_arn"
+else
+  echo "⚠️  Could not determine IoT certificate ARN; skipping certificate import."
+fi
+
 ### ALB and Target Group
 echo "🌐 Fetching ALB and target group ARNs..."
 alb_arn=$(aws elbv2 describe-load-balancers --names openadr-vtn-alb --region "$REGION" --query "LoadBalancers[0].LoadBalancerArn" --output text || echo "")
