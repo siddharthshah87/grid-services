@@ -48,10 +48,9 @@ module "ecs_cluster" {
 }
 
 module "ecs_security_group" {
-  source     = "../../modules/security-group"
-  name       = "ecs-tasks-sg"
-  vpc_id     = module.vpc.vpc_id
-  allow_http = false
+  source = "../../modules/security-group"
+  name   = "ecs-tasks-sg"
+  vpc_id = module.vpc.vpc_id
 }
 
 module "ecs_task_roles" {
@@ -193,6 +192,26 @@ resource "aws_security_group_rule" "ecs_from_volttron_alb" {
   protocol                 = "tcp"
   security_group_id        = module.ecs_security_group.id
   source_security_group_id = module.volttron_alb.security_group_id
+}
+
+resource "aws_security_group_rule" "ecs_postgresql" {
+  type                     = "ingress"
+  protocol                 = "tcp"
+  from_port                = 5432
+  to_port                  = 5432
+  security_group_id        = module.ecs_security_group.id
+  source_security_group_id = module.ecs_security_group.id
+  description              = "PostgreSQL access from ECS tasks and Aurora"
+}
+
+resource "aws_security_group_rule" "ecs_egress_all" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = module.ecs_security_group.id
+  description       = "Allow all egress"
 }
 
 module "ecr_backend" {
