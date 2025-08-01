@@ -285,6 +285,7 @@ module "ecr_frontend" {
     Project   = "grid-services"
     Component = "Frontend"
   }
+}
   
 module "ecs_service_frontend" {
   source = "../../modules/ecs-service-frontend"
