@@ -10,6 +10,14 @@ RUN npm run build
 
 # Run stage
 FROM nginx:1.25-alpine
+
+# Copy our built SPA
 COPY --from=build /app/dist /usr/share/nginx/html
+
+# Add a dedicated health‐check config
+RUN printf 'location = /health {\n  return 200 "OK";\n  add_header Content-Type text/plain;\n}\n' \
+    > /etc/nginx/conf.d/health.conf
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
+

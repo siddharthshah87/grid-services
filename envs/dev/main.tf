@@ -265,7 +265,7 @@ module "frontend_alb" {
   public_subnets    = module.vpc.public_subnets
   listener_port     = 80
   target_port       = 80
-  health_check_path = "/"
+  health_check_path = "/health"
 }
 
 module "ecr_frontend" {
