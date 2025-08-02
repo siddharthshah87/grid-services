@@ -7,11 +7,21 @@ router = APIRouter()
 
 @router.get("")
 async def health_check():
+    """Report basic service health.
+
+    Returns:
+        A simple status message.
+    """
     return {"status": "ok"}
 
 
 @router.get("/db-check")
 async def db_check():
+    """Verify database connectivity and required tables.
+
+    Returns:
+        Status details indicating database health.
+    """
     try:
         async with engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
