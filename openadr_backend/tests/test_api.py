@@ -1,17 +1,19 @@
 import os
 import sys
+import asyncio
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 import pytest_asyncio
+from alembic import command
+from alembic.config import Config
 
 os.environ.setdefault("DB_HOST", "test")
 os.environ.setdefault("DB_PORT", "5432")
 os.environ.setdefault("DB_USER", "test")
 os.environ.setdefault("DB_PASSWORD", "test")
 os.environ.setdefault("DB_TIMEOUT", "30")
-
 os.environ.setdefault("DB_NAME", "test")
 
 # Allow importing the `app` package when tests are executed without
@@ -21,7 +23,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from fastapi import FastAPI
 from app.routers import health, ven, event
 from app.db.database import get_session
-from app.models import Base
 
 
 def create_app() -> FastAPI:
@@ -33,13 +34,25 @@ def create_app() -> FastAPI:
 
 app = create_app()
 
-DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+BASE_DIR = os.path.dirname(__file__)
+db_file = os.path.join(BASE_DIR, "test.db")
+DATABASE_URL = f"sqlite+aiosqlite:///{db_file}"
 
 
 @pytest_asyncio.fixture(scope="module")
 async def async_client():
+    if os.path.exists(db_file):
+        os.remove(db_file)
     engine = create_async_engine(DATABASE_URL, future=True)
     async_session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+    from app.db import database as db
+    db.engine = engine
+
+    alembic_cfg = Config(os.path.join(BASE_DIR, "..", "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", os.path.join(BASE_DIR, "..", "alembic"))
+    alembic_cfg.set_main_option("sqlalchemy.url", DATABASE_URL)
+    await asyncio.to_thread(command.upgrade, alembic_cfg, "head")
 
     async def override_get_session():
         async with async_session() as session:
@@ -47,15 +60,14 @@ async def async_client():
 
     app.dependency_overrides[get_session] = override_get_session
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
     app.dependency_overrides.clear()
     await engine.dispose()
+    if os.path.exists(db_file):
+        os.remove(db_file)
 
 @pytest.mark.asyncio
 async def test_health(async_client):
