@@ -1,8 +1,8 @@
 # envs/dev/outputs.tf
 
-output "openleadr_alb_dns_name" {
-  description = "Public DNS of the OpenADR ALB"
-  value       = module.openadr_alb.dns_name
+output "grid_event_gateway_alb_dns_name" {
+  description = "Public DNS of the Grid-Event Gateway ALB"
+  value       = module.grid_event_gateway_alb.dns_name
 }
 
 output "iot_endpoint" {
@@ -10,14 +10,14 @@ output "iot_endpoint" {
   value       = module.iot_core.endpoint
 }
 
-output "openleadr_service_name" {
-  description = "ECS Service name for OpenADR VTN"
-  value       = module.ecs_service_openadr.name
+output "grid_event_gateway_service_name" {
+  description = "ECS Service name for Grid-Event Gateway"
+  value       = module.ecs_service_grid_event_gateway.name
 }
 
-output "openleadr_log_group_name" {
-  description = "CloudWatch Log Group for OpenADR"
-  value       = module.ecs_service_openadr.log_group_name
+output "grid_event_gateway_log_group_name" {
+  description = "CloudWatch Log Group for Grid-Event Gateway"
+  value       = module.ecs_service_grid_event_gateway.log_group_name
 }
 
 output "volttron_service_name" {

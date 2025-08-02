@@ -1,6 +1,6 @@
-# OpenADR Backend
+# ECS Backend
 
-This directory contains a FastAPI application providing the administration API for the OpenADR VTN.
+This directory contains a FastAPI application providing the administration API for the Grid-Event Gateway.
 
 ## Setup
 
@@ -37,13 +37,13 @@ poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000
 Build the image with the provided `Dockerfile` and pass the database settings when running:
 
 ```bash
-docker build -t openadr-backend .
+docker build -t ecs-backend .
 docker run -p 8000:8000 \
   -e DB_HOST=<db-host> \
   -e DB_USER=<db-user> \
   -e DB_PASSWORD=<db-password> \
   -e DB_NAME=<db-name> \
-  openadr-backend
+  ecs-backend
 ```
 
 The container's entrypoint runs database migrations via Alembic before starting

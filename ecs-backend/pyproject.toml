@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "openadr-backend"
+name = "ecs-backend"
 version = "0.1.0"
-description = "OpenADR VTN Admin Backend"
+description = "Grid-Event Gateway Admin Backend"
 authors = ["Siddharth Shah"]
 readme = "README.md"
 packages = [{ include = "app" }] 

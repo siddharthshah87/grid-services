@@ -18,19 +18,19 @@ cd "$REPO_DIR/envs/dev"
 ./terraform_init.sh
 
 # Build and push the Docker images for all services
-cd "$REPO_DIR/openleadr"
+cd "$REPO_DIR/grid-event-gateway"
 ./build_and_push.sh
 
-cd "$REPO_DIR/openadr_backend"
+cd "$REPO_DIR/ecs-backend"
 ./build_and_push.sh
 
 cd "$REPO_DIR/ecs-frontend"
 ./build_and_push.sh
 
-cd "$REPO_DIR/volttron"
+cd "$REPO_DIR/volttron-ven"
 ./build_and_push.sh
 
-for svc in openadr-backend openleadr-vtn volttron-ven ecs-frontend; do
+for svc in ecs-backend grid-event-gateway volttron-ven ecs-frontend; do
   echo "🔁 Forcing redeploy of $svc"
   aws ecs update-service \
     --cluster "$CLUSTER" \

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 CLUSTER_NAME="grid-services-cluster"
-SERVICES=("volttron-ven" "openleadr-vtn")
+SERVICES=("volttron-ven" "grid-event-gateway")
 
 echo "🔧 Cleaning up stale ECS services (if any)..."
 
@@ -25,12 +25,12 @@ done
 
 echo "🔍 Verifying security groups..."
 SEC_GROUP_ID=$(aws ec2 describe-security-groups \
-  --filters "Name=group-name,Values=openleadr-vtn-sg" \
+  --filters "Name=group-name,Values=grid-event-gateway-sg" \
   --query "SecurityGroups[0].GroupId" \
   --output text 2>/dev/null || echo "MISSING")
 
 if [[ "$SEC_GROUP_ID" == "MISSING" || "$SEC_GROUP_ID" == "None" ]]; then
-  echo "🚨 ERROR: Required security group 'openleadr-vtn-sg' not found. Please ensure it exists."
+  echo "🚨 ERROR: Required security group 'grid-event-gateway-sg' not found. Please ensure it exists."
   exit 1
 else
   echo "✅ Found security group: $SEC_GROUP_ID"

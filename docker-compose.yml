@@ -1,7 +1,7 @@
 version: '3.8'
 services:
-  openleadr:
-    build: ./openleadr
+  grid-event-gateway:
+    build: ./grid-event-gateway
     environment:
       IOT_ENDPOINT: ${IOT_ENDPOINT:-localhost}
       MQTT_TOPIC_EVENTS: ${MQTT_TOPIC_EVENTS:-openadr/event}
@@ -16,8 +16,8 @@ services:
       - "8080:8080"
       - "8081:8081"
 
-  volttron:
-    build: ./volttron
+  volttron-ven:
+    build: ./volttron-ven
     environment:
       IOT_ENDPOINT: ${IOT_ENDPOINT:-localhost}
       MQTT_TOPIC_EVENTS: ${MQTT_TOPIC_EVENTS:-openadr/event}

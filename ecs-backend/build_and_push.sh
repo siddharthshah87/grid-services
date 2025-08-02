@@ -11,16 +11,16 @@ else
   LOGIN_CMD="aws ecr get-login-password --region \"$REGION\""
 fi
 
-REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/openadr-backend"
+REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/ecs-backend"
 eval "$LOGIN_CMD" | docker login --username AWS --password-stdin "$REPO_URI"
 
 cd "$(dirname "$0")"
 
 echo "🐳 Building Docker image..."
-docker build -t openadr-backend .
+docker build -t ecs-backend .
 
 echo "🏷️ Tagging and pushing to $REPO_URI..."
-docker tag openadr-backend:latest "$REPO_URI:latest"
+docker tag ecs-backend:latest "$REPO_URI:latest"
 docker push "$REPO_URI:latest"
 
 echo "✅ Done. Image pushed to $REPO_URI:latest"
