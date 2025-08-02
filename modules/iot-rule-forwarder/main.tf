@@ -47,9 +47,10 @@ resource "aws_iam_role_policy" "actions" {
   })
 }
 
+
 # IoT rules for each topic
 resource "aws_iot_topic_rule" "forward_rules" {
-  for_each = toset(var.topics)
+  for_each    = toset(var.topics)
   # IoT rule names only allow alphanumeric characters and underscores. Replace
   # any disallowed characters in the prefix and topic filter to ensure
   # validation succeeds.
@@ -68,6 +69,11 @@ resource "aws_iot_topic_rule" "forward_rules" {
     role_arn      = aws_iam_role.rule_role.arn
     stream_name   = aws_kinesis_stream.log_stream.name
     partition_key = "iot"
+  }
+
+  lifecycle {
+    # Ignore the dynamically-generated S3 key so Terraform stops trying to update it
+    ignore_changes = [s3]
   }
 }
 

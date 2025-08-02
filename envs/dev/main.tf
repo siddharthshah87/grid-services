@@ -204,16 +204,6 @@ resource "aws_security_group_rule" "ecs_postgresql" {
   description              = "PostgreSQL access from ECS tasks and Aurora"
 }
 
-resource "aws_security_group_rule" "ecs_egress_all" {
-  type              = "egress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = module.ecs_security_group.id
-  description       = "Allow all egress"
-}
-
 module "ecr_backend" {
   source = "../../modules/ecr-repo"
   name   = "ecs-backend"

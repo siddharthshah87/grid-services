@@ -15,5 +15,7 @@ RUN pip install --upgrade pip \
  && poetry config virtualenvs.create false \
  && poetry install --only main --no-root
 
+RUN chmod +x /entrypoint.sh
+
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -6,8 +6,18 @@ resource "aws_security_group" "this" {
   description = "Security group for ECS tasks"
   vpc_id      = var.vpc_id
 
-  ingress = []
-  egress  = []
+  #default outbound rules so terraform stops trying to delete AWS's implicit egress
+  egress {
+    description = "Allow all outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = []
+    prefix_list_ids = []
+    security_groups = []
+    self = false
+  }
 
   lifecycle {
     prevent_destroy = true
@@ -22,3 +32,4 @@ resource "aws_security_group" "this" {
 output "id" {
   value = aws_security_group.this.id
 }
+
