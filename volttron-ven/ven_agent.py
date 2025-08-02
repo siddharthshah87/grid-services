@@ -1,4 +1,4 @@
-# volttron/ven_agent.py
+# volttron-ven/ven_agent.py
 import os
 import json
 import random

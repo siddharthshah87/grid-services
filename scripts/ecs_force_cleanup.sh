@@ -6,7 +6,7 @@ set -euo pipefail
 CLUSTER_NAME="grid-services-cluster"
 
 # Services to check and clean up
-SERVICES=("volttron-ven" "openleadr-vtn")
+SERVICES=("volttron-ven" "grid-event-gateway")
 
 echo "🔍 Checking ECS services in cluster: $CLUSTER_NAME"
 

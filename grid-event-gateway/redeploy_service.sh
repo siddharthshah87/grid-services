@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVICE_NAME="openleadr-vtn"
+SERVICE_NAME="grid-event-gateway"
 CLUSTER_NAME="hems-ecs-cluster"
 REGION="us-west-2"
 PROFILE="AdministratorAccess-923675928909"

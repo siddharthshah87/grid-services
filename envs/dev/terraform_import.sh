@@ -32,9 +32,9 @@ safe_import() {
 
 ### ECR Repos
 echo "🗃️  Importing ECR repositories..."
-is_imported "module.ecr_openleadr.aws_ecr_repository.this" || safe_import "module.ecr_openleadr.aws_ecr_repository.this" "openleadr-vtn"
+is_imported "module.ecr_grid_event_gateway.aws_ecr_repository.this" || safe_import "module.ecr_grid_event_gateway.aws_ecr_repository.this" "grid-event-gateway"
 is_imported "module.ecr_volttron.aws_ecr_repository.this" || safe_import "module.ecr_volttron.aws_ecr_repository.this" "volttron-ven"
-is_imported "module.ecr_backend.aws_ecr_repository.this"   || safe_import "module.ecr_backend.aws_ecr_repository.this"   "openadr-backend"
+is_imported "module.ecr_backend.aws_ecr_repository.this"   || safe_import "module.ecr_backend.aws_ecr_repository.this"   "ecs-backend"
 
 ### IAM Roles
 echo "🔐 Importing IAM roles..."
@@ -60,8 +60,8 @@ fi
 
 ### ALB and Target Group
 echo "🌐 Fetching ALB and target group ARNs..."
-alb_arn=$(aws elbv2 describe-load-balancers --names openadr-vtn-alb --region "$REGION" --query "LoadBalancers[0].LoadBalancerArn" --output text || echo "")
-tg_arn=$(aws elbv2 describe-target-groups --names openadr-vtn-alb-tg --region "$REGION" --query "TargetGroups[0].TargetGroupArn" --output text || echo "")
+alb_arn=$(aws elbv2 describe-load-balancers --names grid-event-gateway-alb --region "$REGION" --query "LoadBalancers[0].LoadBalancerArn" --output text || echo "")
+tg_arn=$(aws elbv2 describe-target-groups --names grid-event-gateway-alb-tg --region "$REGION" --query "TargetGroups[0].TargetGroupArn" --output text || echo "")
 
 if [[ -z "$alb_arn" || -z "$tg_arn" ]]; then
   echo "❌ Failed to fetch ALB or Target Group ARN. Aborting."
@@ -69,10 +69,10 @@ if [[ -z "$alb_arn" || -z "$tg_arn" ]]; then
 fi
 
 echo "🌍 Importing ALB: $alb_arn"
-is_imported "module.openadr_alb.aws_lb.this" || safe_import "module.openadr_alb.aws_lb.this" "$alb_arn"
+is_imported "module.grid_event_gateway_alb.aws_lb.this" || safe_import "module.grid_event_gateway_alb.aws_lb.this" "$alb_arn"
 
 echo "🎯 Importing Target Group: $tg_arn"
-is_imported "module.openadr_alb.aws_lb_target_group.this" || safe_import "module.openadr_alb.aws_lb_target_group.this" "$tg_arn"
+is_imported "module.grid_event_gateway_alb.aws_lb_target_group.this" || safe_import "module.grid_event_gateway_alb.aws_lb_target_group.this" "$tg_arn"
 
 ### Backend ALB and Target Group
 echo "🌐 Fetching Backend ALB and target group ARNs..."
@@ -119,14 +119,14 @@ import_task_definition() {
   fi
 }
 
-import_task_definition "module.ecs_service_openadr.aws_ecs_task_definition.this" "openleadr-vtn"
+import_task_definition "module.ecs_service_grid_event_gateway.aws_ecs_task_definition.this" "grid-event-gateway"
 import_task_definition "module.ecs_service_volttron.aws_ecs_task_definition.this" "volttron-ven"
-import_task_definition "module.ecs_service_backend.aws_ecs_task_definition.this" "openadr-backend"
+import_task_definition "module.ecs_service_backend.aws_ecs_task_definition.this" "ecs-backend"
 
 ### ALB Security groups
 echo "🛡️  Importing ALB security groups..."
-alb_sg_id=$(aws ec2 describe-security-groups --filters Name=group-name,Values=openadr-vtn-alb-sg --region "$REGION" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
-[[ -n "$alb_sg_id" ]] && is_imported "module.openadr_alb.aws_security_group.alb_sg" || safe_import "module.openadr_alb.aws_security_group.alb_sg" "$alb_sg_id"
+alb_sg_id=$(aws ec2 describe-security-groups --filters Name=group-name,Values=grid-event-gateway-alb-sg --region "$REGION" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
+[[ -n "$alb_sg_id" ]] && is_imported "module.grid_event_gateway_alb.aws_security_group.alb_sg" || safe_import "module.grid_event_gateway_alb.aws_security_group.alb_sg" "$alb_sg_id"
 
 backend_alb_sg_id=$(aws ec2 describe-security-groups --filters Name=group-name,Values=backend-alb-sg --region "$REGION" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
 [[ -n "$backend_alb_sg_id" ]] && is_imported "module.backend_alb.aws_security_group.alb_sg" || safe_import "module.backend_alb.aws_security_group.alb_sg" "$backend_alb_sg_id"
@@ -144,8 +144,8 @@ import_service() {
   fi
 }
 
-import_service "openleadr-vtn" "module.ecs_service_openadr.aws_ecs_service.this"
+import_service "grid-event-gateway" "module.ecs_service_grid_event_gateway.aws_ecs_service.this"
 import_service "volttron-ven" "module.ecs_service_volttron.aws_ecs_service.this"
-import_service "openadr-backend" "module.ecs_service_backend.aws_ecs_service.this"
+import_service "ecs-backend" "module.ecs_service_backend.aws_ecs_service.this"
 
 echo "✅ All necessary resources imported or already managed."

@@ -9,9 +9,9 @@ module "vpc" {
   }
 }
 
-module "ecr_openleadr" {
+module "ecr_grid_event_gateway" {
   source = "../../modules/ecr-repo"
-  name   = "openleadr-vtn"
+  name   = "grid-event-gateway"
   tags = {
     Project   = "grid-services"
     Component = "OpenADR"
@@ -58,34 +58,34 @@ module "ecs_task_roles" {
   name_prefix = "grid-sim"
 }
 
-module "openadr_alb" {
+module "grid_event_gateway_alb" {
   source            = "../../modules/alb"
-  name              = "openadr-vtn-alb"
+  name              = "grid-event-gateway-alb"
   vpc_id            = module.vpc.vpc_id
   public_subnets    = module.vpc.public_subnets
   listener_port     = 80
   target_port       = 8080
   health_check_path = "/health"
 }
-module "ecs_service_openadr" {
+module "ecs_service_grid_event_gateway" {
   source               = "../../modules/ecs-service-openadr"
-  name                 = "openleadr-vtn"
+  name                 = "grid-event-gateway"
   cluster_id           = module.ecs_cluster.id
   subnet_ids           = module.vpc.public_subnets
   security_group_id    = module.ecs_security_group.id
   execution_role_arn   = module.ecs_task_roles.execution
   task_role_arn        = module.ecs_task_roles.iot_mqtt
-  image                = "${module.ecr_openleadr.repository_url}:latest"
+  image                = "${module.ecr_grid_event_gateway.repository_url}:latest"
   mqtt_topic_events    = "oadr/event/ven1"
   mqtt_topic_responses = "oadr/response/ven1"
   mqtt_topic_metering  = "oadr/meter/ven1"
   iot_endpoint         = module.iot_core.endpoint
   vens_port            = 8081
-  target_group_arn     = module.openadr_alb.target_group_arn
+  target_group_arn     = module.grid_event_gateway_alb.target_group_arn
   environment_secrets = [
     {
       name      = "CERT_BUNDLE_JSON"
-      valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:openleadr-iot-cert-bundle-oWaWux"
+      valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:grid-event-gateway-iot-cert-bundle-oWaWux"
     }
   ]
 
@@ -93,8 +93,8 @@ module "ecs_service_openadr" {
   # created before attempting to register. This avoids race conditions during
   # provisioning.
   depends_on = [
-    module.openadr_alb.listener,
-    module.openadr_alb.target_group
+    module.grid_event_gateway_alb.listener,
+    module.grid_event_gateway_alb.target_group
   ]
 }
 
@@ -129,9 +129,9 @@ module "ecs_service_volttron" {
 module "aurora_postgresql" {
   source             = "../../modules/rds-postgresql"
   name               = "opendar-aurora"
-  db_name            = "openadrdb"
+  db_name            = "ecsbackenddb"
   engine_version     = "15.10"
-  username           = "openadr_admin"
+  username           = "ecs_backend_admin"
   password           = "Grid2025!" # Use Secrets Manager in production
   vpc_id             = module.vpc.vpc_id
   subnet_ids         = module.vpc.private_subnet_ids
@@ -175,13 +175,13 @@ resource "aws_security_group_rule" "ecs_from_backend_alb" {
   source_security_group_id = module.backend_alb.security_group_id
 }
 
-resource "aws_security_group_rule" "ecs_from_openadr_alb" {
+resource "aws_security_group_rule" "ecs_from_grid_event_gateway_alb" {
   type                     = "ingress"
   from_port                = 8080
   to_port                  = 8080
   protocol                 = "tcp"
   security_group_id        = module.ecs_security_group.id
-  source_security_group_id = module.openadr_alb.security_group_id
+  source_security_group_id = module.grid_event_gateway_alb.security_group_id
 }
 
 resource "aws_security_group_rule" "ecs_from_volttron_alb" {
@@ -216,7 +216,7 @@ resource "aws_security_group_rule" "ecs_egress_all" {
 
 module "ecr_backend" {
   source = "../../modules/ecr-repo"
-  name   = "openadr-backend"
+  name   = "ecs-backend"
   tags = {
     Project   = "grid-services"
     Component = "Backend"
@@ -227,7 +227,7 @@ module "ecs_service_backend" {
   source = "../../modules/ecs-service-backend"
 
   # -------- names ----------
-  service_name = "openadr-backend"
+  service_name = "ecs-backend"
   cluster_id   = module.ecs_cluster.id
 
   # -------- image ----------

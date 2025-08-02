@@ -7,8 +7,9 @@ This repository contains Terraform modules and Dockerized applications to deploy
 
 - `envs/` – Terraform environments. The `dev` folder is a working example that provisions the required AWS resources.
 - `modules/` – Reusable Terraform modules (VPC, ECS cluster, ECR repositories, security groups, IAM roles, IoT Core and more).
-- `openleadr/` – Source code and Dockerfile for the [OpenLEADR](https://github.com/OpenLEADR/openleadr) VTN server.
-- `volttron/` – Source code and Dockerfile for a simple Volttron VEN agent.
+- `grid-event-gateway/` – Source code and Dockerfile for the Grid-Event Gateway (OpenADR VTN) server.
+- `volttron-ven/` – Source code and Dockerfile for a simple Volttron VEN agent.
+- `ecs-backend/` – FastAPI backend providing the administration API.
 - `scripts/` – Helper scripts to install dependencies, authenticate to AWS, create Terraform backend resources, push Docker images, and verify Terraform formatting.
 - `.github/workflows/` – GitHub Actions pipelines for linting, testing, security scanning and Terraform operations.
 
@@ -39,23 +40,31 @@ This script uses your current AWS credentials to create a bucket named `tf-state
    ./scripts/ecr-login.sh
    ```
 
-2. Build and push the OpenLEADR VTN image:
+2. Build and push the Grid-Event Gateway image:
 
    ```bash
-   cd openleadr
+   cd grid-event-gateway
    ./build_and_push.sh
    cd ..
    ```
 
-3. Build and push the Volttron VEN image:
+3. Build and push the ECS Backend image:
 
    ```bash
-   cd volttron
+   cd ecs-backend
    ./build_and_push.sh
    cd ..
    ```
 
-4. Build and push the frontend dashboard image. Optionally set
+4. Build and push the Volttron VEN image:
+
+   ```bash
+   cd volttron-ven
+   ./build_and_push.sh
+   cd ..
+   ```
+
+5. Build and push the frontend dashboard image. Optionally set
    `BACKEND_API_URL` to inject the backend endpoint during the build:
 
    ```bash
@@ -179,11 +188,11 @@ Re-running `terraform apply` will recreate the services when needed.
   the environment variables `CA_CERT`, `CLIENT_CERT`, and `PRIVATE_KEY` with the
   paths to your broker's certificate authority, client certificate and key to
   enable TLS.
-- The container applications are minimal examples. Customize `openleadr/vtn_server.py` and `volttron/ven_agent.py` for your use case.
+- The container applications are minimal examples. Customize `grid-event-gateway/vtn_server.py` and `volttron-ven/ven_agent.py` for your use case.
 
-## OpenADR VTN
+## Grid-Event Gateway
 
-The `openleadr/vtn_server.py` script provides a minimal VTN for testing. The
+The `grid-event-gateway/vtn_server.py` script provides a minimal VTN for testing. The
 server listens on port `8080` for OpenADR traffic. It now tracks the VENs that
 register with it and exposes a simple HTTP endpoint to list them. The
 listing server's port can be configured via the `VENS_PORT` environment
@@ -247,7 +256,7 @@ create a `.env` file) and then start the stack:
 docker compose up
 ```
 
-The OpenADR VTN will be available on port `8080` with the VEN listing endpoint on
+The Grid-Event Gateway will be available on port `8080` with the VEN listing endpoint on
 `8081`.
 
 
@@ -264,11 +273,11 @@ To run the unit tests locally install the required Python packages and execute
 can validate the configuration.
 
 ```bash
-pip install -r openleadr/requirements.txt -r volttron/requirements.txt \
+pip install -r grid-event-gateway/requirements.txt -r volttron-ven/requirements.txt \
   fastapi uvicorn sqlalchemy asyncpg alembic python-dotenv \
   pydantic pydantic-settings sqlmodel httpx pytest pytest-asyncio \
   aiosqlite paho-mqtt pyOpenSSL==22.1.0
-export PYTHONPATH=openadr_backend
+export PYTHONPATH=ecs-backend
 ./scripts/check_terraform.sh
 pytest
 ```

@@ -11,7 +11,7 @@ echo "🚨 Starting full reset of ECS + Terraform environment [$WORKSPACE]"
 
 ### STEP 1: Delete ECS Services if Present ###
 echo "🔧 Deleting ECS services if they exist..."
-for svc in openleadr-vtn volttron-ven; do
+for svc in grid-event-gateway volttron-ven; do
   if aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$svc" | grep -q '"status": "ACTIVE"'; then
     echo "➡️  Deleting $svc..."
     aws ecs update-service --cluster "$CLUSTER_NAME" --service "$svc" --desired-count 0
@@ -25,7 +25,7 @@ done
 ### STEP 2: Clean Up Terraform State ###
 cd "$ENV_DIR"
 echo "🧹 Cleaning stale Terraform state..."
-terraform state list | grep 'module\.ecs_service_openadr\|module\.ecs_service_volttron\|module\.openadr_alb' | while read -r line; do
+terraform state list | grep 'module.ecs_service_grid_event_gateway|module.ecs_service_volttron|module.grid_event_gateway_alb' | while read -r line; do
   terraform state rm "$line" || true
 done
 

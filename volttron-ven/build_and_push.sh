@@ -1,4 +1,4 @@
-# volttron/build_and_push.sh
+# volttron-ven/build_and_push.sh
 #!/usr/bin/env bash
 set -euo pipefail
 

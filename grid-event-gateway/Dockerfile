@@ -1,4 +1,4 @@
-# openleadr/Dockerfile
+# grid-event-gateway/Dockerfile
 FROM python:3.10-slim
 WORKDIR /app
 
