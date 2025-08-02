@@ -1,8 +1,8 @@
 import importlib.util
+import json
+import os
 from pathlib import Path
 from unittest import mock
-import os
-import json
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "ven_agent.py"
 
