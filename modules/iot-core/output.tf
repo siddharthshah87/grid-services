@@ -1,17 +1,17 @@
 output "thing_name" {
-  value = aws_iot_thing.device_sim.name
+  value = aws_iot_thing.volttron.name
 }
 
 output "certificate_pem" {
-  value = aws_iot_certificate.cert.certificate_pem
+  value = aws_iot_certificate.volttron.certificate_pem
 }
 
 output "private_key" {
-  value = aws_iot_certificate.cert.private_key
+  value = aws_iot_certificate.volttron.private_key
 }
 
 output "public_key" {
-  value = aws_iot_certificate.cert.public_key
+  value = aws_iot_certificate.volttron.public_key
 }
 
 output "policy_name" {

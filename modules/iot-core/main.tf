@@ -20,12 +20,12 @@ resource "aws_iot_topic_rule" "forward_to_s3" {
 #  Access policy
 ############################################################
 resource "aws_iot_policy" "allow_publish_subscribe" {
-  name   = "${var.prefix}_policy"
+  name = "${var.prefix}_policy"
   policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = ["iot:Connect","iot:Publish","iot:Subscribe","iot:Receive"]
+      Action   = ["iot:Connect", "iot:Publish", "iot:Subscribe", "iot:Receive"]
       Resource = "*"
     }]
   })
@@ -34,12 +34,21 @@ resource "aws_iot_policy" "allow_publish_subscribe" {
 ############################################################
 #  Device identity
 ############################################################
-resource "aws_iot_certificate" "cert" {
+resource "aws_iot_certificate" "volttron" {
   active = true
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
-resource "aws_iot_thing" "device_sim" {
+resource "aws_iot_thing" "volttron" {
   name = "${var.prefix}_thing"
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [attributes]
+  }
 }
 
 ############################################################
@@ -47,7 +56,7 @@ resource "aws_iot_thing" "device_sim" {
 ############################################################
 resource "aws_iot_policy_attachment" "cert_policy" {
   policy = aws_iot_policy.allow_publish_subscribe.name
-  target = aws_iot_certificate.cert.arn
+  target = aws_iot_certificate.volttron.arn
 
   # Prevent the destroy-before-detach race:
   lifecycle {
@@ -55,9 +64,9 @@ resource "aws_iot_policy_attachment" "cert_policy" {
   }
 }
 
-resource "aws_iot_thing_principal_attachment" "thing_cert" {
-  thing     = aws_iot_thing.device_sim.name
-  principal = aws_iot_certificate.cert.arn
+resource "aws_iot_thing_principal_attachment" "volttron" {
+  thing     = aws_iot_thing.volttron.name
+  principal = aws_iot_certificate.volttron.arn
 
   # Same ordering safeguard
   lifecycle {
