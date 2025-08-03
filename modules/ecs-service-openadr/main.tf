@@ -14,6 +14,7 @@ variable "target_group_arn" {}
 variable "assign_public_ip" { default = true }
 variable "cpu" { default = "256" }
 variable "memory" { default = "512" }
+variable "container_port" { default = 8080 }
 variable "vens_port" { default = 8081 }
 
 data "aws_region" "current" {}
@@ -38,7 +39,8 @@ resource "aws_ecs_task_definition" "this" {
       essential = true
       portMappings = [
         {
-          containerPort = 8080
+          containerPort = var.container_port
+          hostPort      = var.container_port
           protocol      = "tcp"
         }
       ]
@@ -77,7 +79,7 @@ resource "aws_ecs_service" "this" {
   load_balancer {
     target_group_arn = var.target_group_arn
     container_name   = var.name
-    container_port   = 8080
+    container_port   = var.container_port
   }
 
   desired_count = 1
