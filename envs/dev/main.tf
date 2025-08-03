@@ -80,6 +80,7 @@ module "ecs_service_grid_event_gateway" {
   mqtt_topic_responses = "oadr/response/ven1"
   mqtt_topic_metering  = "oadr/meter/ven1"
   iot_endpoint         = module.iot_core.endpoint
+  container_port       = 8080
   vens_port            = 8081
   target_group_arn     = module.grid_event_gateway_alb.target_group_arn
   environment_secrets = [
@@ -255,7 +256,7 @@ module "ecs_service_backend" {
 
 }
 
-      
+
 
 # Application load balancer for the frontend service
 module "frontend_alb" {
@@ -265,7 +266,7 @@ module "frontend_alb" {
   public_subnets    = module.vpc.public_subnets
   listener_port     = 80
   target_port       = 80
-  health_check_path = "/"
+  health_check_path = "/health"
 }
 
 module "ecr_frontend" {
@@ -276,7 +277,7 @@ module "ecr_frontend" {
     Component = "Frontend"
   }
 }
-  
+
 module "ecs_service_frontend" {
   source = "../../modules/ecs-service-frontend"
 

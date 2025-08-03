@@ -20,6 +20,7 @@ resource "aws_ecs_task_definition" "this" {
         {
           containerPort = var.container_port
           hostPort      = var.container_port
+          protocol      = "tcp"
         }
       ]
       environment = [
