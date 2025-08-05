@@ -33,5 +33,52 @@ resource "aws_subnet" "private" {
   })
 }
 
+resource "aws_security_group" "vpc_endpoints" {
+  name        = "secrets-endpoint-sg"
+  description = "Allow ECS tasks to hit AWS interface endpoints (443)"
+  vpc_id      = aws_vpc.this.id
+}
+
+locals {
+  interface_services = [
+    "secretsmanager",
+    "ecr.api",
+    "ecr.dkr",
+    "logs",
+  ]
+}
+
+resource "aws_vpc_endpoint" "interface" {
+  for_each = toset(local.interface_services)
+
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.${each.value}"
+  vpc_endpoint_type = "Interface"
+
+  subnet_ids         = aws_subnet.private[*].id
+  security_group_ids = [aws_security_group.vpc_endpoints.id]
+
+  private_dns_enabled = true
+}
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.this.id
+}
+
+resource "aws_route_table_association" "private" {
+  count          = length(aws_subnet.private)
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_vpc_endpoint" "s3_gateway" {
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  vpc_endpoint_type = "Gateway"
+
+  route_table_ids = [aws_route_table.private.id]
+}
+
 data "aws_availability_zones" "azs" {}
+data "aws_region" "current" {}
 

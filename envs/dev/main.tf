@@ -53,6 +53,15 @@ module "ecs_security_group" {
   vpc_id = module.vpc.vpc_id
 }
 
+resource "aws_security_group_rule" "vpc_endpoints_ingress_from_tasks" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = module.vpc.vpc_endpoints_security_group_id
+  source_security_group_id = module.ecs_security_group.id
+}
+
 module "ecs_task_roles" {
   source      = "../../modules/iam-roles/ecs_task_roles"
   name_prefix = "grid-sim"
