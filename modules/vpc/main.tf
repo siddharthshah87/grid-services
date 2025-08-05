@@ -4,8 +4,7 @@ locals {
     "ecr.api",
     "ecr.dkr",
     "logs",
-    "iot",
-    "iot-data",
+    "iot.data",
   ]
 }
 
