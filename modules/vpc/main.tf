@@ -75,7 +75,8 @@ resource "aws_vpc_endpoint" "interface" {
   subnet_ids         = aws_subnet.private[*].id
   security_group_ids = [aws_security_group.vpc_endpoints.id]
 
-  private_dns_enabled = true
+  # <- only iot.data must use `false`
+  private_dns_enabled = each.value == "iot.data" ? false : true
 }
 
 resource "aws_route_table" "private" {
