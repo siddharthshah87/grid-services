@@ -52,7 +52,7 @@ resource "aws_security_group" "vpc_endpoints" {
     from_port                = 443
     to_port                  = 443
     security_groups          = [var.ecs_tasks_sg_id]  # see note below
-    description              = "ECS tasks → interface endpoints"
+    description              = "ECS tasks to interface endpoints"
   }
 
   egress  {
