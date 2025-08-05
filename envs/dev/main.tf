@@ -7,7 +7,7 @@ module "vpc" {
     Project = "hems-demo"
     Env     = "dev"
   }
-  ecs_tasks_sg_id = module.ecs_security_group.id  # ← here
+  ecs_tasks_sg_id = module.ecs_security_group.id # ← here
 }
 
 module "ecr_grid_event_gateway" {
