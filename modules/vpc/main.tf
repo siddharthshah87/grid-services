@@ -38,18 +38,6 @@ resource "aws_security_group" "vpc_endpoints" {
   description = "Allow ECS tasks to hit Secrets Manager"   # <- keep the live text
   vpc_id      = aws_vpc.this.id
 
-  ingress = [{
-    protocol                 = "tcp"
-    from_port                = 443
-    to_port                  = 443
-    security_groups          = [module.ecs_security_group.id]
-    cidr_blocks              = []
-    ipv6_cidr_blocks         = []
-    prefix_list_ids          = []
-    description              = "ECS tasks → interface endpoints"
-    self                     = false
-  }]
-
   egress = [{
     protocol         = "-1"
     from_port        = 0
