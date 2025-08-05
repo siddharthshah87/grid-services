@@ -45,25 +45,40 @@ resource "aws_subnet" "private" {
 
 resource "aws_security_group" "vpc_endpoints" {
   name        = "secrets-endpoint-sg"
-  description = "Allow ECS tasks to hit Secrets Manager"
-  vpc_id      = aws_vpc.this.id           # ← valid here
+  description = "Interface-endpoint SG"
+  vpc_id      = aws_vpc.this.id
 
-  ingress  {
-    protocol                 = "tcp"
-    from_port                = 443
-    to_port                  = 443
-    security_groups          = [var.ecs_tasks_sg_id]  # see note below
-    description              = "ECS tasks to interface endpoints"
-  }
-
-  egress  {
-    protocol  = "-1"
-    from_port = 0
-    to_port   = 0
+  egress {
+    protocol   = "-1"
+    from_port  = 0
+    to_port    = 0
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
+### root module (envs/dev/main.tf, alongside the ECS cluster)
+
+# 443
+resource "aws_security_group_rule" "endpoints_443_from_ecs" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = module.vpc.vpc_endpoints_security_group_id
+  source_security_group_id = module.ecs_security_group.id
+  description              = "TLS (443) from ECS tasks"
+}
+
+# 8883
+resource "aws_security_group_rule" "endpoints_8883_from_ecs" {
+  type                     = "ingress"
+  from_port                = 8883
+  to_port                  = 8883
+  protocol                 = "tcp"
+  security_group_id        = module.vpc.vpc_endpoints_security_group_id
+  source_security_group_id = module.ecs_security_group.id
+  description              = "MQTTS (8883) from ECS tasks"
+}
 
 resource "aws_vpc_endpoint" "interface" {
   for_each = toset(local.interface_services)
