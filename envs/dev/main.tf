@@ -216,6 +216,20 @@ resource "aws_security_group_rule" "ecs_from_frontend_alb" {
   source_security_group_id = module.frontend_alb.security_group_id
 }
 
+resource "aws_security_group" "vpc_endpoints" {
+  name        = "secrets-endpoint-sg"
+  description = "Allow ECS tasks to hit Secrets Manager"   # ← keep EXACTLY
+
+  vpc_id = aws_vpc.this.id
+
+  # leave ingress & egress EMPTY – we manage them with sg-rule resources now
+
+  lifecycle {
+    # Stops Terraform from ever trying to destroy the SG
+    prevent_destroy = true
+  }
+}
+
 # 443
 resource "aws_security_group_rule" "endpoints_443_from_ecs" {
   type                     = "ingress"
