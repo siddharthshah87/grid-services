@@ -148,4 +148,39 @@ import_service "grid-event-gateway" "module.ecs_service_grid_event_gateway.aws_e
 import_service "volttron-ven" "module.ecs_service_volttron.aws_ecs_service.this"
 import_service "ecs-backend" "module.ecs_service_backend.aws_ecs_service.this"
 
+### VPC endpoint security-group
+echo "🛡️  Importing VPC-endpoint SG..."
+is_imported "module.vpc.aws_security_group.vpc_endpoints" \
+  || safe_import "module.vpc.aws_security_group.vpc_endpoints" "sg-01e456a9778841bf9"
+
+### Interface endpoints
+declare -A iface_epids=(
+  ["secretsmanager"]="vpce-08de1c06f5bb2eeb0"
+  ["ecr.api"]="vpce-07ba4d7b136adc582"
+  ["ecr.dkr"]="vpce-0839bd9ff0f9d32b6"
+  ["logs"]="vpce-<put-the-logs-endpoint-id-here>"
+)
+for svc in "${!iface_epids[@]}"; do
+  addr="module.vpc.aws_vpc_endpoint.interface[\"$svc\"]"
+  is_imported "$addr" || safe_import "$addr" "${iface_epids[$svc]}"
+done
+
+### S3 gateway endpoint
+echo "📦 Importing S3 gateway endpoint..."
+is_imported "module.vpc.aws_vpc_endpoint.s3_gateway" \
+  || safe_import "module.vpc.aws_vpc_endpoint.s3_gateway" "vpce-0d391db96e62e6b4a"
+
+### Private route-table & associations
+echo "🛣️  Importing private route-table..."
+is_imported "module.vpc.aws_route_table.private" \
+  || safe_import "module.vpc.aws_route_table.private" "rtb-004cee8be40de956b"
+
+# One association per private subnet: index order must match the count index
+is_imported "module.vpc.aws_route_table_association.private[0]" \
+  || safe_import "module.vpc.aws_route_table_association.private[0]" "subnet-0c8626ca17517b62d/rtb-004cee8be40de956b"
+
+is_imported "module.vpc.aws_route_table_association.private[1]" \
+  || safe_import "module.vpc.aws_route_table_association.private[1]" "subnet-0852fcaf3e9454b1c/rtb-004cee8be40de956b"
+
+
 echo "✅ All necessary resources imported or already managed."
