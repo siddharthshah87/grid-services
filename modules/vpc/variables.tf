@@ -17,6 +17,7 @@ variable "tags" {
   default = {}
 }
 
-module "vpc" {
-  ecs_tasks_sg_id = module.ecs_security_group.id
+variable "ecs_tasks_sg_id" {
+  description = "Security-group ID of the ECS tasks"
+  type        = string
 }
