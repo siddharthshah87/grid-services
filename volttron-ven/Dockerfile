@@ -22,7 +22,7 @@ ENV MQTT_TOPIC_METERING=volttron/metering \
     MQTT_TOPIC_EVENTS=openadr/event \
     MQTT_TOPIC_RESPONSES=openadr/response \
     MQTT_TOPIC_STATUS=volttron/dev \
-    IOT_ENDPOINT=localhost
+    IOT_ENDPOINT=data-ats.iot.us-west-2.amazonaws.com 
 
 # ---- entry-point -----------------------------------------------------
 # Writes PEM strings from env vars to /tmp/ven/*.pem and launches agent
