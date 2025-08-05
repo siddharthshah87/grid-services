@@ -53,15 +53,6 @@ module "ecs_security_group" {
   vpc_id = module.vpc.vpc_id
 }
 
-resource "aws_security_group_rule" "vpc_endpoints_ingress_from_tasks" {
-  type                     = "ingress"
-  from_port                = 443
-  to_port                  = 443
-  protocol                 = "tcp"
-  security_group_id        = module.vpc.vpc_endpoints_security_group_id
-  source_security_group_id = module.ecs_security_group.id
-}
-
 module "ecs_task_roles" {
   source      = "../../modules/iam-roles/ecs_task_roles"
   name_prefix = "grid-sim"
@@ -222,6 +213,36 @@ resource "aws_security_group_rule" "ecs_from_frontend_alb" {
   protocol                 = "tcp"
   security_group_id        = module.ecs_security_group.id
   source_security_group_id = module.frontend_alb.security_group_id
+}
+
+resource "aws_security_group" "vpc_endpoints" {
+  name        = "secrets-endpoint-sg"
+  description = "Allow ECS tasks to hit Secrets Manager"   # <- keep the live text
+  vpc_id      = aws_vpc.this.id
+
+  ingress = [{
+    protocol                 = "tcp"
+    from_port                = 443
+    to_port                  = 443
+    security_groups          = [module.ecs_security_group.id]
+    cidr_blocks              = []
+    ipv6_cidr_blocks         = []
+    prefix_list_ids          = []
+    description              = "ECS tasks → interface endpoints"
+    self                     = false
+  }]
+
+  egress = [{
+    protocol         = "-1"
+    from_port        = 0
+    to_port          = 0
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = []
+    prefix_list_ids  = []
+    security_groups  = []
+    description      = "allow all egress"
+    self             = false
+  }]
 }
 
 module "ecr_backend" {
