@@ -50,7 +50,7 @@ resource "aws_iam_role_policy" "actions" {
 
 # IoT rules for each topic
 resource "aws_iot_topic_rule" "forward_rules" {
-  for_each    = toset(var.topics)
+  for_each = toset(var.topics)
   # IoT rule names only allow alphanumeric characters and underscores. Replace
   # any disallowed characters in the prefix and topic filter to ensure
   # validation succeeds.
