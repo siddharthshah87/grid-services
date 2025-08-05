@@ -17,3 +17,6 @@ variable "tags" {
   default = {}
 }
 
+module "vpc" {
+  ecs_tasks_sg_id = module.ecs_security_group.id
+}
