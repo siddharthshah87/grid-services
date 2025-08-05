@@ -218,7 +218,7 @@ resource "aws_security_group_rule" "ecs_from_frontend_alb" {
 
 resource "aws_security_group" "vpc_endpoints" {
   name        = "secrets-endpoint-sg"
-  description = "Allow ECS tasks to hit Secrets Manager"   # ← keep EXACTLY
+  description = "Allow ECS tasks to hit Secrets Manager" # ← keep EXACTLY
 
   vpc_id = aws_vpc.this.id
 
