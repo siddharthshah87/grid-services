@@ -158,7 +158,7 @@ declare -A iface_epids=(
   ["secretsmanager"]="vpce-08de1c06f5bb2eeb0"
   ["ecr.api"]="vpce-07ba4d7b136adc582"
   ["ecr.dkr"]="vpce-0839bd9ff0f9d32b6"
-  ["logs"]="vpce-<put-the-logs-endpoint-id-here>"
+  ["logs"]="vpce-03e3d5b35acd70980"
 )
 for svc in "${!iface_epids[@]}"; do
   addr="module.vpc.aws_vpc_endpoint.interface[\"$svc\"]"
