@@ -56,30 +56,6 @@ resource "aws_security_group" "vpc_endpoints" {
   }
 }
 
-### root module (envs/dev/main.tf, alongside the ECS cluster)
-
-# 443
-resource "aws_security_group_rule" "endpoints_443_from_ecs" {
-  type                     = "ingress"
-  from_port                = 443
-  to_port                  = 443
-  protocol                 = "tcp"
-  security_group_id        = module.vpc.vpc_endpoints_security_group_id
-  source_security_group_id = module.ecs_security_group.id
-  description              = "TLS (443) from ECS tasks"
-}
-
-# 8883
-resource "aws_security_group_rule" "endpoints_8883_from_ecs" {
-  type                     = "ingress"
-  from_port                = 8883
-  to_port                  = 8883
-  protocol                 = "tcp"
-  security_group_id        = module.vpc.vpc_endpoints_security_group_id
-  source_security_group_id = module.ecs_security_group.id
-  description              = "MQTTS (8883) from ECS tasks"
-}
-
 resource "aws_vpc_endpoint" "interface" {
   for_each = toset(local.interface_services)
 
