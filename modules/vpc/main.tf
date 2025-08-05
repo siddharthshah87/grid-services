@@ -1,3 +1,12 @@
+locals {
+  interface_services = [
+    "secretsmanager",
+    "ecr.api",
+    "ecr.dkr",
+    "logs",
+  ]
+}
+
 resource "aws_vpc" "this" {
   cidr_block           = var.cidr_block
   enable_dns_hostnames = true
