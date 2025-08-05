@@ -48,6 +48,13 @@ resource "aws_security_group" "vpc_endpoints" {
   description = "Interface-endpoint SG"
   vpc_id      = aws_vpc.this.id
 
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   lifecycle {
     ignore_changes = [
       description,
