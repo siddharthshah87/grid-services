@@ -215,34 +215,6 @@ resource "aws_security_group_rule" "ecs_from_frontend_alb" {
   source_security_group_id = module.frontend_alb.security_group_id
 }
 
-resource "aws_security_group" "vpc_endpoints" {
-  name        = "secrets-endpoint-sg"
-  description = "Allow ECS tasks to hit interface endpoints (:443)"
-  vpc_id      = aws_vpc.this.id
-
-  ingress = [{
-    protocol                 = "tcp"
-    from_port                = 443
-    to_port                  = 443
-    security_groups          = [var.ecs_tasks_sg_id]   # <— see note below
-    cidr_blocks              = []
-    ipv6_cidr_blocks         = []
-    prefix_list_ids          = []
-    description              = "ECS tasks → VPC interface endpoints"
-    self                     = false
-  }]
-
-  egress = [{
-    protocol         = "-1"
-    from_port        = 0
-    to_port          = 0
-    cidr_blocks      = ["0.0.0.0/0"]
-    description      = "allow all egress"
-    self             = false
-  }]
-}
-
-
 module "ecr_backend" {
   source = "../../modules/ecr-repo"
   name   = "ecs-backend"
