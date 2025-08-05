@@ -215,6 +215,20 @@ resource "aws_security_group_rule" "ecs_from_frontend_alb" {
   source_security_group_id = module.frontend_alb.security_group_id
 }
 
+# Allow all ECS tasks to reach the interface endpoints on :443
+resource "aws_security_group_rule" "vpc_endpoints_ingress_from_tasks" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+
+  # SG that lives inside the VPC module
+  security_group_id        = module.vpc.vpc_endpoints_security_group_id
+
+  # ECS task SG that already exists in the root module
+  source_security_group_id = module.ecs_security_group.id
+}
+
 module "ecr_backend" {
   source = "../../modules/ecr-repo"
   name   = "ecs-backend"
