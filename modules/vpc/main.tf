@@ -35,30 +35,25 @@ resource "aws_subnet" "private" {
 
 resource "aws_security_group" "vpc_endpoints" {
   name        = "secrets-endpoint-sg"
-  description = "Allow ECS tasks to hit Secrets Manager"   # <- keep the live text
-  vpc_id      = aws_vpc.this.id
+  description = "Allow ECS tasks to hit Secrets Manager"
+  vpc_id      = aws_vpc.this.id           # ← valid here
+
+  ingress = [{
+    protocol                 = "tcp"
+    from_port                = 443
+    to_port                  = 443
+    security_groups          = [var.ecs_tasks_sg_id]  # see note below
+    description              = "ECS tasks → interface endpoints"
+  }]
 
   egress = [{
-    protocol         = "-1"
-    from_port        = 0
-    to_port          = 0
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = []
-    prefix_list_ids  = []
-    security_groups  = []
-    description      = "allow all egress"
-    self             = false
+    protocol  = "-1"
+    from_port = 0
+    to_port   = 0
+    cidr_blocks = ["0.0.0.0/0"]
   }]
 }
 
-locals {
-  interface_services = [
-    "secretsmanager",
-    "ecr.api",
-    "ecr.dkr",
-    "logs",
-  ]
-}
 
 resource "aws_vpc_endpoint" "interface" {
   for_each = toset(local.interface_services)
