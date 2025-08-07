@@ -21,7 +21,11 @@ COPY . .
 ENV MQTT_TOPIC_METERING=volttron/metering \
     MQTT_TOPIC_EVENTS=openadr/event \
     MQTT_TOPIC_RESPONSES=openadr/response \
+<<<<<<< HEAD
     MQTT_TOPIC_STATUS=volttron/dev
+=======
+    MQTT_TOPIC_STATUS=volttron/dev 
+>>>>>>> 4d6c86b (fmt and changesg)
 
 # ---- entry-point -----------------------------------------------------
 # Writes PEM strings from env vars to /tmp/ven/*.pem and launches agent
