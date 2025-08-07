@@ -114,12 +114,7 @@ module "ecs_service_volttron" {
   mqtt_topic_responses   = "oadr/response/ven1"
   mqtt_topic_metering    = "oadr/meter/ven1"
   mqtt_topic_status      = "ven/status/ven1"
-<<<<<<< HEAD
-  # Use VPC IoT endpoint
   iot_endpoint           = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
-=======
-  iot_endpoint           = module.vpc.iot_data_endpoint_dns
->>>>>>> 4d6c86b (fmt and changesg)
   ca_cert_secret_arn     = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:ca_cert::"
   client_cert_secret_arn = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:client_cert::"
   private_key_secret_arn = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:private_key::"
