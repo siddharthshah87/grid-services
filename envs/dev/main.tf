@@ -55,8 +55,9 @@ module "ecs_security_group" {
 }
 
 module "ecs_task_roles" {
-  source      = "../../modules/iam-roles/ecs_task_roles"
-  name_prefix = "grid-sim"
+  source         = "../../modules/iam-roles/ecs_task_roles"
+  name_prefix    = "grid-sim"
+  tls_secret_arn = aws_secretsmanager_secret.volttron_tls.arn
 }
 
 module "grid_event_gateway_alb" {
@@ -115,9 +116,9 @@ module "ecs_service_volttron" {
   mqtt_topic_metering    = "oadr/meter/ven1"
   mqtt_topic_status      = "ven/status/ven1"
   iot_endpoint           = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
-  ca_cert_secret_arn     = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:ca_cert::"
-  client_cert_secret_arn = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:client_cert::"
-  private_key_secret_arn = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:private_key::"
+  ca_cert_secret_arn     = "${aws_secretsmanager_secret.volttron_tls.arn}:ca_cert::"
+  client_cert_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:client_cert::"
+  private_key_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:private_key::"
   container_port         = 8000
   target_group_arn       = module.volttron_alb.target_group_arn
 

@@ -56,15 +56,15 @@ resource "aws_ecs_task_definition" "this" {
       secrets = [
         {
           name      = "CA_CERT_PEM"
-          valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:ca_cert::"
+          valueFrom = var.ca_cert_secret_arn
         },
         {
           name      = "CLIENT_CERT_PEM"
-          valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:client_cert::"
+          valueFrom = var.client_cert_secret_arn
         },
         {
           name      = "PRIVATE_KEY_PEM"
-          valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:ven-mqtt-certs:private_key::"
+          valueFrom = var.private_key_secret_arn
         }
       ]
       logConfiguration = {

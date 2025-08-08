@@ -12,3 +12,8 @@ variable "volttron_port" {
   type    = number
   default = 8000
 }
+
+variable "prefix" {
+  type    = string
+  default = "dev"
+}
