@@ -1,6 +1,7 @@
 # modules/iam-roles/ecs_task_roles/main.tf
 
 variable "name_prefix" { default = "ecs" }
+variable "tls_secret_arn" {}
 
 # IAM Role for ECS Task Execution
 resource "aws_iam_role" "execution" {
@@ -62,6 +63,26 @@ resource "aws_iam_role_policy" "iot_publish_policy" {
       }
     ]
   })
+}
+
+resource "aws_iam_policy" "allow_tls_secret_access" {
+  name = "${var.name_prefix}-ven-tls-secret-access"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["secretsmanager:GetSecretValue"],
+        Resource = var.tls_secret_arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "attach_tls_secret" {
+  role       = aws_iam_role.iot_mqtt.name
+  policy_arn = aws_iam_policy.allow_tls_secret_access.arn
 }
 
 output "execution" {
