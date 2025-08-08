@@ -80,7 +80,7 @@ module "ecs_service_grid_event_gateway" {
   mqtt_topic_events    = "oadr/event/ven1"
   mqtt_topic_responses = "oadr/response/ven1"
   mqtt_topic_metering  = "oadr/meter/ven1"
-  iot_endpoint           = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
+  iot_endpoint         = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
   container_port       = 8080
   vens_port            = 8081
   target_group_arn     = module.grid_event_gateway_alb.target_group_arn
