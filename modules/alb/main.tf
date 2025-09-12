@@ -38,6 +38,17 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = var.allowed_cidrs
   }
 
+  # Permit HTTPS traffic when a certificate is provided
+  dynamic "ingress" {
+    for_each = var.acm_cert_arn != null ? [1] : []
+    content {
+      protocol    = "tcp"
+      from_port   = 443
+      to_port     = 443
+      cidr_blocks = var.allowed_cidrs
+    }
+  }
+
   # ALB → targets (any port; SG on the tasks restricts to 8000)
   egress {
     protocol    = "-1"
