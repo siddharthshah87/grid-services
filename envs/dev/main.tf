@@ -301,6 +301,7 @@ module "frontend_alb" {
   listener_port     = 80
   target_port       = 80
   health_check_path = "/health"
+  acm_cert_arn      = var.frontend_cert_arn
 }
 
 module "ecr_frontend" {
