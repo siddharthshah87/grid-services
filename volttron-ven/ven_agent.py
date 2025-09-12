@@ -121,7 +121,7 @@ def _on_connect(_client, _userdata, _flags, rc, *_args):
 
 client.on_connect = _on_connect
 
-for attempt in range(1, 6):
+for attempt in range(1, 10):
     try:
         port = 8883 if CA_CERT and CLIENT_CERT and PRIVATE_KEY else 1883
         client.connect(IOT_ENDPOINT, port, 60)
