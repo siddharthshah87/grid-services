@@ -1,0 +1,509 @@
+openapi: 3.1.0
+info:
+  title: Grid Services Backend API
+  version: 0.1.0
+  description: |
+    API specification to support the Smart Grid Control Center dashboard.
+    Provides endpoints for network metrics, VEN management, load insights,
+    ADR event control and historical queries.
+servers:
+  - url: /api
+paths:
+  /stats/network:
+    get:
+      summary: Get current network metrics
+      tags: [Stats]
+      responses:
+        '200':
+          description: Current status of the VTN network
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkStats'
+  /stats/loads:
+    get:
+      summary: Get aggregated load statistics by type
+      tags: [Stats]
+      responses:
+        '200':
+          description: Load capability and usage by load type
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoadTypeStats'
+  /stats/network/history:
+    get:
+      summary: Query historical network metrics
+      tags: [Stats]
+      parameters:
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: Start of the interval
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: End of the interval
+        - in: query
+          name: granularity
+          required: false
+          schema:
+            type: string
+            enum: [minute, hour, day]
+          description: Aggregation interval
+      responses:
+        '200':
+          description: Time series of network metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryResponse'
+  /vens:
+    get:
+      summary: List all VENs
+      tags: [VENs]
+      responses:
+        '200':
+          description: Array of VENs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ven'
+    post:
+      summary: Register a new VEN
+      tags: [VENs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ven'
+      responses:
+        '201':
+          description: VEN created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ven'
+  /vens/{venId}:
+    parameters:
+      - in: path
+        name: venId
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get details for a specific VEN
+      tags: [VENs]
+      responses:
+        '200':
+          description: VEN details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ven'
+    patch:
+      summary: Update configuration for a VEN
+      tags: [VENs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ven'
+      responses:
+        '200':
+          description: Updated VEN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ven'
+    delete:
+      summary: Remove a VEN
+      tags: [VENs]
+      responses:
+        '204':
+          description: VEN deleted
+  /vens/{venId}/loads:
+    parameters:
+      - in: path
+        name: venId
+        required: true
+        schema:
+          type: string
+    get:
+      summary: List loads managed by a VEN
+      tags: [Loads]
+      responses:
+        '200':
+          description: Array of loads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Load'
+  /vens/{venId}/loads/{loadId}:
+    parameters:
+      - in: path
+        name: venId
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: loadId
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get load details
+      tags: [Loads]
+      responses:
+        '200':
+          description: Load information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Load'
+    patch:
+      summary: Update load configuration
+      tags: [Loads]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Load'
+      responses:
+        '200':
+          description: Updated load
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Load'
+  /vens/{venId}/loads/{loadId}/commands/shed:
+    post:
+      summary: Issue a load shed command for a specific load
+      tags: [Loads]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                  description: kW to shed
+      responses:
+        '202':
+          description: Shed command accepted
+  /vens/{venId}/history:
+    parameters:
+      - in: path
+        name: venId
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get historical metrics for a VEN
+      tags: [History]
+      parameters:
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: granularity
+          required: false
+          schema:
+            type: string
+            enum: [minute, hour, day]
+      responses:
+        '200':
+          description: Time series of VEN metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryResponse'
+  /vens/{venId}/loads/{loadId}/history:
+    parameters:
+      - in: path
+        name: venId
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: loadId
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get historical metrics for a specific load
+      tags: [History]
+      parameters:
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: granularity
+          required: false
+          schema:
+            type: string
+            enum: [minute, hour, day]
+      responses:
+        '200':
+          description: Time series of load metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryResponse'
+  /events:
+    get:
+      summary: List ADR events
+      tags: [Events]
+      responses:
+        '200':
+          description: Array of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdrEvent'
+    post:
+      summary: Start a new ADR event
+      tags: [Events]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdrEvent'
+      responses:
+        '201':
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdrEvent'
+  /events/{eventId}:
+    parameters:
+      - in: path
+        name: eventId
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get ADR event details
+      tags: [Events]
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdrEvent'
+    delete:
+      summary: Cancel an event
+      tags: [Events]
+      responses:
+        '204':
+          description: Event cancelled
+  /events/{eventId}/stop:
+    post:
+      summary: Stop an active event
+      tags: [Events]
+      responses:
+        '202':
+          description: Event stop command accepted
+  /events/current:
+    get:
+      summary: Get the currently active ADR event if any
+      tags: [Events]
+      responses:
+        '200':
+          description: Active event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdrEvent'
+  /events/history:
+    get:
+      summary: Query historical ADR events
+      tags: [Events, History]
+      parameters:
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Events within the interval
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdrEvent'
+components:
+  schemas:
+    NetworkStats:
+      type: object
+      properties:
+        totalVens:
+          type: integer
+        onlineVens:
+          type: integer
+        totalControllablePower:
+          type: number
+          description: MW available for control
+        currentLoadReduction:
+          type: number
+          description: MW currently shed
+        networkEfficiency:
+          type: number
+          description: Percentage efficiency
+        averageHousePower:
+          type: number
+          description: kW last hour
+        totalHousePowerToday:
+          type: number
+          description: kWh consumed today
+    LoadTypeStats:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Load category e.g. ev, solar
+        totalCapacity:
+          type: number
+          description: Total capacity in MW
+        availableCapacity:
+          type: number
+          description: Remaining capacity that can be shed
+        currentUsage:
+          type: number
+          description: Current power draw in MW
+    Ven:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        location:
+          type: string
+        status:
+          type: string
+          enum: [online, offline, maintenance]
+        controllablePower:
+          type: number
+          description: kW that can be shed
+        currentPower:
+          type: number
+          description: Current power usage in kW
+        address:
+          type: string
+        lastSeen:
+          type: string
+          format: date-time
+        responseTime:
+          type: number
+          description: Response latency in ms
+        latitude:
+          type: number
+        longitude:
+          type: number
+        loads:
+          type: array
+          items:
+            $ref: '#/components/schemas/Load'
+    Load:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [ev, solar, washer_dryer, ac, pool_heater, other]
+        name:
+          type: string
+        capacity:
+          type: number
+          description: Maximum power in kW
+        shedCapability:
+          type: number
+          description: Shed capacity in kW
+        currentPower:
+          type: number
+          description: Current power usage in kW
+    AdrEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        targetReduction:
+          type: number
+          description: MW reduction requested
+        achievedReduction:
+          type: number
+          description: MW achieved
+        startTime:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+        status:
+          type: string
+          enum: [scheduled, active, completed, cancelled]
+    HistoryPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        value:
+          type: number
+    HistoryResponse:
+      type: object
+      properties:
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryPoint'
