@@ -5,10 +5,10 @@ This document summarizes backend API endpoints required to support the Smart Gri
 ## Data Model
 
 - **NetworkStats** – summary metrics such as `venCount`, `controllablePowerKw`, `potentialLoadReductionKw`, `efficiencyPercent`, and `householdUsageKw`.
-- **VEN** – a Virtual End Node with `id`, `name`, `status`, `location {lat, lon}`, `loads[]`, and `metrics` describing current power and shed availability.
+- **VEN** – a Virtual End Node with `id`, `name`, `status`, `location {lat, lon}`, `loads[]`, and `metrics` describing current power, shed availability, and Shed status (event id, shed load ids)
 - **Load** – device attached to a VEN with `id`, `type`, `capacityKw`, `shedCapabilityKw`, and `currentPowerKw`.
-- **Event** – ADR event with `id`, `status`, `startTime`, `endTime`, `requestedReductionKw`, and `actualReductionKw`.
-- **TimeseriesPoint** – `{timestamp, powerKw}` used in historical responses.
+- **Event** – ADR event with `id`, `status`, `startTime`, `endTime`, (`requestedReductionKw`, and `actualReductionKw` -- need to confirm if openADR specifies)
+- **TimeseriesPoint** – VENB level - system level `{timestamp, used powerKw, shed powerKw}` used in historical responses.
 
 ## Network Statistics
 
