@@ -4,6 +4,9 @@ import logging
 import sys
 
 from app.routers import health, event, ven
+from app.routers import stats as api_stats
+from app.routers import ven_ext as api_ven
+from app.routers import event_ext as api_event
 
 app = FastAPI(
     title="OpenADR VTN Admin API",
@@ -25,6 +28,13 @@ app.add_middleware(
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(ven.router, prefix="/vens", tags=["VENs"])
 app.include_router(event.router, prefix="/events", tags=["Events"])
+"""
+New API surface aligned to docs/backend-api.md (served under /api/*)
+This provides dummy data for rapid UI integration without requiring a DB.
+"""
+app.include_router(api_stats.router, prefix="/api/stats", tags=["Stats"]) 
+app.include_router(api_ven.router, prefix="/api/vens", tags=["VENs (Spec)"])
+app.include_router(api_event.router, prefix="/api/events", tags=["Events (Spec)"])
 
 # Startup/shutdown hooks
 
