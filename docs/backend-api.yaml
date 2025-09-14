@@ -1,11 +1,10 @@
 openapi: 3.1.0
 info:
   title: Grid Services Backend API
-  version: 0.1.0
+  version: 0.2.0
   description: |
-    API specification to support the Smart Grid Control Center dashboard.
-    Provides endpoints for network metrics, VEN management, load insights,
-    ADR event control and historical queries.
+    API for the Smart Grid Control Center dashboard.
+    Endpoints are aligned with the Data Model defined in docs/backend-api.md.
 servers:
   - url: /api
 paths:
@@ -15,7 +14,7 @@ paths:
       tags: [Stats]
       responses:
         '200':
-          description: Current status of the VTN network
+          description: Current network metrics
           content:
             application/json:
               schema:
@@ -26,7 +25,7 @@ paths:
       tags: [Stats]
       responses:
         '200':
-          description: Load capability and usage by load type
+          description: Aggregated capability and usage by load type
           content:
             application/json:
               schema:
@@ -36,7 +35,7 @@ paths:
   /stats/network/history:
     get:
       summary: Query historical network metrics
-      tags: [Stats]
+      tags: [Stats, History]
       parameters:
         - in: query
           name: start
@@ -57,8 +56,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [minute, hour, day]
-          description: Aggregation interval
+            description: Aggregation step (e.g., 5m, 1h)
       responses:
         '200':
           description: Time series of network metrics
@@ -87,7 +85,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Ven'
+              $ref: '#/components/schemas/VenCreate'
       responses:
         '201':
           description: VEN created
@@ -120,7 +118,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Ven'
+              $ref: '#/components/schemas/VenUpdate'
       responses:
         '200':
           description: Updated VEN
@@ -183,7 +181,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Load'
+              $ref: '#/components/schemas/LoadUpdate'
       responses:
         '200':
           description: Updated load
@@ -200,11 +198,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                amount:
-                  type: number
-                  description: kW to shed
+              $ref: '#/components/schemas/ShedCommand'
       responses:
         '202':
           description: Shed command accepted
@@ -236,7 +230,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [minute, hour, day]
+            description: Aggregation step (e.g., 5m, 1h)
       responses:
         '200':
           description: Time series of VEN metrics
@@ -277,7 +271,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [minute, hour, day]
+            description: Aggregation step (e.g., 5m, 1h)
       responses:
         '200':
           description: Time series of load metrics
@@ -297,7 +291,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/AdrEvent'
+                  $ref: '#/components/schemas/Event'
     post:
       summary: Start a new ADR event
       tags: [Events]
@@ -306,14 +300,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AdrEvent'
+              type: object
+              required: [startTime, endTime, requestedReductionKw]
+              properties:
+                startTime:
+                  type: string
+                  format: date-time
+                endTime:
+                  type: string
+                  format: date-time
+                requestedReductionKw:
+                  type: number
       responses:
         '201':
           description: Event created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdrEvent'
+                $ref: '#/components/schemas/Event'
   /events/{eventId}:
     parameters:
       - in: path
@@ -330,7 +334,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdrEvent'
+                $ref: '#/components/schemas/Event'
     delete:
       summary: Cancel an event
       tags: [Events]
@@ -354,7 +358,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdrEvent'
+                $ref: '#/components/schemas/Event'
   /events/history:
     get:
       summary: Query historical ADR events
@@ -380,46 +384,64 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/AdrEvent'
+                  $ref: '#/components/schemas/Event'
 components:
   schemas:
     NetworkStats:
       type: object
       properties:
-        totalVens:
+        venCount:
           type: integer
-        onlineVens:
-          type: integer
-        totalControllablePower:
+          description: Number of registered VENs
+        controllablePowerKw:
           type: number
-          description: MW available for control
-        currentLoadReduction:
+          description: Total kW available for control
+        potentialLoadReductionKw:
           type: number
-          description: MW currently shed
-        networkEfficiency:
+          description: Potential kW reduction if fully shed
+        householdUsageKw:
           type: number
-          description: Percentage efficiency
-        averageHousePower:
-          type: number
-          description: kW last hour
-        totalHousePowerToday:
-          type: number
-          description: kWh consumed today
+          description: Current household usage in kW
+      required: [venCount, controllablePowerKw, potentialLoadReductionKw, householdUsageKw]
     LoadTypeStats:
       type: object
       properties:
         type:
           type: string
-          description: Load category e.g. ev, solar
-        totalCapacity:
+          description: Load category (e.g., ev, solar, hvac)
+        totalCapacityKw:
           type: number
-          description: Total capacity in MW
-        availableCapacity:
+          description: Total capacity in kW
+        totalShedCapabilityKw:
           type: number
-          description: Remaining capacity that can be shed
-        currentUsage:
+          description: Total shed capability in kW
+        currentUsageKw:
           type: number
-          description: Current power draw in MW
+          description: Current aggregated usage in kW
+      required: [type, totalCapacityKw, totalShedCapabilityKw, currentUsageKw]
+    Location:
+      type: object
+      properties:
+        lat:
+          type: number
+        lon:
+          type: number
+      required: [lat, lon]
+    VenMetrics:
+      type: object
+      properties:
+        currentPowerKw:
+          type: number
+        shedAvailabilityKw:
+          type: number
+        activeEventId:
+          type: string
+          nullable: true
+        shedLoadIds:
+          type: array
+          items:
+            type: string
+      required: [currentPowerKw, shedAvailabilityKw, shedLoadIds]
     Ven:
       type: object
       properties:
@@ -427,33 +449,35 @@ components:
           type: string
         name:
           type: string
-        location:
-          type: string
         status:
           type: string
-          enum: [online, offline, maintenance]
-        controllablePower:
-          type: number
-          description: kW that can be shed
-        currentPower:
-          type: number
-          description: Current power usage in kW
-        address:
-          type: string
-        lastSeen:
-          type: string
-          format: date-time
-        responseTime:
-          type: number
-          description: Response latency in ms
-        latitude:
-          type: number
-        longitude:
-          type: number
+        location:
+          $ref: '#/components/schemas/Location'
         loads:
           type: array
           items:
             $ref: '#/components/schemas/Load'
+        metrics:
+          $ref: '#/components/schemas/VenMetrics'
+      required: [id, name, status, location, loads, metrics]
+    VenCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        location:
+          $ref: '#/components/schemas/Location'
+      required: [name, location]
+    VenUpdate:
+      type: object
+      description: Partial VEN update
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+        location:
+          $ref: '#/components/schemas/Location'
     Load:
       type: object
       properties:
@@ -461,49 +485,78 @@ components:
           type: string
         type:
           type: string
-          enum: [ev, solar, washer_dryer, ac, pool_heater, other]
-        name:
-          type: string
-        capacity:
+        capacityKw:
           type: number
           description: Maximum power in kW
-        shedCapability:
+        shedCapabilityKw:
           type: number
-          description: Shed capacity in kW
-        currentPower:
+          description: Shed capability in kW
+        currentPowerKw:
           type: number
           description: Current power usage in kW
-    AdrEvent:
+        name:
+          type: string
+      required: [id, type, capacityKw, shedCapabilityKw, currentPowerKw]
+    LoadUpdate:
+      type: object
+      description: Partial Load update
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        capacityKw:
+          type: number
+        shedCapabilityKw:
+          type: number
+    ShedCommand:
+      type: object
+      properties:
+        amountKw:
+          type: number
+          description: Kilowatts to shed
+      required: [amountKw]
+    Event:
       type: object
       properties:
         id:
           type: string
-        targetReduction:
-          type: number
-          description: MW reduction requested
-        achievedReduction:
-          type: number
-          description: MW achieved
-        startTime:
-          type: string
-          format: date-time
-        durationMinutes:
-          type: integer
         status:
           type: string
           enum: [scheduled, active, completed, cancelled]
-    HistoryPoint:
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        requestedReductionKw:
+          type: number
+        actualReductionKw:
+          type: number
+          default: 0
+      required: [id, status, startTime, endTime, requestedReductionKw]
+    TimeseriesPoint:
       type: object
       properties:
         timestamp:
           type: string
           format: date-time
-        value:
+        usedPowerKw:
           type: number
+        shedPowerKw:
+          type: number
+        eventId:
+          type: string
+          nullable: true
+        requestedReductionKw:
+          type: number
+      required: [timestamp, usedPowerKw, shedPowerKw]
     HistoryResponse:
       type: object
       properties:
         points:
           type: array
           items:
-            $ref: '#/components/schemas/HistoryPoint'
+            $ref: '#/components/schemas/TimeseriesPoint'
+      required: [points]
