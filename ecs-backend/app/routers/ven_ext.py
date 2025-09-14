@@ -13,7 +13,7 @@ async def list_vens_v2():
     return list_vens()
 
 
-@router.post("/", response_model=Ven)
+@router.post("/", response_model=Ven, status_code=201)
 async def create_ven_v2(payload: VenCreate):
     # Create a simple ID
     new_id = f"ven-{100 + len(list_vens()) + 1}"
@@ -43,6 +43,15 @@ async def patch_ven_v2(ven_id: str, update: VenUpdate):
         raise HTTPException(status_code=404, detail="VEN not found")
     data = ven.model_copy(update={k: v for k, v in update.model_dump(exclude_unset=True).items()})
     return upsert_dummy_ven(data)
+
+
+@router.delete("/{ven_id}", status_code=204)
+async def delete_ven_v2(ven_id: str):
+    from app.data.dummy import VENS
+    if ven_id not in VENS:
+        raise HTTPException(status_code=404, detail="VEN not found")
+    del VENS[ven_id]
+    return {"status": "deleted"}
 
 
 @router.get("/{ven_id}/loads", response_model=List[Load])
@@ -107,4 +116,3 @@ async def ven_load_history(ven_id: str, load_id: str):
     if not ven or not any(l.id == load_id for l in ven.loads):
         raise HTTPException(status_code=404, detail="Not found")
     return sample_history_points()
-
