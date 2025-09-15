@@ -25,31 +25,21 @@ variable "acm_cert_arn" {
   default     = null
 }
 
+variable "enable_https" {
+  type        = bool
+  description = "Enable HTTPS listener and 80->443 redirect"
+  default     = false
+}
+
+locals {
+  alb_ingress_ports = var.enable_https ? [var.listener_port, 443] : [var.listener_port]
+}
+
 # --- ALB security-group -----------------------------------------------------
 resource "aws_security_group" "alb_sg" {
   name   = "${var.name}-sg"
   vpc_id = var.vpc_id
 
-  # Permit traffic from allowed CIDRs to the listener
-  ingress {
-    protocol    = "tcp"
-    from_port   = var.listener_port
-    to_port     = var.listener_port
-    cidr_blocks = var.allowed_cidrs
-  }
-
-  # Permit HTTPS traffic when a certificate is provided
-  dynamic "ingress" {
-    for_each = var.acm_cert_arn != null ? [1] : []
-    content {
-      protocol    = "tcp"
-      from_port   = 443
-      to_port     = 443
-      cidr_blocks = var.allowed_cidrs
-    }
-  }
-
-  # ALB → targets (any port; SG on the tasks restricts to 8000)
   egress {
     protocol    = "-1"
     from_port   = 0
@@ -57,9 +47,28 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  lifecycle { prevent_destroy = true }
+}
+
+# HTTP :80 always (for redirect and/or plain HTTP)
+resource "aws_security_group_rule" "alb_http_ingress" {
+  type              = "ingress"
+  protocol          = "tcp"
+  from_port         = 80
+  to_port           = 80
+  cidr_blocks       = var.allowed_cidrs
+  security_group_id = aws_security_group.alb_sg.id
+}
+
+# HTTPS :443 only when enabled
+resource "aws_security_group_rule" "alb_https_ingress" {
+  count             = var.enable_https ? 1 : 0
+  type              = "ingress"
+  protocol          = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_blocks       = var.allowed_cidrs
+  security_group_id = aws_security_group.alb_sg.id
 }
 
 # --- ALB --------------------------------------------------------------------
@@ -101,7 +110,7 @@ resource "aws_lb_target_group" "this" {
 # Create an HTTP listener that either forwards to the target group or
 # redirects to HTTPS when a certificate is provided.
 resource "aws_lb_listener" "http" {
-  count             = var.acm_cert_arn == null ? 1 : 0
+  count             = var.enable_https ? 0 : 1
   load_balancer_arn = aws_lb.this.arn
   port              = var.listener_port # 80
   protocol          = "HTTP"
@@ -113,7 +122,7 @@ resource "aws_lb_listener" "http" {
 }
 
 resource "aws_lb_listener" "http_redirect" {
-  count             = var.acm_cert_arn != null ? 1 : 0
+  count             = var.enable_https ? 1 : 0
   load_balancer_arn = aws_lb.this.arn
   port              = var.listener_port # 80
   protocol          = "HTTP"
@@ -131,7 +140,7 @@ resource "aws_lb_listener" "http_redirect" {
 
 # Optional HTTPS listener
 resource "aws_lb_listener" "https" {
-  count             = var.acm_cert_arn != null ? 1 : 0
+  count             = var.enable_https ? 1 : 0
   load_balancer_arn = aws_lb.this.arn
   port              = 443
   protocol          = "HTTPS"
@@ -144,6 +153,7 @@ resource "aws_lb_listener" "https" {
   }
 }
 
+
 output "dns_name" { value = aws_lb.this.dns_name }
 output "target_group_arn" { value = aws_lb_target_group.this.arn }
 output "security_group_id" { value = aws_security_group.alb_sg.id }
@@ -152,14 +162,14 @@ output "security_group_id" { value = aws_security_group.alb_sg.id }
 # explicitly depend on them. This prevents race conditions when creating
 # resources like ECS services that reference these objects via variables.
 output "listener" {
-  # Export whichever listener forwards traffic to the target group. When a
-  # certificate ARN is supplied, the HTTPS listener handles the forwarding and
-  # the HTTP listener only performs redirects. Otherwise, the HTTP listener
-  # forwards requests directly.
-  value = var.acm_cert_arn == null ? aws_lb_listener.http[0] : aws_lb_listener.https[0]
+  value = var.enable_https ? aws_lb_listener.https[0] : aws_lb_listener.http[0]
 }
 
 output "target_group" {
   value = aws_lb_target_group.this
+}
+
+output "lb_zone_id" {
+  value = aws_lb.this.zone_id
 }
 
