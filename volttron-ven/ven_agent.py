@@ -1,4 +1,5 @@
 import os
+import ssl
 import json
 import random
 import time
@@ -106,26 +107,44 @@ if not all([CA_CERT, CLIENT_CERT, PRIVATE_KEY]):
     CLIENT_CERT = _materialise_pem("CLIENT_CERT")
     PRIVATE_KEY = _materialise_pem("PRIVATE_KEY")
 
-# ── MQTT setup ─────────────────────────────────────────────────────────
-client = mqtt.Client(protocol=mqtt.MQTTv5)
+if not all([CA_CERT, CLIENT_CERT, PRIVATE_KEY]):
+    print(
+        "❌ TLS credentials are required for AWS IoT Core but were not provided",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
-if CA_CERT and CLIENT_CERT and PRIVATE_KEY:
-    client.tls_set(ca_certs=CA_CERT, certfile=CLIENT_CERT, keyfile=PRIVATE_KEY)
-else:
-    print("⚠️ TLS certificates not provided; using insecure MQTT", file=sys.stderr)
+# ── MQTT setup ─────────────────────────────────────────────────────────
+client = mqtt.Client(protocol=mqtt.MQTTv311)
+client.tls_set(
+    ca_certs=CA_CERT,
+    certfile=CLIENT_CERT,
+    keyfile=PRIVATE_KEY,
+    tls_version=ssl.PROTOCOL_TLSv1_2,
+)
+client.tls_insecure_set(False)
 
 connected = False
 
 def _on_connect(_client, _userdata, _flags, rc, *_args):
     global connected
     connected = rc == 0
+    status = "established" if connected else f"failed (code {rc})"
+    print(f"MQTT connection {status}")
+
+
+def _on_disconnect(_client, _userdata, rc):
+    global connected
+    connected = False
+    reason = "graceful" if rc == mqtt.MQTT_ERR_SUCCESS else f"unexpected (code {rc})"
+    print(f"MQTT disconnected: {reason}", file=sys.stderr)
 
 client.on_connect = _on_connect
+client.on_disconnect = _on_disconnect
 
 for attempt in range(1, 10):
     try:
-        port = 8883 if CA_CERT and CLIENT_CERT and PRIVATE_KEY else 1883
-        client.connect(IOT_ENDPOINT, port, 60)
+        client.connect(IOT_ENDPOINT, 8883, 60)
         break
     except Exception as e:
         print(f"MQTT connect failed (try {attempt}/5): {e}", file=sys.stderr)
@@ -202,4 +221,3 @@ def main(iterations: int | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-
