@@ -70,6 +70,23 @@ check_service() {
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 main() {
+  # ─── Show ALB URLs for reference ─────────────────────────────────────────────
+  echo
+  echo "=== ALB DNS Names ==="
+
+  # List all load balancers that match your known prefixes
+  lbs=$(timeout_cmd elbv2 describe-load-balancers \
+          --query 'LoadBalancers[].{Name:LoadBalancerName,DNS:DNSName}' \
+          --output text 2>/dev/null)
+
+  if [[ -n "$lbs" ]]; then
+    printf "%-30s %s\n" "NAME" "DNS"
+    echo "------------------------------ -----------------------------------------"
+    while read -r name dns; do
+      printf "%-30s http://%s\n" "$name" "$dns"
+    done <<<"$lbs"
+    echo
+  fi
   echo "─── ECS and ALB Health check ───"
   echo "▶︎ Health run $(date -u '+%Y-%m-%dT%H:%M:%SZ') ($REGION, profile=$PROFILE)
 "
@@ -85,24 +102,6 @@ main() {
     check_service "$svc_arn"
   done
 }
-
-# ─── Show ALB URLs for reference ─────────────────────────────────────────────
-echo
-echo "=== ALB DNS Names ==="
-
-# List all load balancers that match your known prefixes
-lbs=$(timeout_cmd elbv2 describe-load-balancers \
-        --query 'LoadBalancers[].{Name:LoadBalancerName,DNS:DNSName}' \
-        --output text 2>/dev/null)
-
-if [[ -n "$lbs" ]]; then
-  printf "%-30s %s\n" "NAME" "DNS"
-  echo "------------------------------ -----------------------------------------"
-  while read -r name dns; do
-    printf "%-30s http://%s\n" "$name" "$dns"
-  done <<<"$lbs"
-  echo
-fi
 
 main "$@"
 
