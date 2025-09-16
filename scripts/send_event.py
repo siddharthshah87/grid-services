@@ -9,6 +9,9 @@ from datetime import datetime
 import paho.mqtt.client as mqtt
 
 
+DEFAULT_IOT_ENDPOINT = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Publish a test OpenADR event to a VEN"
@@ -16,8 +19,8 @@ def main() -> None:
     parser.add_argument("ven_id", help="Target VEN ID")
     parser.add_argument(
         "--host",
-        default=os.getenv("IOT_ENDPOINT", "localhost"),
-        help="MQTT broker host (default from IOT_ENDPOINT or localhost)",
+        default=os.getenv("IOT_ENDPOINT", DEFAULT_IOT_ENDPOINT),
+        help="MQTT broker host (default from IOT_ENDPOINT or AWS IoT endpoint)",
     )
     parser.add_argument(
         "--port", type=int, default=1883, help="MQTT broker port"
