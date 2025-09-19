@@ -188,6 +188,9 @@ Re-running `terraform apply` will recreate the services when needed.
   the environment variables `CA_CERT`, `CLIENT_CERT`, and `PRIVATE_KEY` with the
   paths to your broker's certificate authority, client certificate and key to
   enable TLS.
+- By default the applications target the AWS IoT Core endpoint
+  `vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com`. Set
+  the `IOT_ENDPOINT` environment variable if you need to override this.
 - The container applications are minimal examples. Customize `grid-event-gateway/vtn_server.py` and `volttron-ven/ven_agent.py` for your use case.
 
 ## Grid-Event Gateway
@@ -211,7 +214,7 @@ Two helper scripts allow quick testing of the MQTT topics used by the VTN and
 VEN examples. Set the environment variables before running them:
 
 ```bash
-export IOT_ENDPOINT=<broker-host>
+export IOT_ENDPOINT=vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com
 # For MQTT over TLS also set the certificate paths
 export CA_CERT=/path/to/ca.pem
 export CLIENT_CERT=/path/to/client.crt
