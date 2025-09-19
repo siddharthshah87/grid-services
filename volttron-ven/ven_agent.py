@@ -69,17 +69,19 @@ def fetch_tls_creds_from_secrets(secret_name: str, region_name="us-west-2") -> d
         print(f"❌ Error fetching TLS secrets: {e}", file=sys.stderr)
         return None
 
-def _materialise_pem(var_name: str) -> str | None:
+def _materialise_pem(*var_names: str) -> str | None:
     """Return a file-path ready for paho.tls_set()."""
-    val = os.getenv(var_name)
-    if not val:
-        return None
-    if val.startswith("-----BEGIN"):
-        pem_path = pathlib.Path(tempfile.gettempdir()) / f"{var_name.lower()}.pem"
-        pem_path.write_text(val)
-        os.environ[var_name] = str(pem_path)
-        return str(pem_path)
-    return val
+    for var_name in var_names:
+        val = os.getenv(var_name)
+        if not val:
+            continue
+        if val.startswith("-----BEGIN"):
+            pem_path = pathlib.Path(tempfile.gettempdir()) / f"{var_name.lower()}.pem"
+            pem_path.write_text(val)
+            os.environ[var_name] = str(pem_path)
+            return str(pem_path)
+        return val
+    return None
 
 # ── env / config ───────────────────────────────────────────────────────
 MQTT_TOPIC_STATUS     = os.getenv("MQTT_TOPIC_STATUS", "volttron/dev")
@@ -91,6 +93,7 @@ IOT_ENDPOINT          = os.getenv("IOT_ENDPOINT", DEFAULT_IOT_ENDPOINT)
 HEALTH_PORT           = int(os.getenv("HEALTH_PORT", "8000"))
 TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME")
 AWS_REGION            = os.getenv("AWS_REGION", "us-west-2")
+MQTT_PORT             = int(os.getenv("MQTT_PORT", "8883"))
 
 # ── TLS setup ──────────────────────────────────────────────────────────
 CA_CERT = CLIENT_CERT = PRIVATE_KEY = None
@@ -103,9 +106,9 @@ if TLS_SECRET_NAME:
         PRIVATE_KEY = creds.get("private_key")
 
 if not all([CA_CERT, CLIENT_CERT, PRIVATE_KEY]):
-    CA_CERT     = _materialise_pem("CA_CERT")
-    CLIENT_CERT = _materialise_pem("CLIENT_CERT")
-    PRIVATE_KEY = _materialise_pem("PRIVATE_KEY")
+    CA_CERT     = _materialise_pem("CA_CERT", "CA_CERT_PEM")
+    CLIENT_CERT = _materialise_pem("CLIENT_CERT", "CLIENT_CERT_PEM")
+    PRIVATE_KEY = _materialise_pem("PRIVATE_KEY", "PRIVATE_KEY_PEM")
 
 if not all([CA_CERT, CLIENT_CERT, PRIVATE_KEY]):
     print(
@@ -144,7 +147,7 @@ client.on_disconnect = _on_disconnect
 
 for attempt in range(1, 10):
     try:
-        client.connect(IOT_ENDPOINT, 8883, 60)
+        client.connect(IOT_ENDPOINT, MQTT_PORT, 60)
         break
     except Exception as e:
         print(f"MQTT connect failed (try {attempt}/5): {e}", file=sys.stderr)
