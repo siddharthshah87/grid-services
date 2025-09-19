@@ -13,14 +13,28 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Monitor MQTT responses from a VEN"
     )
+    default_host = os.getenv("IOT_ENDPOINT", DEFAULT_IOT_ENDPOINT)
+
+    def default_port_for_host(host: str) -> int:
+        """Return the typical MQTT port for the given endpoint."""
+
+        normalized_host = (host or "").lower()
+        if normalized_host.endswith("amazonaws.com"):
+            return 8883
+        return 1883
+
+    default_port = default_port_for_host(default_host)
     parser.add_argument("ven_id", help="VEN ID to monitor")
     parser.add_argument(
         "--host",
-        default=os.getenv("IOT_ENDPOINT", DEFAULT_IOT_ENDPOINT),
+        default=default_host,
         help="MQTT broker host (default from IOT_ENDPOINT or AWS IoT endpoint)",
     )
     parser.add_argument(
-        "--port", type=int, default=1883, help="MQTT broker port"
+        "--port",
+        type=int,
+        default=default_port,
+        help=f"MQTT broker port (default {default_port})",
     )
     ca_cert = os.getenv("CA_CERT")
     client_cert = os.getenv("CLIENT_CERT")
