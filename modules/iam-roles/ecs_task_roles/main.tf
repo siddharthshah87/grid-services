@@ -85,6 +85,11 @@ resource "aws_iam_role_policy_attachment" "attach_tls_secret" {
   policy_arn = aws_iam_policy.allow_tls_secret_access.arn
 }
 
+resource "aws_iam_role_policy_attachment" "attach_execution_tls_secret" {
+  role       = aws_iam_role.execution.name
+  policy_arn = aws_iam_policy.allow_tls_secret_access.arn
+}
+
 output "execution" {
   value = aws_iam_role.execution.arn
 }
