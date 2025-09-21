@@ -63,7 +63,7 @@ def fetch_tls_creds_from_secrets(secret_name: str, region_name="us-west-2") -> d
                 path = tmp_dir / filename
                 path.write_text(secret[key])
                 cert_files[key] = str(path)
-
+        print("✅ Fetched TLS secrets from AWS Secrets Manager")
         return cert_files
     except ClientError as e:
         print(f"❌ Error fetching TLS secrets: {e}", file=sys.stderr)
@@ -91,7 +91,7 @@ MQTT_TOPIC_METERING   = os.getenv("MQTT_TOPIC_METERING", "volttron/metering")
 DEFAULT_IOT_ENDPOINT  = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
 IOT_ENDPOINT          = os.getenv("IOT_ENDPOINT", DEFAULT_IOT_ENDPOINT)
 HEALTH_PORT           = int(os.getenv("HEALTH_PORT", "8000"))
-TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME")
+TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME", "dev-volttron-tls")
 AWS_REGION            = os.getenv("AWS_REGION", "us-west-2")
 MQTT_PORT             = int(os.getenv("MQTT_PORT", "8883"))
 
