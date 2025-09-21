@@ -18,35 +18,15 @@ import {
   AlertTriangle,
   CheckCircle
 } from 'lucide-react';
+import { useNetworkStats } from '@/hooks/useApi';
+import { formatPowerKw } from '@/lib/utils';
 
 export const Dashboard = () => {
   const [activeView, setActiveView] = useState('list');
 
   const { data: stats, isLoading } = useNetworkStats();
-
-  // Map backend response to UI shape (convert kW -> MW where appropriate)
-  const networkStats = useMemo(() => {
-    if (!stats) {
-      return {
-        totalVens: 0,
-        onlineVens: 0,
-        totalControllablePower: 0,
-        currentLoadReduction: 0,
-        networkEfficiency: 0,
-        averageHousePower: 0,
-        totalHousePowerToday: 0,
-      };
-    }
-    return {
-      totalVens: stats.venCount,
-      onlineVens: stats.onlineVens ?? 0,
-      totalControllablePower: (stats.controllablePowerKw ?? 0) / 1000,
-      currentLoadReduction: (stats.currentLoadReductionKw ?? 0) / 1000,
-      networkEfficiency: stats.networkEfficiency ?? 0,
-      averageHousePower: stats.averageHousePower ?? 0,
-      totalHousePowerToday: stats.totalHousePowerToday ?? 0,
-    };
-  }, [stats]);
+  const onlineCount = stats?.onlineVens ?? 0;
+  const totalVens = stats?.venCount ?? 0;
 
   return (
     <div className="min-h-screen bg-background p-6 space-y-6">
@@ -82,7 +62,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {isLoading ? '…' : `${networkStats.onlineVens}/${networkStats.totalVens}`}
+              {isLoading ? '…' : `${onlineCount}/${totalVens}`}
             </div>
             <p className="text-xs text-muted-foreground">
               VENs Online ({networkStats.networkEfficiency}% efficiency)
@@ -97,7 +77,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {isLoading ? '…' : `${networkStats.totalControllablePower} MW`}
+              {isLoading ? '…' : formatPowerKw(stats?.controllablePowerKw)}
             </div>
             <p className="text-xs text-muted-foreground">
               Available for load shedding
@@ -112,7 +92,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">
-              {isLoading ? '…' : `${networkStats.currentLoadReduction} MW`}
+              {isLoading ? '…' : formatPowerKw(stats?.currentLoadReductionKw)}
             </div>
             <p className="text-xs text-muted-foreground">
               Current load reduction
@@ -127,7 +107,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">
-              {isLoading ? '…' : `${networkStats.averageHousePower} kW`}
+              {isLoading ? '…' : formatPowerKw(stats?.averageHousePower)}
             </div>
             <p className="text-xs text-muted-foreground">
               Last hour average
@@ -175,7 +155,7 @@ import { useNetworkStats } from '@/hooks/useApi';
 
         {/* Sidebar Controls */}
         <div className="space-y-6">
-          <PowerMetrics networkStats={networkStats} />
+          <PowerMetrics networkStats={stats} />
           <AdrControls />
         </div>
       </div>

@@ -48,6 +48,7 @@ export const MapView = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
   const markers = useRef<google.maps.Marker[]>([]);
+  const markerMap = useRef<Record<string, { marker: google.maps.Marker; info: google.maps.InfoWindow }>>({});
 
   const center = useMemo(() => {
     if (vens && vens.length > 0) {
@@ -76,6 +77,7 @@ export const MapView = () => {
     // clear existing markers
     markers.current.forEach((m) => m.setMap(null));
     markers.current = [];
+    markerMap.current = {};
     (vens || []).forEach((v) => {
       const color = v.status === 'online' ? '#22c55e' : v.status === 'offline' ? '#ef4444' : '#f59e0b';
       const m = new google.maps.Marker({
@@ -105,8 +107,28 @@ export const MapView = () => {
       });
       m.addListener('click', () => info.open({ map: mapInstance.current!, anchor: m }));
       markers.current.push(m);
+      markerMap.current[v.id] = { marker: m, info };
     });
   }, [loaded, vens]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const custom = e as CustomEvent<{ id: string }>;
+      const id = custom.detail?.id;
+      if (!id || !mapInstance.current) return;
+      const entry = markerMap.current[id];
+      if (entry) {
+        const pos = entry.marker.getPosition();
+        if (pos) {
+          mapInstance.current.setZoom(12);
+          mapInstance.current.panTo(pos);
+          entry.info.open({ map: mapInstance.current, anchor: entry.marker });
+        }
+      }
+    };
+    window.addEventListener('focus-ven', handler as EventListener);
+    return () => window.removeEventListener('focus-ven', handler as EventListener);
+  }, []);
 
   return (
     <div className="p-4">

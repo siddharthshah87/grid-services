@@ -115,6 +115,7 @@ export const VenList = () => {
                   size="sm" 
                   variant="outline"
                   className="text-xs h-7"
+                  onClick={() => window.dispatchEvent(new CustomEvent('focus-ven', { detail: { id: ven.id } }))}
                 >
                   Details
                 </Button>
