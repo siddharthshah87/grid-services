@@ -13,11 +13,14 @@ from app.schemas.api_models import (
     HistoryResponse,
     TimeseriesPoint,
     Event,
+    VenSummary,
+    EventMetrics,
 )
 
 
 # Static dummy VENs
 VENS: Dict[str, Ven] = {}
+VEN_META: Dict[str, dict] = {}
 
 
 def _init_vens() -> None:
@@ -28,7 +31,7 @@ def _init_vens() -> None:
         "ven-101": Ven(
             id="ven-101",
             name="Main Street Facility",
-            status="active",
+            status="online",
             location=Location(lat=37.42, lon=-122.08),
             loads=[
                 Load(id="ld-101-a", type="hvac", capacityKw=7.5, shedCapabilityKw=3.0, currentPowerKw=4.2),
@@ -39,7 +42,7 @@ def _init_vens() -> None:
         "ven-102": Ven(
             id="ven-102",
             name="Riverside Plant",
-            status="active",
+            status="online",
             location=Location(lat=47.61, lon=-122.33),
             loads=[
                 Load(id="ld-102-a", type="washer_dryer", capacityKw=2.5, shedCapabilityKw=1.5, currentPowerKw=1.1),
@@ -58,6 +61,27 @@ def _init_vens() -> None:
             ],
             metrics=VenMetrics(currentPowerKw=-1.5, shedAvailabilityKw=4.5, activeEventId=None, shedLoadIds=[]),
         ),
+    }
+    global VEN_META
+    VEN_META = {
+        "ven-101": {
+            "address": "123 Main St, Grid Sector 1",
+            "locationLabel": "Downtown District",
+            "lastSeen": "PT2M",  # ISO-8601 duration or humanized string
+            "responseTimeMs": 145,
+        },
+        "ven-102": {
+            "address": "456 Commerce Ave, Grid Sector 2",
+            "locationLabel": "Business District",
+            "lastSeen": "PT1M",
+            "responseTimeMs": 89,
+        },
+        "ven-103": {
+            "address": "789 Industrial Blvd, Grid Sector 3",
+            "locationLabel": "Manufacturing Zone",
+            "lastSeen": "PT15M",
+            "responseTimeMs": 0,
+        },
     }
 
 
@@ -96,11 +120,23 @@ def get_network_stats() -> NetworkStats:
     controllable = sum(v.metrics.shedAvailabilityKw for v in vens)
     potential = sum(sum(l.shedCapabilityKw for l in v.loads) for v in vens)
     household = sum(max(0.0, v.metrics.currentPowerKw) for v in vens)
+    # Extended fields for UI
+    online_vens = sum(1 for v in vens if v.status == "online")
+    # Event-based reduction (dummy)
+    evt = current_event()
+    current_reduction_kw = 0.0
+    if evt and evt.status == "active":
+        current_reduction_kw = min(evt.requestedReductionKw, controllable)
     return NetworkStats(
         venCount=ven_count,
         controllablePowerKw=round(controllable, 2),
         potentialLoadReductionKw=round(potential, 2),
         householdUsageKw=round(household, 2),
+        onlineVens=online_vens,
+        currentLoadReductionKw=round(current_reduction_kw, 2),
+        networkEfficiency=94.2,
+        averageHousePower=3.2,
+        totalHousePowerToday=1247.6,
     )
 
 
@@ -160,3 +196,34 @@ def current_event() -> Optional[Event]:
     scheduled = [e for e in EVENTS.values() if e.status == "scheduled"]
     return scheduled[0] if scheduled else None
 
+
+def ven_summaries() -> list[VenSummary]:
+    out: list[VenSummary] = []
+    for v in list_vens():
+        meta = VEN_META.get(v.id, {})
+        out.append(
+            VenSummary(
+                id=v.id,
+                name=v.name,
+                location=meta.get("locationLabel", f"{v.location.lat:.2f},{v.location.lon:.2f}"),
+                status=v.status,
+                controllablePower=max(0.0, v.metrics.shedAvailabilityKw),
+                currentPower=max(0.0, v.metrics.currentPowerKw),
+                address=meta.get("address", ""),
+                lastSeen=meta.get("lastSeen", "PT1M"),
+                responseTime=meta.get("responseTimeMs", 0),
+            )
+        )
+    return out
+
+
+def event_metrics(event_id: str) -> EventMetrics | None:
+    evt = get_event(event_id)
+    if not evt:
+        return None
+    # Dummy progress: 40% of requested reduction, 238 VENS responding, 142ms avg
+    return EventMetrics(
+        currentReductionKw=round(evt.requestedReductionKw * 0.4, 2),
+        vensResponding=238,
+        avgResponseMs=142,
+    )

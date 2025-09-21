@@ -1,8 +1,14 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
 
-from app.schemas.api_models import Ven, VenCreate, VenUpdate, Load, HistoryResponse, ShedCommand
-from app.data.dummy import list_vens, get_ven as get_dummy_ven, upsert_ven as upsert_dummy_ven, sample_history_points
+from app.schemas.api_models import Ven, VenCreate, VenUpdate, Load, HistoryResponse, ShedCommand, VenSummary
+from app.data.dummy import (
+    list_vens,
+    get_ven as get_dummy_ven,
+    upsert_ven as upsert_dummy_ven,
+    sample_history_points,
+    ven_summaries,
+)
 
 
 router = APIRouter()
@@ -114,3 +120,9 @@ async def ven_load_history(ven_id: str, load_id: str):
     if not ven or not any(l.id == load_id for l in ven.loads):
         raise HTTPException(status_code=404, detail="Not found")
     return sample_history_points()
+
+
+@router.get("/summary", response_model=List[VenSummary])
+async def list_vens_summary():
+    """Summarized VEN data tailored for the current UI list view."""
+    return ven_summaries()

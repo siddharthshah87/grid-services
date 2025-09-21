@@ -50,6 +50,12 @@ class NetworkStats(BaseModel):
     controllablePowerKw: float
     potentialLoadReductionKw: float
     householdUsageKw: float
+    # Extended fields to support current UI without frontend refactors
+    onlineVens: int | None = None
+    currentLoadReductionKw: float | None = None
+    networkEfficiency: float | None = None
+    averageHousePower: float | None = None
+    totalHousePowerToday: float | None = None
 
 
 class LoadTypeStats(BaseModel):
@@ -89,3 +95,20 @@ class EventCreate(BaseModel):
 class ShedCommand(BaseModel):
     amountKw: float = Field(..., description="Kilowatts to shed")
 
+
+class VenSummary(BaseModel):
+    id: str
+    name: str
+    location: str  # label for UI
+    status: str  # online | offline | maintenance
+    controllablePower: float  # kW
+    currentPower: float  # kW
+    address: str
+    lastSeen: str
+    responseTime: int  # ms
+
+
+class EventMetrics(BaseModel):
+    currentReductionKw: float
+    vensResponding: int
+    avgResponseMs: int

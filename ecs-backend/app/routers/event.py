@@ -1,8 +1,14 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
 
-from app.schemas.api_models import Event, EventCreate
-from app.data.dummy import list_events, get_event as get_dummy_event, set_event as set_dummy_event, current_event as get_current_event
+from app.schemas.api_models import Event, EventCreate, EventMetrics
+from app.data.dummy import (
+    list_events,
+    get_event as get_dummy_event,
+    set_event as set_dummy_event,
+    current_event as get_current_event,
+    event_metrics as calc_event_metrics,
+)
 
 
 router = APIRouter()
@@ -59,9 +65,31 @@ async def stop_event_v2(event_id: str):
 
 @router.get("/current", response_model=Event | None)
 async def current_event_v2():
-    return get_current_event()
+    evt = get_current_event()
+    if not evt:
+        return None
+    metrics = calc_event_metrics(evt.id)
+    # Enrich the response with metrics for the UI
+    data = evt.model_dump()
+    if metrics:
+        data.update(
+            {
+                "currentReductionKw": metrics.currentReductionKw,
+                "vensResponding": metrics.vensResponding,
+                "avgResponseMs": metrics.avgResponseMs,
+            }
+        )
+    return data
 
 
 @router.get("/history", response_model=List[Event])
 async def history_events_v2(start: str | None = None, end: str | None = None):
     return list_events()
+
+
+@router.get("/{event_id}/metrics", response_model=EventMetrics)
+async def event_metrics_v2(event_id: str):
+    metrics = calc_event_metrics(event_id)
+    if not metrics:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return metrics
