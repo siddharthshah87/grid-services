@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { 
+import {
   MapPin, 
   Zap, 
   CheckCircle, 
@@ -10,78 +10,10 @@ import {
   Settings,
   Activity
 } from 'lucide-react';
-
-interface VenData {
-  id: string;
-  name: string;
-  location: string;
-  status: 'online' | 'offline' | 'maintenance';
-  controllablePower: number; // kW
-  currentPower: number; // kW
-  address: string;
-  lastSeen: string;
-  responseTime: number; // ms
-}
+import { useVenSummary } from '@/hooks/useApi';
 
 export const VenList = () => {
-  // Mock VEN data - in real app this would come from API
-  const vens: VenData[] = [
-    {
-      id: 'VEN-001',
-      name: 'Residential Block A',
-      location: 'Downtown District',
-      status: 'online',
-      controllablePower: 85.4,
-      currentPower: 67.2,
-      address: '123 Main St, Grid Sector 1',
-      lastSeen: '2 mins ago',
-      responseTime: 145
-    },
-    {
-      id: 'VEN-002', 
-      name: 'Commercial Plaza',
-      location: 'Business District',
-      status: 'online',
-      controllablePower: 120.8,
-      currentPower: 98.5,
-      address: '456 Commerce Ave, Grid Sector 2',
-      lastSeen: '1 min ago',
-      responseTime: 89
-    },
-    {
-      id: 'VEN-003',
-      name: 'Industrial Complex',
-      location: 'Manufacturing Zone',
-      status: 'maintenance',
-      controllablePower: 245.0,
-      currentPower: 0,
-      address: '789 Industrial Blvd, Grid Sector 3',
-      lastSeen: '15 mins ago',
-      responseTime: 0
-    },
-    {
-      id: 'VEN-004',
-      name: 'Residential Block B',
-      location: 'Suburban Area',
-      status: 'online',
-      controllablePower: 62.3,
-      currentPower: 45.1,
-      address: '321 Oak Street, Grid Sector 4',
-      lastSeen: '30 secs ago',
-      responseTime: 234
-    },
-    {
-      id: 'VEN-005',
-      name: 'Shopping Center',
-      location: 'Retail District',
-      status: 'offline',
-      controllablePower: 95.7,
-      currentPower: 0,
-      address: '654 Shopping Blvd, Grid Sector 5',
-      lastSeen: '25 mins ago',
-      responseTime: 0
-    }
-  ];
+  const { data: vens, isLoading } = useVenSummary();
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -113,7 +45,7 @@ export const VenList = () => {
   return (
     <ScrollArea className="h-[500px]">
       <div className="p-4 space-y-3">
-        {vens.map((ven) => (
+        {(vens || []).map((ven) => (
           <Card key={ven.id} className="transition-all duration-200 hover:shadow-energy border-l-4 border-l-primary/30">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
@@ -190,6 +122,9 @@ export const VenList = () => {
             </CardContent>
           </Card>
         ))}
+        {isLoading && (
+          <div className="p-4 text-sm text-muted-foreground">Loading VENs…</div>
+        )}
       </div>
     </ScrollArea>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,16 +22,31 @@ import {
 export const Dashboard = () => {
   const [activeView, setActiveView] = useState('list');
 
-  // Mock data - in real app this would come from API
-  const networkStats = {
-    totalVens: 245,
-    onlineVens: 238,
-    totalControllablePower: 15.8, // MW
-    currentLoadReduction: 2.3, // MW
-    networkEfficiency: 94.2, // %
-    averageHousePower: 3.2, // kW last hour
-    totalHousePowerToday: 1247.6 // kWh
-  };
+  const { data: stats, isLoading } = useNetworkStats();
+
+  // Map backend response to UI shape (convert kW -> MW where appropriate)
+  const networkStats = useMemo(() => {
+    if (!stats) {
+      return {
+        totalVens: 0,
+        onlineVens: 0,
+        totalControllablePower: 0,
+        currentLoadReduction: 0,
+        networkEfficiency: 0,
+        averageHousePower: 0,
+        totalHousePowerToday: 0,
+      };
+    }
+    return {
+      totalVens: stats.venCount,
+      onlineVens: stats.onlineVens ?? 0,
+      totalControllablePower: (stats.controllablePowerKw ?? 0) / 1000,
+      currentLoadReduction: (stats.currentLoadReductionKw ?? 0) / 1000,
+      networkEfficiency: stats.networkEfficiency ?? 0,
+      averageHousePower: stats.averageHousePower ?? 0,
+      totalHousePowerToday: stats.totalHousePowerToday ?? 0,
+    };
+  }, [stats]);
 
   return (
     <div className="min-h-screen bg-background p-6 space-y-6">
@@ -67,7 +82,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {networkStats.onlineVens}/{networkStats.totalVens}
+              {isLoading ? '…' : `${networkStats.onlineVens}/${networkStats.totalVens}`}
             </div>
             <p className="text-xs text-muted-foreground">
               VENs Online ({networkStats.networkEfficiency}% efficiency)
@@ -82,7 +97,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {networkStats.totalControllablePower} MW
+              {isLoading ? '…' : `${networkStats.totalControllablePower} MW`}
             </div>
             <p className="text-xs text-muted-foreground">
               Available for load shedding
@@ -97,7 +112,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">
-              {networkStats.currentLoadReduction} MW
+              {isLoading ? '…' : `${networkStats.currentLoadReduction} MW`}
             </div>
             <p className="text-xs text-muted-foreground">
               Current load reduction
@@ -112,7 +127,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">
-              {networkStats.averageHousePower} kW
+              {isLoading ? '…' : `${networkStats.averageHousePower} kW`}
             </div>
             <p className="text-xs text-muted-foreground">
               Last hour average
@@ -151,6 +166,7 @@ export const Dashboard = () => {
                 </Tabs>
               </div>
             </CardHeader>
+import { useNetworkStats } from '@/hooks/useApi';
             <CardContent className="p-0">
               {activeView === 'list' ? <VenList /> : <MapView />}
             </CardContent>
