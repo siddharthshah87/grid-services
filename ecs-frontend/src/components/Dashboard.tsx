@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -146,7 +146,6 @@ export const Dashboard = () => {
                 </Tabs>
               </div>
             </CardHeader>
-import { useNetworkStats } from '@/hooks/useApi';
             <CardContent className="p-0">
               {activeView === 'list' ? <VenList /> : <MapView />}
             </CardContent>

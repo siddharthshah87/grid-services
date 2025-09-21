@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
 
-from app.schemas.api_models import Event, EventCreate, EventMetrics
+from app.schemas.api_models import Event, EventCreate, EventMetrics, EventWithMetrics
 from app.data.dummy import (
     list_events,
     get_event as get_dummy_event,
@@ -63,7 +63,7 @@ async def stop_event_v2(event_id: str):
     return {"status": "stopping", "eventId": event_id}
 
 
-@router.get("/current", response_model=Event | None)
+@router.get("/current", response_model=EventWithMetrics | None)
 async def current_event_v2():
     evt = get_current_event()
     if not evt:
@@ -79,7 +79,7 @@ async def current_event_v2():
                 "avgResponseMs": metrics.avgResponseMs,
             }
         )
-    return data
+    return EventWithMetrics(**data)
 
 
 @router.get("/history", response_model=List[Event])

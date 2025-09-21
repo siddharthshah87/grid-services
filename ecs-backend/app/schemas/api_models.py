@@ -112,3 +112,9 @@ class EventMetrics(BaseModel):
     currentReductionKw: float
     vensResponding: int
     avgResponseMs: int
+
+
+class EventWithMetrics(Event):
+    currentReductionKw: Optional[float] = None
+    vensResponding: Optional[int] = None
+    avgResponseMs: Optional[int] = None

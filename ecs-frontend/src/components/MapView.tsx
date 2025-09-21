@@ -26,7 +26,7 @@ function useGoogleMaps() {
   return loaded;
 }
 
-const mapStyle: google.maps.MapTypeStyle[] = [
+const mapStyle: any[] = [
   { elementType: 'geometry', stylers: [{ color: '#0b0e14' }] },
   { elementType: 'labels.text.stroke', stylers: [{ color: '#0b0e14' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#9aa4b2' }] },
@@ -46,9 +46,9 @@ export const MapView = () => {
   const loaded = useGoogleMaps();
   const { data: vens } = useVens();
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<google.maps.Map | null>(null);
-  const markers = useRef<google.maps.Marker[]>([]);
-  const markerMap = useRef<Record<string, { marker: google.maps.Marker; info: google.maps.InfoWindow }>>({});
+  const mapInstance = useRef<any | null>(null);
+  const markers = useRef<any[]>([]);
+  const markerMap = useRef<Record<string, { marker: any; info: any }>>({});
 
   const center = useMemo(() => {
     if (vens && vens.length > 0) {
