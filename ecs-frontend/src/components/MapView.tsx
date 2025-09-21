@@ -1,133 +1,124 @@
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { MapPin, Zap, Activity } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useVens } from '@/hooks/useApi';
+
+const MAPS_API_KEY = (import.meta as any)?.env?.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyDXc2YBTobbyySrM-CgMpx5NvkMC3ZAPn0';
+
+function useGoogleMaps() {
+  const [loaded, setLoaded] = useState<boolean>(false);
+  useEffect(() => {
+    if ((window as any).google && (window as any).google.maps) {
+      setLoaded(true);
+      return;
+    }
+    const existing = document.querySelector('script[data-google-maps]') as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener('load', () => setLoaded(true));
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_API_KEY}`;
+    s.async = true;
+    s.defer = true;
+    s.setAttribute('data-google-maps', 'true');
+    s.onload = () => setLoaded(true);
+    document.body.appendChild(s);
+  }, []);
+  return loaded;
+}
+
+const mapStyle: google.maps.MapTypeStyle[] = [
+  { elementType: 'geometry', stylers: [{ color: '#0b0e14' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0b0e14' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#9aa4b2' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#0f1320' }] },
+  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#6ee7b7' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1f2937' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#111827' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#334155' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a0f1f' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] }
+];
 
 export const MapView = () => {
-  // Mock VEN locations for the map view
-  const venLocations = [
-    { id: 'VEN-001', name: 'Residential Block A', x: 25, y: 30, status: 'online', power: 67.2 },
-    { id: 'VEN-002', name: 'Commercial Plaza', x: 60, y: 45, status: 'online', power: 98.5 },
-    { id: 'VEN-003', name: 'Industrial Complex', x: 75, y: 70, status: 'maintenance', power: 0 },
-    { id: 'VEN-004', name: 'Residential Block B', x: 40, y: 80, status: 'online', power: 45.1 },
-    { id: 'VEN-005', name: 'Shopping Center', x: 80, y: 25, status: 'offline', power: 0 },
-  ];
+  const loaded = useGoogleMaps();
+  const { data: vens } = useVens();
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<google.maps.Map | null>(null);
+  const markers = useRef<google.maps.Marker[]>([]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online': return 'bg-online';
-      case 'offline': return 'bg-offline';
-      case 'maintenance': return 'bg-warning';
-      default: return 'bg-muted';
+  const center = useMemo(() => {
+    if (vens && vens.length > 0) {
+      const first = vens[0];
+      return { lat: first.location.lat, lng: first.location.lon };
     }
-  };
+    return { lat: 37.42, lng: -122.08 };
+  }, [vens]);
+
+  useEffect(() => {
+    if (!loaded || !mapRef.current) return;
+    if (!mapInstance.current) {
+      mapInstance.current = new google.maps.Map(mapRef.current, {
+        center,
+        zoom: 6,
+        styles: mapStyle,
+        disableDefaultUI: true,
+      });
+    } else {
+      mapInstance.current.setCenter(center);
+    }
+  }, [loaded, center]);
+
+  useEffect(() => {
+    if (!loaded || !mapInstance.current) return;
+    // clear existing markers
+    markers.current.forEach((m) => m.setMap(null));
+    markers.current = [];
+    (vens || []).forEach((v) => {
+      const color = v.status === 'online' ? '#22c55e' : v.status === 'offline' ? '#ef4444' : '#f59e0b';
+      const m = new google.maps.Marker({
+        map: mapInstance.current!,
+        position: { lat: v.location.lat, lng: v.location.lon },
+        title: `${v.name} / ${v.id}`,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 6,
+          fillColor: color,
+          fillOpacity: 1,
+          strokeColor: '#0b0e14',
+          strokeOpacity: 0.9,
+          strokeWeight: 2,
+        },
+      });
+      const info = new google.maps.InfoWindow({
+        content: `
+          <div style="font-family: Inter, sans-serif; font-size: 12px; color: #e2e8f0;">
+            <div style="font-weight: 600; margin-bottom: 4px;">${v.name}</div>
+            <div style="opacity: 0.8">ID: ${v.id}</div>
+            <div style="opacity: 0.8">Status: ${v.status}</div>
+            <div style="opacity: 0.8">Power: ${(v.metrics.currentPowerKw).toFixed(1)} kW</div>
+            <div style="opacity: 0.8">Controllable: ${(v.metrics.shedAvailabilityKw).toFixed(1)} kW</div>
+          </div>
+        `,
+      });
+      m.addListener('click', () => info.open({ map: mapInstance.current!, anchor: m }));
+      markers.current.push(m);
+    });
+  }, [loaded, vens]);
 
   return (
     <div className="p-4">
-      <div className="relative bg-gradient-to-br from-muted/30 to-muted/10 rounded-lg border-2 border-dashed border-border/50 h-[450px] overflow-hidden">
-        {/* Grid Background */}
-        <div 
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage: `
-              linear-gradient(hsl(var(--border)) 1px, transparent 1px),
-              linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px)
-            `,
-            backgroundSize: '40px 40px'
-          }}
-        />
-        
-        {/* VEN Markers */}
-        {venLocations.map((ven) => (
-          <div
-            key={ven.id}
-            className="absolute group cursor-pointer transform -translate-x-1/2 -translate-y-1/2"
-            style={{ left: `${ven.x}%`, top: `${ven.y}%` }}
-          >
-            {/* VEN Marker */}
-            <div className={`w-4 h-4 rounded-full ${getStatusColor(ven.status)} border-2 border-background shadow-lg animate-pulse-energy`}>
-              <div className="absolute inset-0 rounded-full bg-current opacity-30 animate-ping"></div>
-            </div>
-            
-            {/* Tooltip on Hover */}
-            <Card className="absolute bottom-6 left-1/2 transform -translate-x-1/2 w-64 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 shadow-energy">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-sm">{ven.name}</h4>
-                  <Badge 
-                    variant="outline" 
-                    className={`text-xs ${
-                      ven.status === 'online' ? 'border-online text-online' :
-                      ven.status === 'offline' ? 'border-offline text-offline' :
-                      'border-warning text-warning'
-                    }`}
-                  >
-                    {ven.status}
-                  </Badge>
-                </div>
-                <div className="space-y-1 text-xs">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">ID:</span>
-                    <span className="font-medium">{ven.id}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Activity className="h-3 w-3 text-primary" />
-                    <span className="text-muted-foreground">Power:</span>
-                    <span className="font-medium text-primary">{ven.power} kW</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ))}
-
-        {/* Power Flow Lines (decorative) */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-30">
-          <defs>
-            <linearGradient id="powerFlow" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0" />
-              <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          
-          {/* Animated power flow lines */}
-          <g stroke="url(#powerFlow)" strokeWidth="2" fill="none">
-            <path d="M 25% 30% Q 50% 15% 75% 25%" className="animate-data-flow">
-              <animate attributeName="stroke-dasharray" values="0,100;20,80;0,100" dur="3s" repeatCount="indefinite" />
-            </path>
-            <path d="M 40% 80% Q 65% 60% 75% 70%" className="animate-data-flow">
-              <animate attributeName="stroke-dasharray" values="0,100;20,80;0,100" dur="2.5s" repeatCount="indefinite" />
-            </path>
-          </g>
-        </svg>
-
-        {/* Legend */}
-        <div className="absolute bottom-4 right-4 bg-card/90 backdrop-blur-sm border rounded-lg p-3">
-          <h4 className="text-sm font-semibold mb-2">VEN Status</h4>
-          <div className="space-y-1 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-online"></div>
-              <span>Online</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-offline"></div>
-              <span>Offline</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-warning"></div>
-              <span>Maintenance</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Center Grid Label */}
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-          <div className="bg-card/80 backdrop-blur-sm border rounded-lg p-4">
-            <Zap className="h-8 w-8 text-primary mx-auto mb-2" />
-            <div className="text-sm font-semibold">Smart Grid Network</div>
-            <div className="text-xs text-muted-foreground">Regional Coverage Area</div>
-          </div>
+      <div className="rounded-lg border h-[450px] overflow-hidden">
+        <div ref={mapRef} className="w-full h-full" />
+      </div>
+      <div className="mt-3 bg-card/90 backdrop-blur-sm border rounded-lg p-3">
+        <h4 className="text-sm font-semibold mb-2">VEN Status</h4>
+        <div className="space-y-1 text-xs">
+          <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-online inline-block"></span> Online</div>
+          <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-offline inline-block"></span> Offline</div>
+          <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-warning inline-block"></span> Maintenance</div>
         </div>
       </div>
     </div>

@@ -39,6 +39,16 @@ export interface Event {
   avgResponseMs?: number;
 }
 
+export interface VenLocation { lat: number; lon: number }
+export interface VenMetrics { currentPowerKw: number; shedAvailabilityKw: number; activeEventId?: string | null; shedLoadIds?: string[] }
+export interface Ven {
+  id: string;
+  name: string;
+  status: string;
+  location: VenLocation;
+  metrics: VenMetrics;
+}
+
 export function useNetworkStats() {
   return useQuery({
     queryKey: ["networkStats"],
@@ -74,6 +84,25 @@ export function useCreateEvent() {
   });
 }
 
+export function useEventsHistory(params?: { start?: string; end?: string }) {
+  const qp: string[] = [];
+  if (params?.start) qp.push(`start=${encodeURIComponent(params.start)}`);
+  if (params?.end) qp.push(`end=${encodeURIComponent(params.end)}`);
+  const qs = qp.length ? `?${qp.join("&")}` : "";
+  return useQuery({
+    queryKey: ["eventsHistory", params?.start ?? null, params?.end ?? null],
+    queryFn: () => apiGet<Event[]>(`/api/events/history${qs}`),
+  });
+}
+
+export function useVens() {
+  return useQuery({
+    queryKey: ["vens"],
+    queryFn: () => apiGet<Ven[]>("/api/vens"),
+    refetchInterval: 15000,
+  });
+}
+
 export function useStopEvent() {
   const qc = useQueryClient();
   return useMutation({
@@ -83,4 +112,3 @@ export function useStopEvent() {
     },
   });
 }
-
