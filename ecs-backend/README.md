@@ -29,6 +29,7 @@ The service loads its database settings from environment variables with the `DB_
 Launch the API using Poetry:
 
 ```bash
+poetry install
 poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 

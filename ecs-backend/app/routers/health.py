@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from sqlalchemy import text
 
-from app.db.database import engine
+# from app.db.database import engine
 
 router = APIRouter()
 
@@ -22,6 +22,7 @@ async def db_check():
     Returns:
         Status details indicating database health.
     """
+    '''
     try:
         async with engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
@@ -39,3 +40,5 @@ async def db_check():
         return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "details": str(e)}
+    '''
+    return {"status": "disabled", "details": "Database check is currently disabled."}
