@@ -42,7 +42,7 @@ const mapStyle: any[] = [
   { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] }
 ];
 
-export const MapView = () => {
+export const MapView = ({ focusId, onFocused }: { focusId?: string; onFocused?: () => void }) => {
   const loaded = useGoogleMaps();
   const { data: vens } = useVens();
   const mapRef = useRef<HTMLDivElement>(null);
@@ -111,24 +111,20 @@ export const MapView = () => {
     });
   }, [loaded, vens]);
 
+  // Focus a given VEN id when provided by parent (Dashboard)
   useEffect(() => {
-    const handler = (e: Event) => {
-      const custom = e as CustomEvent<{ id: string }>;
-      const id = custom.detail?.id;
-      if (!id || !mapInstance.current) return;
-      const entry = markerMap.current[id];
-      if (entry) {
-        const pos = entry.marker.getPosition();
-        if (pos) {
-          mapInstance.current.setZoom(12);
-          mapInstance.current.panTo(pos);
-          entry.info.open({ map: mapInstance.current, anchor: entry.marker });
-        }
+    if (!focusId || !mapInstance.current) return;
+    const entry = markerMap.current[focusId];
+    if (entry) {
+      const pos = entry.marker.getPosition();
+      if (pos) {
+        mapInstance.current.setZoom(12);
+        mapInstance.current.panTo(pos);
+        entry.info.open({ map: mapInstance.current, anchor: entry.marker });
+        onFocused && onFocused();
       }
-    };
-    window.addEventListener('focus-ven', handler as EventListener);
-    return () => window.removeEventListener('focus-ven', handler as EventListener);
-  }, []);
+    }
+  }, [focusId, onFocused]);
 
   return (
     <div className="p-4">

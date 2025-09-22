@@ -19,6 +19,30 @@ async def list_events_v2():
     return list_events()
 
 
+@router.get("/current", response_model=EventWithMetrics | None)
+async def current_event_v2():
+    evt = get_current_event()
+    if not evt:
+        return None
+    metrics = calc_event_metrics(evt.id)
+    # Enrich the response with metrics for the UI
+    data = evt.model_dump()
+    if metrics:
+        data.update(
+            {
+                "currentReductionKw": metrics.currentReductionKw,
+                "vensResponding": metrics.vensResponding,
+                "avgResponseMs": metrics.avgResponseMs,
+            }
+        )
+    return EventWithMetrics(**data)
+
+
+@router.get("/history", response_model=List[Event])
+async def history_events_v2(start: str | None = None, end: str | None = None):
+    return list_events()
+
+
 @router.post("/", response_model=Event, status_code=201)
 async def create_event_v2(payload: EventCreate):
     new_id = f"evt-{len(list_events()) + 1}"
@@ -61,31 +85,6 @@ async def stop_event_v2(event_id: str):
     evt.status = "completed"
     set_dummy_event(evt)
     return {"status": "stopping", "eventId": event_id}
-
-
-@router.get("/current", response_model=EventWithMetrics | None)
-async def current_event_v2():
-    evt = get_current_event()
-    if not evt:
-        return None
-    metrics = calc_event_metrics(evt.id)
-    # Enrich the response with metrics for the UI
-    data = evt.model_dump()
-    if metrics:
-        data.update(
-            {
-                "currentReductionKw": metrics.currentReductionKw,
-                "vensResponding": metrics.vensResponding,
-                "avgResponseMs": metrics.avgResponseMs,
-            }
-        )
-    return EventWithMetrics(**data)
-
-
-@router.get("/history", response_model=List[Event])
-async def history_events_v2(start: str | None = None, end: str | None = None):
-    return list_events()
-
 
 @router.get("/{event_id}/metrics", response_model=EventMetrics)
 async def event_metrics_v2(event_id: str):

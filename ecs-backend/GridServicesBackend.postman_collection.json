@@ -258,6 +258,18 @@
               ]
             }
           }
+        },
+        {
+          "name": "GET /api/vens/summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", "summary"]
+            }
+          }
         }
       ]
     },
@@ -360,6 +372,19 @@
               ]
             }
           }
+        },
+        {
+          "name": "GET /api/events/:eventId/metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/:eventId/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", ":eventId", "metrics"],
+              "variable": [{"key": "eventId", "value": "evt-1"}]
+            }
+          }
         }
       ]
     }
@@ -368,4 +393,3 @@
     { "key": "baseUrl", "value": "http://localhost:8000" }
   ]
 }
-

@@ -25,12 +25,18 @@ async def create_ven_v2(payload: VenCreate):
     ven = Ven(
         id=new_id,
         name=payload.name,
-        status="active",
+        status="online",
         location=payload.location,
         loads=[],
         metrics={"currentPowerKw": 0.0, "shedAvailabilityKw": 0.0, "activeEventId": None, "shedLoadIds": []},
     )
     return upsert_dummy_ven(ven)
+
+
+@router.get("/summary", response_model=List[VenSummary])
+async def list_vens_summary():
+    """Summarized VEN data tailored for the current UI list view."""
+    return ven_summaries()
 
 
 @router.get("/{ven_id}", response_model=Ven)
@@ -120,9 +126,3 @@ async def ven_load_history(ven_id: str, load_id: str):
     if not ven or not any(l.id == load_id for l in ven.loads):
         raise HTTPException(status_code=404, detail="Not found")
     return sample_history_points()
-
-
-@router.get("/summary", response_model=List[VenSummary])
-async def list_vens_summary():
-    """Summarized VEN data tailored for the current UI list view."""
-    return ven_summaries()

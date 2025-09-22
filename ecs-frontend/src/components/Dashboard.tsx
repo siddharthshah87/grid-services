@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,10 +23,24 @@ import { formatPowerKw } from '@/lib/utils';
 
 export const Dashboard = () => {
   const [activeView, setActiveView] = useState('list');
+  const [mapFocusId, setMapFocusId] = useState<string | undefined>(undefined);
 
   const { data: stats, isLoading } = useNetworkStats();
   const onlineCount = stats?.onlineVens ?? 0;
   const totalVens = stats?.venCount ?? 0;
+
+  // When a component (e.g., VenList) requests focusing a VEN, switch to the map
+  // and pass a focusId prop to MapView to avoid global event loops.
+  useEffect(() => {
+    const onFocusVen = (e: Event) => {
+      const id = (e as CustomEvent<{ id: string }>).detail?.id;
+      if (!id) return;
+      setActiveView('map');
+      setMapFocusId(id);
+    };
+    window.addEventListener('focus-ven', onFocusVen as EventListener);
+    return () => window.removeEventListener('focus-ven', onFocusVen as EventListener);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background p-6 space-y-6">
@@ -147,7 +161,7 @@ export const Dashboard = () => {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {activeView === 'list' ? <VenList /> : <MapView />}
+              {activeView === 'list' ? <VenList /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
             </CardContent>
           </Card>
         </div>
