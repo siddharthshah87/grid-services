@@ -117,7 +117,7 @@ export const PowerMetrics = ({ networkStats }: PowerMetricsProps) => {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Peak Shaving Potential</span>
               <span className="font-medium text-warning">
-                {(networkStats.totalControllablePower * 0.7).toFixed(1)} MW
+                {formatPowerKw(totalKw * 0.7)}
               </span>
             </div>
             <div className="flex items-center justify-between">

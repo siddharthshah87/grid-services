@@ -17,7 +17,8 @@ import {
   Zap,
   Target
 } from 'lucide-react';
-import { useCreateEvent, useCurrentEvent, useStopEvent, useEventsHistory } from '@/hooks/useApi';
+import { useCreateEvent, useCurrentEvent, useStopEvent, useEventsHistory, Event } from '@/hooks/useApi';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 export const AdrControls = () => {
   const { toast } = useToast();
@@ -29,6 +30,13 @@ export const AdrControls = () => {
   const createEvent = useCreateEvent();
   const stopEvent = useStopEvent();
   const { data: eventsHistory } = useEventsHistory();
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+
+  const openEventModal = (evt: Event) => {
+    setSelectedEvent(evt);
+    setEventModalOpen(true);
+  };
 
   const isEventActive = !!currentEvent && currentEvent.status !== 'completed' && currentEvent.status !== 'cancelled';
   const currentReductionMw = (currentEvent?.currentReductionKw ?? 0) / 1000;
@@ -196,8 +204,8 @@ export const AdrControls = () => {
             </Button>
           )}
           
-          <Button variant="outline" size="sm" className="w-full h-8 text-xs">
-            Schedule Event
+          <Button variant="outline" size="sm" className="w-full h-8 text-xs opacity-50 cursor-not-allowed" disabled>
+            Schedule Event (coming soon)
           </Button>
         </div>
 
@@ -205,20 +213,60 @@ export const AdrControls = () => {
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">Recent Events</Label>
           <div className="space-y-1">
-            {(eventsHistory || []).slice(0, 5).map((evt) => (
-              <div key={evt.id} className="flex justify-between items-center text-xs bg-muted/20 p-2 rounded">
-                <span>{evt.status === 'active' ? 'Active Event' : evt.status === 'completed' ? 'Completed Event' : 'Scheduled Event'}</span>
-                <div className="flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3 text-success" />
-                  <span className="text-success">{(evt.requestedReductionKw / 1000).toFixed(1)} MW</span>
-                </div>
-              </div>
-            ))}
+            {(eventsHistory || []).slice(0, 5).map((evt) => {
+              const isCompleted = evt.status === 'completed';
+              const isOngoing = evt.status === 'active';
+              const icon = isCompleted ? <CheckCircle className="h-3 w-3 text-success" /> : <Zap className="h-3 w-3 text-warning" />;
+              const start = new Date(evt.startTime);
+              return (
+                <button
+                  key={evt.id}
+                  className="w-full text-left flex justify-between items-center text-xs bg-muted/20 hover:bg-muted/30 p-2 rounded"
+                  onClick={() => openEventModal(evt)}
+                >
+                  <span className="flex items-center gap-1">
+                    {icon}
+                    <span className="text-muted-foreground">{start.toLocaleString()}</span>
+                  </span>
+                  <span className={isCompleted ? 'text-success' : 'text-warning'}>
+                    {(evt.requestedReductionKw / 1000).toFixed(1)} MW
+                  </span>
+                </button>
+              );
+            })}
             {(!eventsHistory || eventsHistory.length === 0) && (
               <div className="text-xs text-muted-foreground bg-muted/20 p-2 rounded">No recent events</div>
             )}
           </div>
         </div>
+
+        <Dialog open={eventModalOpen} onOpenChange={setEventModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>ADR Event Details</DialogTitle>
+              <DialogDescription>Summary of the selected event</DialogDescription>
+            </DialogHeader>
+            {selectedEvent && (
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">ID</span><span className="font-medium">{selectedEvent.id}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="font-medium capitalize">{selectedEvent.status}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Start</span><span className="font-medium">{new Date(selectedEvent.startTime).toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">End</span><span className="font-medium">{new Date(selectedEvent.endTime).toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Requested</span><span className="font-medium">{(selectedEvent.requestedReductionKw/1000).toFixed(1)} MW</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Actual</span><span className="font-medium">{(selectedEvent.actualReductionKw/1000).toFixed(1)} MW</span></div>
+                {typeof selectedEvent.currentReductionKw === 'number' && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Current Reduction</span><span className="font-medium">{(selectedEvent.currentReductionKw/1000).toFixed(1)} MW</span></div>
+                )}
+                {typeof selectedEvent.vensResponding === 'number' && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">VENs Responding</span><span className="font-medium">{selectedEvent.vensResponding}</span></div>
+                )}
+                {typeof selectedEvent.avgResponseMs === 'number' && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Avg Response</span><span className="font-medium">{selectedEvent.avgResponseMs} ms</span></div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

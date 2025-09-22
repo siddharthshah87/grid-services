@@ -41,12 +41,21 @@ export interface Event {
 
 export interface VenLocation { lat: number; lon: number }
 export interface VenMetrics { currentPowerKw: number; shedAvailabilityKw: number; activeEventId?: string | null; shedLoadIds?: string[] }
+export interface Load {
+  id: string;
+  type: string;
+  capacityKw: number;
+  shedCapabilityKw: number;
+  currentPowerKw: number;
+  name?: string;
+}
 export interface Ven {
   id: string;
   name: string;
   status: string;
   location: VenLocation;
   metrics: VenMetrics;
+  loads?: Load[];
 }
 
 export function useNetworkStats() {

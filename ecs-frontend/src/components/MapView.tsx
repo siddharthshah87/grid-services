@@ -96,12 +96,12 @@ export const MapView = () => {
       });
       const info = new google.maps.InfoWindow({
         content: `
-          <div style="font-family: Inter, sans-serif; font-size: 12px; color: #e2e8f0;">
-            <div style="font-weight: 600; margin-bottom: 4px;">${v.name}</div>
-            <div style="opacity: 0.8">ID: ${v.id}</div>
-            <div style="opacity: 0.8">Status: ${v.status}</div>
-            <div style="opacity: 0.8">Power: ${(v.metrics.currentPowerKw).toFixed(1)} kW</div>
-            <div style="opacity: 0.8">Controllable: ${(v.metrics.shedAvailabilityKw).toFixed(1)} kW</div>
+          <div style="font-family: Inter, sans-serif; font-size: 12px; color: #e2e8f0; background:#0b0e14; border:1px solid #1f2937; padding:8px 10px; border-radius:8px;">
+            <div style="font-weight: 600; margin-bottom: 4px; color:#cbd5e1;">${v.name}</div>
+            <div style="opacity: 0.9">ID: ${v.id}</div>
+            <div style="opacity: 0.9">Status: ${v.status}</div>
+            <div style="opacity: 0.9">Power: ${(v.metrics.currentPowerKw).toFixed(1)} kW</div>
+            <div style="opacity: 0.9">Controllable: ${(v.metrics.shedAvailabilityKw).toFixed(1)} kW</div>
           </div>
         `,
       });
