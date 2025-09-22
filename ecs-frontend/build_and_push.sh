@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Defaults (override via env)
-PROFILE="${AWS_PROFILE:-AdministratorAccess-923675928909}"
 REGION="${AWS_REGION:-us-west-2}"
-ACCOUNT_ID=$(aws sts get-caller-identity \
-  --query Account --output text --profile "$PROFILE")
-REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/ecs-frontend:latest"
 
-# Log into ECR
-aws ecr get-login-password \
-  --region "$REGION" \
-  --profile "$PROFILE" \
-| docker login --username AWS --password-stdin "${REPO_URI%/*}"
+if [ -n "${AWS_PROFILE:-}" ]; then
+  ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text --profile "$AWS_PROFILE")
+  LOGIN_CMD="aws ecr get-login-password --region \"$REGION\" --profile \"$AWS_PROFILE\""
+else
+  ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+  LOGIN_CMD="aws ecr get-login-password --region \"$REGION\""
+fi
+
+REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/ecs-frontend:latest"
+eval "$LOGIN_CMD" | docker login --username AWS --password-stdin "$REPO_URI"
 
 # Build args
 BUILD_ARGS=()
