@@ -13,12 +13,6 @@ variable "volttron_port" {
   default = 8000
 }
 
-variable "frontend_cert_arn" {
-  description = "ACM certificate ARN for the frontend ALB"
-  type        = string
-  default     = null
-}
-
 variable "prefix" {
   type    = string
   default = "dev"

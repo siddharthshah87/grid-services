@@ -301,7 +301,8 @@ module "frontend_alb" {
   listener_port     = 80
   target_port       = 80
   health_check_path = "/health"
-  acm_cert_arn      = var.frontend_cert_arn
+  enable_https      = true
+  acm_cert_arn      = aws_acm_certificate_validation.frontend.certificate_arn
 }
 
 module "ecr_frontend" {
@@ -334,3 +335,4 @@ module "ecs_service_frontend" {
   backend_api_url = "http://${module.backend_alb.dns_name}"
   aws_region      = var.aws_region
 }
+

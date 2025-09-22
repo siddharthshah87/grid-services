@@ -7,8 +7,17 @@ from unittest import mock
 MODULE_PATH = Path(__file__).resolve().parents[1] / "ven_agent.py"
 
 
+FAKE_CERT = """-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----"""
+FAKE_KEY = """-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----"""
+
+
 def load_module(mock_client):
-    env = {"HEALTH_PORT": "0"}
+    env = {
+        "HEALTH_PORT": "0",
+        "CA_CERT_PEM": FAKE_CERT,
+        "CLIENT_CERT_PEM": FAKE_CERT,
+        "PRIVATE_KEY_PEM": FAKE_KEY,
+    }
     with mock.patch.dict(os.environ, env, clear=False), \
             mock.patch("paho.mqtt.client.Client", return_value=mock_client):
         spec = importlib.util.spec_from_file_location("ven_agent", MODULE_PATH)
