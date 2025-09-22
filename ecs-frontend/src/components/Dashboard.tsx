@@ -65,7 +65,7 @@ export const Dashboard = () => {
               {isLoading ? '…' : `${onlineCount}/${totalVens}`}
             </div>
             <p className="text-xs text-muted-foreground">
-              VENs Online ({networkStats.networkEfficiency}% efficiency)
+              VENs Online ({stats?.networkEfficiency ?? 0}% efficiency)
             </p>
           </CardContent>
         </Card>
