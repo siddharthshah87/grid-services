@@ -83,6 +83,53 @@ def _materialise_pem(*var_names: str) -> str | None:
         return val
     return None
 
+
+def _dnsname_matches(pattern: str, hostname: str) -> bool:
+    pattern = pattern.lower()
+    hostname = hostname.lower()
+
+    if pattern.startswith("*."):
+        suffix = pattern[1:]
+        if not suffix or not hostname.endswith(suffix):
+            return False
+        prefix = hostname[: -len(suffix)]
+        return bool(prefix) and "." not in prefix
+
+    return pattern == hostname
+
+
+def _ensure_expected_server_hostname(mqtt_client: mqtt.Client, expected: str) -> None:
+    """Perform hostname verification manually when connect and TLS hosts differ."""
+    hostname = expected.strip()
+    if not hostname:
+        raise ssl.SSLError("Expected TLS server hostname not provided")
+
+    sock = mqtt_client.socket()
+    if sock is None:
+        raise ssl.SSLError("TLS socket not available for hostname verification")
+
+    cert = sock.getpeercert()
+    if not cert:
+        raise ssl.SSLError("TLS peer certificate missing")
+
+    dns_names = [value for key, value in cert.get("subjectAltName", ()) if key == "DNS"]
+    if not dns_names:
+        for subject in cert.get("subject", ()):  # fall back to CN when SAN absent
+            for key, value in subject:
+                if key.lower() == "commonname":
+                    dns_names.append(value)
+
+    if not dns_names:
+        raise ssl.CertificateError("TLS certificate does not present any DNS names")
+
+    for pattern in dns_names:
+        if _dnsname_matches(pattern, hostname):
+            return
+
+    raise ssl.CertificateError(
+        f"Hostname '{hostname}' does not match certificate names: {dns_names}"
+    )
+
 # ── env / config ───────────────────────────────────────────────────────
 MQTT_TOPIC_STATUS     = os.getenv("MQTT_TOPIC_STATUS", "volttron/dev")
 MQTT_TOPIC_EVENTS     = os.getenv("MQTT_TOPIC_EVENTS", "openadr/event")
@@ -90,6 +137,13 @@ MQTT_TOPIC_RESPONSES  = os.getenv("MQTT_TOPIC_RESPONSES", "openadr/response")
 MQTT_TOPIC_METERING   = os.getenv("MQTT_TOPIC_METERING", "volttron/metering")
 DEFAULT_IOT_ENDPOINT  = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
 IOT_ENDPOINT          = os.getenv("IOT_ENDPOINT", DEFAULT_IOT_ENDPOINT)
+MQTT_CONNECT_HOST     = os.getenv("IOT_CONNECT_HOST") or os.getenv("MQTT_CONNECT_HOST") or IOT_ENDPOINT
+TLS_SERVER_HOSTNAME   = os.getenv("IOT_TLS_SERVER_NAME") or os.getenv("MQTT_TLS_SERVER_NAME") or IOT_ENDPOINT
+try:
+    MQTT_MAX_CONNECT_ATTEMPTS = int(os.getenv("MQTT_MAX_CONNECT_ATTEMPTS", "5"))
+except ValueError:
+    MQTT_MAX_CONNECT_ATTEMPTS = 5
+MQTT_MAX_CONNECT_ATTEMPTS = max(1, MQTT_MAX_CONNECT_ATTEMPTS)
 HEALTH_PORT           = int(os.getenv("HEALTH_PORT", "8000"))
 TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME", "dev-volttron-tls")
 AWS_REGION            = os.getenv("AWS_REGION", "us-west-2")
@@ -125,7 +179,19 @@ client.tls_set(
     keyfile=PRIVATE_KEY,
     tls_version=ssl.PROTOCOL_TLSv1_2,
 )
-client.tls_insecure_set(False)
+manual_hostname_override = TLS_SERVER_HOSTNAME != MQTT_CONNECT_HOST
+if manual_hostname_override:
+    print(
+        "🔐 TLS hostname override enabled: "
+        f"connecting to {MQTT_CONNECT_HOST} but verifying certificate for {TLS_SERVER_HOSTNAME}"
+    )
+elif ".vpce." in MQTT_CONNECT_HOST:
+    print(
+        "⚠️ Connecting to an AWS IoT VPC endpoint without a TLS hostname override. "
+        "Set IOT_TLS_SERVER_NAME to your IoT data endpoint to enable certificate checks.",
+        file=sys.stderr,
+    )
+client.tls_insecure_set(manual_hostname_override)
 
 connected = False
 
@@ -145,12 +211,22 @@ def _on_disconnect(_client, _userdata, rc):
 client.on_connect = _on_connect
 client.on_disconnect = _on_disconnect
 
-for attempt in range(1, 10):
+for attempt in range(1, MQTT_MAX_CONNECT_ATTEMPTS + 1):
     try:
-        client.connect(IOT_ENDPOINT, MQTT_PORT, 60)
+        client.connect(MQTT_CONNECT_HOST, MQTT_PORT, 60)
+        if manual_hostname_override:
+            _ensure_expected_server_hostname(client, TLS_SERVER_HOSTNAME)
         break
     except Exception as e:
-        print(f"MQTT connect failed (try {attempt}/5): {e}", file=sys.stderr)
+        if client.is_connected():
+            try:
+                client.disconnect()
+            except Exception:
+                pass
+        print(
+            f"MQTT connect failed (try {attempt}/{MQTT_MAX_CONNECT_ATTEMPTS}): {e}",
+            file=sys.stderr,
+        )
         time.sleep(min(2 ** attempt, 30))
 else:
     print("❌ Could not connect to MQTT broker", file=sys.stderr)
