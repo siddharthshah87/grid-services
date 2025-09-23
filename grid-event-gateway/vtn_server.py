@@ -83,7 +83,7 @@ def handle_event_request(ven_id: str, payload: dict):
 MQTT_TOPIC_METERING  = os.getenv("MQTT_TOPIC_METERING", "volttron/metering")
 MQTT_TOPIC_EVENTS    = os.getenv("MQTT_TOPIC_EVENTS",   "openadr/event")
 MQTT_TOPIC_RESPONSES = os.getenv("MQTT_TOPIC_RESPONSES","openadr/response")
-DEFAULT_IOT_ENDPOINT = "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com
+DEFAULT_IOT_ENDPOINT = "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com"
 IOT_ENDPOINT         = os.getenv("IOT_ENDPOINT",        DEFAULT_IOT_ENDPOINT)
 VENS_PORT            = int(os.getenv("VENS_PORT", 8081))
 
