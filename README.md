@@ -214,7 +214,7 @@ Two helper scripts allow quick testing of the MQTT topics used by the VTN and
 VEN examples. Set the environment variables before running them:
 
 ```bash
-export IOT_ENDPOINT=vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com
+export IOT_ENDPOINT=a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com
 # For MQTT over TLS also set the certificate paths
 export CA_CERT=/path/to/ca.pem
 export CLIENT_CERT=/path/to/client.crt

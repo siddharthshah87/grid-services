@@ -81,7 +81,7 @@ module "ecs_service_grid_event_gateway" {
   mqtt_topic_events    = "oadr/event/ven1"
   mqtt_topic_responses = "oadr/response/ven1"
   mqtt_topic_metering  = "oadr/meter/ven1"
-  iot_endpoint         = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
+  iot_endpoint         = "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com"
   container_port       = 8080
   vens_port            = 8081
   target_group_arn     = module.grid_event_gateway_alb.target_group_arn
@@ -115,7 +115,7 @@ module "ecs_service_volttron" {
   mqtt_topic_responses   = "oadr/response/ven1"
   mqtt_topic_metering    = "oadr/meter/ven1"
   mqtt_topic_status      = "ven/status/ven1"
-  iot_endpoint           = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
+  iot_endpoint           = "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com"
   ca_cert_secret_arn     = "${aws_secretsmanager_secret.volttron_tls.arn}:ca_cert::"
   client_cert_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:client_cert::"
   private_key_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:private_key::"
