@@ -157,7 +157,7 @@ except ValueError:
     MQTT_MAX_CONNECT_ATTEMPTS = 5
 MQTT_MAX_CONNECT_ATTEMPTS = max(1, MQTT_MAX_CONNECT_ATTEMPTS)
 HEALTH_PORT           = int(os.getenv("HEALTH_PORT", "8000"))
-TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME","ven-mqtt-certs")
+TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME","dev-volttron-tls")
 AWS_REGION            = os.getenv("AWS_REGION", "us-west-2")
 MQTT_PORT             = int(os.getenv("MQTT_PORT", "8883"))
 CLIENT_ID             = (
