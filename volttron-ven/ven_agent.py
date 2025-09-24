@@ -9,6 +9,7 @@ import tempfile
 import pathlib
 import threading
 from copy import deepcopy
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 import paho.mqtt.client as mqtt
@@ -86,6 +87,17 @@ def _materialise_pem(*var_names: str) -> str | None:
     return None
 
 
+def _format_timestamp(timestamp: float | None) -> str | None:
+    if timestamp is None:
+        return None
+
+    return (
+        datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+
+
 def _dnsname_matches(pattern: str, hostname: str) -> bool:
     pattern = pattern.lower()
     hostname = hostname.lower()
@@ -147,7 +159,7 @@ except ValueError:
     MQTT_MAX_CONNECT_ATTEMPTS = 5
 MQTT_MAX_CONNECT_ATTEMPTS = max(1, MQTT_MAX_CONNECT_ATTEMPTS)
 HEALTH_PORT           = int(os.getenv("HEALTH_PORT", "8000"))
-TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME","ven-mqtt-certs")
+TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME","dev-volttron-tls")
 AWS_REGION            = os.getenv("AWS_REGION", "us-west-2")
 MQTT_PORT             = int(os.getenv("MQTT_PORT", "8883"))
 IOT_THING_NAME        = os.getenv("IOT_THING_NAME") or os.getenv("AWS_IOT_THING_NAME")
@@ -169,6 +181,14 @@ else:
     SHADOW_TOPIC_GET = None
     SHADOW_TOPIC_GET_ACCEPTED = None
     SHADOW_TOPIC_GET_REJECTED = None
+
+CLIENT_ID             = (
+    os.getenv("IOT_CLIENT_ID")
+    or os.getenv("CLIENT_ID")
+    or os.getenv("AWS_IOT_THING_NAME")
+    or os.getenv("THING_NAME")
+    or "volttron_thing"
+)
 
 # ── TLS setup ──────────────────────────────────────────────────────────
 CA_CERT = CLIENT_CERT = PRIVATE_KEY = None
@@ -193,7 +213,7 @@ if not all([CA_CERT, CLIENT_CERT, PRIVATE_KEY]):
     sys.exit(1)
 
 # ── MQTT setup ─────────────────────────────────────────────────────────
-client = mqtt.Client(protocol=mqtt.MQTTv311)
+client = mqtt.Client(client_id=CLIENT_ID, protocol=mqtt.MQTTv311)
 client.tls_set(
     ca_certs=CA_CERT,
     certfile=CLIENT_CERT,
@@ -216,6 +236,9 @@ elif ".vpce." in MQTT_CONNECT_HOST:
 client.tls_insecure_set(manual_hostname_override)
 
 connected = False
+_last_connect_time: float | None = None
+_last_disconnect_time: float | None = None
+_last_publish_time: float | None = None
 _reconnect_lock = threading.Lock()
 _reconnect_in_progress = False
 _shadow_state_lock = threading.Lock()
@@ -259,7 +282,7 @@ def _manual_hostname_verification(mqtt_client: mqtt.Client) -> None:
 
 
 def _on_connect(_client, _userdata, _flags, rc, *_args):
-    global connected
+    global connected, _last_connect_time
     if rc == 0:
         try:
             _manual_hostname_verification(_client)
@@ -273,6 +296,7 @@ def _on_connect(_client, _userdata, _flags, rc, *_args):
             })
             return
         connected = True
+        _last_connect_time = time.time()
         _shadow_merge_report({"status": {"mqtt_connected": True}})
     else:
         connected = False
@@ -281,12 +305,13 @@ def _on_connect(_client, _userdata, _flags, rc, *_args):
         })
 
     status = "established" if connected else f"failed (code {rc})"
-    print(f"MQTT connection {status}")
+    print(f"MQTT connection {status} as client_id='{CLIENT_ID}'")
 
 
 def _on_disconnect(_client, _userdata, rc):
-    global connected, _reconnect_in_progress
+    global connected, _reconnect_in_progress, _last_disconnect_time
     connected = False
+    _last_disconnect_time = time.time()
     reason = "graceful" if rc == mqtt.MQTT_ERR_SUCCESS else f"unexpected (code {rc})"
     print(f"MQTT disconnected: {reason}", file=sys.stderr)
     _shadow_merge_report({
@@ -488,6 +513,33 @@ signal.signal(signal.SIGTERM, _shutdown)
 client.loop_start()
 
 # ── simple /health endpoint -------------------------------------------
+def health_snapshot() -> tuple[int, dict]:
+    """Return a status code and JSON payload describing service health."""
+    payload = {
+        "ok": connected,
+        "status": "connected" if connected else "disconnected",
+        "detail": (
+            "MQTT connection established"
+            if connected
+            else "MQTT client disconnected; background reconnect active"
+        ),
+        "reconnect_in_progress": _reconnect_in_progress,
+        "manual_tls_hostname_override": manual_hostname_override,
+        "mqtt_connect_host": MQTT_CONNECT_HOST,
+        "mqtt_port": MQTT_PORT,
+        "tls_server_hostname": TLS_SERVER_HOSTNAME,
+    }
+
+    if _last_connect_time is not None:
+        payload["last_connected_at"] = _format_timestamp(_last_connect_time)
+    if _last_disconnect_time is not None:
+        payload["last_disconnect_at"] = _format_timestamp(_last_disconnect_time)
+    if _last_publish_time is not None:
+        payload["last_publish_at"] = _format_timestamp(_last_publish_time)
+
+    return 200, payload
+
+
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/openapi.json":
@@ -504,11 +556,11 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.wfile.write(SWAGGER_HTML.encode())
             return
 
-        status = 200 if connected else 503
+        status, payload = health_snapshot()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(json.dumps({"ok": connected}).encode())
+        self.wfile.write(json.dumps(payload).encode())
 
 def _start_health_server():
     HTTPServer(("0.0.0.0", HEALTH_PORT), HealthHandler).serve_forever()
@@ -540,6 +592,7 @@ def on_event(_client, _userdata, msg):
 
 # ── main loop ──────────────────────────────────────────────────────────
 def main(iterations: int | None = None) -> None:
+    global _last_publish_time
     client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
     client.subscribe(MQTT_TOPIC_EVENTS)
 
@@ -572,6 +625,7 @@ def main(iterations: int | None = None) -> None:
         client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
         client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
         print("Published VEN status and metering data to MQTT")
+        _last_publish_time = time.time()
 
         with _shadow_state_lock:
             target_power_kw = _shadow_target_power_kw
