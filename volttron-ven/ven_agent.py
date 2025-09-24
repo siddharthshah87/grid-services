@@ -8,8 +8,10 @@ import signal
 import tempfile
 import pathlib
 import threading
+from copy import deepcopy
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Any
 import paho.mqtt.client as mqtt
 import boto3
 from botocore.exceptions import ClientError
@@ -160,6 +162,26 @@ HEALTH_PORT           = int(os.getenv("HEALTH_PORT", "8000"))
 TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME","dev-volttron-tls")
 AWS_REGION            = os.getenv("AWS_REGION", "us-west-2")
 MQTT_PORT             = int(os.getenv("MQTT_PORT", "8883"))
+IOT_THING_NAME        = os.getenv("IOT_THING_NAME") or os.getenv("AWS_IOT_THING_NAME")
+try:
+    REPORT_INTERVAL_SECONDS = int(os.getenv("VEN_REPORT_INTERVAL_SECONDS", "10"))
+except ValueError:
+    REPORT_INTERVAL_SECONDS = 10
+REPORT_INTERVAL_SECONDS = max(1, REPORT_INTERVAL_SECONDS)
+
+if IOT_THING_NAME:
+    SHADOW_TOPIC_UPDATE = f"$aws/things/{IOT_THING_NAME}/shadow/update"
+    SHADOW_TOPIC_DELTA = f"{SHADOW_TOPIC_UPDATE}/delta"
+    SHADOW_TOPIC_GET = f"$aws/things/{IOT_THING_NAME}/shadow/get"
+    SHADOW_TOPIC_GET_ACCEPTED = f"{SHADOW_TOPIC_GET}/accepted"
+    SHADOW_TOPIC_GET_REJECTED = f"{SHADOW_TOPIC_GET}/rejected"
+else:
+    SHADOW_TOPIC_UPDATE = None
+    SHADOW_TOPIC_DELTA = None
+    SHADOW_TOPIC_GET = None
+    SHADOW_TOPIC_GET_ACCEPTED = None
+    SHADOW_TOPIC_GET_REJECTED = None
+    
 CLIENT_ID             = (
     os.getenv("IOT_CLIENT_ID")
     or os.getenv("CLIENT_ID")
@@ -219,6 +241,35 @@ _last_disconnect_time: float | None = None
 _last_publish_time: float | None = None
 _reconnect_lock = threading.Lock()
 _reconnect_in_progress = False
+_shadow_state_lock = threading.Lock()
+_shadow_reported_state: dict[str, Any] = {
+    "status": {"ven": "starting", "mqtt_connected": False},
+    "report_interval_seconds": REPORT_INTERVAL_SECONDS,
+    "shadow_errors": {}
+}
+_shadow_target_power_kw: float | None = None
+
+
+def _merge_dict(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
+    for key, value in updates.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            _merge_dict(target[key], value)
+        else:
+            target[key] = value
+    return target
+
+
+def _shadow_merge_report(updates: dict[str, Any]) -> None:
+    if not SHADOW_TOPIC_UPDATE or not updates:
+        return
+
+    with _shadow_state_lock:
+        _merge_dict(_shadow_reported_state, updates)
+        snapshot = deepcopy(_shadow_reported_state)
+
+    payload = json.dumps({"state": {"reported": snapshot}})
+    client.publish(SHADOW_TOPIC_UPDATE, payload, qos=1)
+    print(f"Published thing shadow update: {payload}")
 
 
 def _manual_hostname_verification(mqtt_client: mqtt.Client) -> None:
@@ -239,11 +290,19 @@ def _on_connect(_client, _userdata, _flags, rc, *_args):
             connected = False
             print(f"MQTT connection failed TLS hostname check: {err}", file=sys.stderr)
             _client.disconnect()
+            _shadow_merge_report({
+                "status": {"mqtt_connected": False},
+                "shadow_errors": {"tls_hostname": str(err)}
+            })
             return
         connected = True
         _last_connect_time = time.time()
+        _shadow_merge_report({"status": {"mqtt_connected": True}})
     else:
         connected = False
+        _shadow_merge_report({
+            "status": {"mqtt_connected": False, "last_connect_code": rc}
+        })
 
     status = "established" if connected else f"failed (code {rc})"
     print(f"MQTT connection {status} as client_id='{CLIENT_ID}'")
@@ -255,6 +314,9 @@ def _on_disconnect(_client, _userdata, rc):
     _last_disconnect_time = time.time()
     reason = "graceful" if rc == mqtt.MQTT_ERR_SUCCESS else f"unexpected (code {rc})"
     print(f"MQTT disconnected: {reason}", file=sys.stderr)
+    _shadow_merge_report({
+        "status": {"mqtt_connected": False, "last_disconnect_code": rc}
+    })
 
     if rc == mqtt.MQTT_ERR_SUCCESS:
         return
@@ -286,8 +348,139 @@ def _on_disconnect(_client, _userdata, rc):
 
     threading.Thread(target=_attempt_reconnect, daemon=True).start()
 
+
+def _shadow_request_sync() -> None:
+    if not SHADOW_TOPIC_GET:
+        return
+    print(f"Requesting device shadow state for thing '{IOT_THING_NAME}'")
+    client.publish(SHADOW_TOPIC_GET, json.dumps({}), qos=0)
+
+
+def _sync_reported_state(reported: dict[str, Any]) -> None:
+    global REPORT_INTERVAL_SECONDS, _shadow_target_power_kw
+    if not isinstance(reported, dict):
+        return
+
+    if "report_interval_seconds" in reported:
+        try:
+            REPORT_INTERVAL_SECONDS = max(1, int(reported["report_interval_seconds"]))
+        except (TypeError, ValueError):
+            pass
+
+    if "target_power_kw" in reported:
+        try:
+            _shadow_target_power_kw = float(reported["target_power_kw"])
+        except (TypeError, ValueError):
+            pass
+
+
+def _apply_shadow_delta(delta: dict[str, Any]) -> dict[str, Any]:
+    global REPORT_INTERVAL_SECONDS, _shadow_target_power_kw
+
+    updates: dict[str, Any] = {}
+    errors: dict[str, str] = {}
+
+    for key, value in delta.items():
+        if key == "report_interval_seconds":
+            try:
+                interval = max(1, int(value))
+                REPORT_INTERVAL_SECONDS = interval
+                updates[key] = interval
+            except (TypeError, ValueError):
+                errors[key] = f"invalid interval: {value}"
+                updates[key] = REPORT_INTERVAL_SECONDS
+        elif key == "target_power_kw":
+            try:
+                _shadow_target_power_kw = float(value)
+                updates[key] = _shadow_target_power_kw
+            except (TypeError, ValueError):
+                errors[key] = f"invalid target_power_kw: {value}"
+        else:
+            updates[key] = value
+
+    if errors:
+        updates.setdefault("shadow_errors", {}).update(errors)
+
+    status_updates = updates.setdefault("status", {})
+    status_updates["last_shadow_delta_ts"] = int(time.time())
+    status_updates["last_shadow_delta"] = deepcopy(delta)
+    return updates
+
+
+def on_shadow_delta(_client, _userdata, msg):
+    if not SHADOW_TOPIC_DELTA:
+        return
+
+    try:
+        payload = json.loads(msg.payload.decode())
+    except json.JSONDecodeError as err:
+        print(f"Invalid thing shadow delta payload: {err}", file=sys.stderr)
+        _shadow_merge_report({"shadow_errors": {"delta_decode": str(err)}})
+        return
+
+    delta = payload.get("state") or {}
+    if not isinstance(delta, dict):
+        print(f"Unexpected thing shadow delta structure: {delta}", file=sys.stderr)
+        _shadow_merge_report({"shadow_errors": {"delta_type": str(type(delta))}})
+        return
+
+    print(f"Received desired shadow state delta: {delta}")
+    updates = _apply_shadow_delta(delta)
+    if updates:
+        _shadow_merge_report(updates)
+
+
+def on_shadow_get_accepted(_client, _userdata, msg):
+    if not SHADOW_TOPIC_GET_ACCEPTED:
+        return
+
+    try:
+        payload = json.loads(msg.payload.decode())
+    except json.JSONDecodeError as err:
+        print(f"Invalid thing shadow document: {err}", file=sys.stderr)
+        _shadow_merge_report({"shadow_errors": {"shadow_get": str(err)}})
+        return
+
+    state = payload.get("state") or {}
+    desired = state.get("desired") or {}
+    reported = state.get("reported") or {}
+    print(f"Thing shadow get accepted: desired={desired}, reported={reported}")
+
+    updates: dict[str, Any] = {"status": {"shadow_version": payload.get("version")}}
+
+    if isinstance(desired, dict) and desired:
+        desired_updates = _apply_shadow_delta(desired)
+        _merge_dict(updates, desired_updates)
+    elif isinstance(reported, dict) and reported:
+        _sync_reported_state(reported)
+        _merge_dict(updates, reported)
+
+    _shadow_merge_report(updates)
+
+
+def on_shadow_get_rejected(_client, _userdata, msg):
+    if not SHADOW_TOPIC_GET_REJECTED:
+        return
+
+    try:
+        error_payload = msg.payload.decode()
+    except Exception:
+        error_payload = repr(msg.payload)
+
+    print(f"Thing shadow get rejected: {error_payload}", file=sys.stderr)
+    _shadow_merge_report({"shadow_errors": {"shadow_get": error_payload}})
+
+
+def _log_unhandled_message(_client, _userdata, msg):
+    try:
+        payload = msg.payload.decode()
+    except Exception:
+        payload = repr(msg.payload)
+    print(f"Unhandled MQTT message on {msg.topic}: {payload}")
+
 client.on_connect = _on_connect
 client.on_disconnect = _on_disconnect
+client.on_message = _log_unhandled_message
 
 for attempt in range(1, MQTT_MAX_CONNECT_ATTEMPTS + 1):
     try:
@@ -376,32 +569,85 @@ threading.Thread(target=_start_health_server, daemon=True).start()
 print(f"🩺 Health server running on port {HEALTH_PORT}")
 
 # ── message handler ────────────────────────────────────────────────────
+def _next_power_reading() -> float:
+    with _shadow_state_lock:
+        target = _shadow_target_power_kw
+
+    if target is None:
+        return round(random.uniform(0.5, 2.0), 2)
+
+    jitter = random.uniform(-0.05, 0.05)
+    return round(max(0.0, target + jitter), 2)
+
+
 def on_event(_client, _userdata, msg):
     payload = json.loads(msg.payload.decode())
     print(f"Received event via MQTT: {payload}")
     response = {"ven_id": payload.get("ven_id", "ven123"), "response": "ack"}
     client.publish(MQTT_TOPIC_RESPONSES, json.dumps(response), qos=1)
+    _shadow_merge_report({
+        "status": {"last_event_ts": int(time.time())},
+        "events": {"last": payload}
+    })
 
 # ── main loop ──────────────────────────────────────────────────────────
 def main(iterations: int | None = None) -> None:
     global _last_publish_time
+    client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
     client.subscribe(MQTT_TOPIC_EVENTS)
-    client.on_message = on_event
+
+    if SHADOW_TOPIC_DELTA:
+        client.message_callback_add(SHADOW_TOPIC_DELTA, on_shadow_delta)
+        client.subscribe(SHADOW_TOPIC_DELTA)
+
+        if SHADOW_TOPIC_GET_ACCEPTED:
+            client.message_callback_add(SHADOW_TOPIC_GET_ACCEPTED, on_shadow_get_accepted)
+            client.subscribe(SHADOW_TOPIC_GET_ACCEPTED)
+
+        if SHADOW_TOPIC_GET_REJECTED:
+            client.message_callback_add(SHADOW_TOPIC_GET_REJECTED, on_shadow_get_rejected)
+            client.subscribe(SHADOW_TOPIC_GET_REJECTED)
+
+        _shadow_request_sync()
+    else:
+        if not IOT_THING_NAME:
+            print("⚠️ IOT_THING_NAME not set; device shadow sync disabled.")
 
     count = 0
     while True:
-        client.publish(MQTT_TOPIC_STATUS,   json.dumps({"ven": "ready"}), qos=1)
-        client.publish(MQTT_TOPIC_METERING, json.dumps({
-            "timestamp": int(time.time()),
-            "power_kw": round(random.uniform(0.5, 2.0), 2),
-        }), qos=1)
+        now = int(time.time())
+        status_payload = {"ven": "ready"}
+        metering_payload = {
+            "timestamp": now,
+            "power_kw": _next_power_reading(),
+        }
+
+        client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
+        client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
         print("Published VEN status and metering data to MQTT")
         _last_publish_time = time.time()
+        with _shadow_state_lock:
+            target_power_kw = _shadow_target_power_kw
+
+        shadow_update = {
+            "status": {
+                "ven": "ready",
+                "last_publish_ts": now,
+                "mqtt_connected": connected
+            },
+            "metering": metering_payload,
+            "report_interval_seconds": REPORT_INTERVAL_SECONDS,
+        }
+
+        if target_power_kw is not None:
+            shadow_update["target_power_kw"] = target_power_kw
+
+        _shadow_merge_report(shadow_update)
 
         count += 1
         if iterations is not None and count >= iterations:
             break
-        time.sleep(10)
+        time.sleep(REPORT_INTERVAL_SECONDS)
 
 if __name__ == "__main__":
     main()

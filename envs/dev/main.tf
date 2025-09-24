@@ -120,6 +120,7 @@ module "ecs_service_volttron" {
   iot_endpoint           = module.iot_core.endpoint
   iot_connect_host       = module.vpc.iot_data_endpoint_dns
   iot_tls_server_name    = module.iot_core.endpoint
+  iot_thing_name         = module.iot_core.thing_name
   ca_cert_secret_arn     = "${aws_secretsmanager_secret.volttron_tls.arn}:ca_cert::"
   client_cert_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:client_cert::"
   private_key_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:private_key::"

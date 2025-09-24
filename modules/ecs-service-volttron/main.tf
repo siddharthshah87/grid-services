@@ -12,6 +12,7 @@ variable "mqtt_topic_status" {}
 variable "iot_endpoint" {}
 variable "iot_connect_host" { default = null }
 variable "iot_tls_server_name" { default = null }
+variable "iot_thing_name" { default = null }
 variable "container_port" { default = 22916 }
 variable "target_group_arn" { default = null }
 variable "assign_public_ip" { default = true }
@@ -61,6 +62,9 @@ resource "aws_ecs_task_definition" "this" {
         ],
         var.iot_tls_server_name == null ? [] : [
           { name = "IOT_TLS_SERVER_NAME", value = var.iot_tls_server_name }
+        ],
+        var.iot_thing_name == null ? [] : [
+          { name = "IOT_THING_NAME", value = var.iot_thing_name }
         ]
       )
       secrets = [
