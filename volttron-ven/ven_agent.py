@@ -181,7 +181,7 @@ else:
     SHADOW_TOPIC_GET = None
     SHADOW_TOPIC_GET_ACCEPTED = None
     SHADOW_TOPIC_GET_REJECTED = None
-
+    
 CLIENT_ID             = (
     os.getenv("IOT_CLIENT_ID")
     or os.getenv("CLIENT_ID")
@@ -626,7 +626,6 @@ def main(iterations: int | None = None) -> None:
         client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
         print("Published VEN status and metering data to MQTT")
         _last_publish_time = time.time()
-
         with _shadow_state_lock:
             target_power_kw = _shadow_target_power_kw
 
