@@ -188,9 +188,12 @@ Re-running `terraform apply` will recreate the services when needed.
   environment variables `CA_CERT`, `CLIENT_CERT`, and `PRIVATE_KEY` (or the
   `_PEM`-suffixed variants) with the paths or PEM contents for your broker's
   certificate authority, client certificate and key to enable TLS.
-- By default the applications target the AWS IoT Core endpoint
-  `vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com`. Set
-  the `IOT_ENDPOINT` environment variable if you need to override this.
+- The applications default to the AWS IoT Core ATS data endpoint exported by
+  Terraform. When the services run behind the VPC interface endpoint,
+  Terraform also sets `IOT_CONNECT_HOST` to the private DNS name and
+  `IOT_TLS_SERVER_NAME` to the public IoT endpoint so TLS hostname checks still
+  succeed. Override these environment variables if you run the containers
+  outside this infrastructure.
 - The container applications are minimal examples. Customize `grid-event-gateway/vtn_server.py` and `volttron-ven/ven_agent.py` for your use case.
 
 ## Grid-Event Gateway
@@ -219,6 +222,9 @@ export IOT_ENDPOINT=a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com
 export CA_CERT=/path/to/ca.pem
 export CLIENT_CERT=/path/to/client.crt
 export PRIVATE_KEY=/path/to/client.key
+# When using a private IoT VPC endpoint also set:
+# export IOT_CONNECT_HOST=your-private-endpoint.amazonaws.com
+# export IOT_TLS_SERVER_NAME=a1234567890-ats.iot.us-west-2.amazonaws.com
 ```
 
 Use `--port 8883` when connecting with TLS (otherwise the default `1883` is
