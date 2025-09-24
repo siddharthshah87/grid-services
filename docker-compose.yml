@@ -24,6 +24,7 @@ services:
       MQTT_TOPIC_RESPONSES: ${MQTT_TOPIC_RESPONSES:-openadr/response}
       MQTT_TOPIC_METERING: ${MQTT_TOPIC_METERING:-volttron/metering}
       MQTT_TOPIC_STATUS: ${MQTT_TOPIC_STATUS:-volttron/dev}
+      IOT_THING_NAME: ${IOT_THING_NAME:-volttron_thing}
       CA_CERT: /certs/ca.crt
       CLIENT_CERT: /certs/client.crt
       PRIVATE_KEY: /certs/client.key

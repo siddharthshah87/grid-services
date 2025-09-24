@@ -119,6 +119,52 @@ export CA_CERT=$CLIENT_CERT
 OpenSSL is not required as AWS IoT generates the certificate and private key
 for you.
 
+### Working with the AWS IoT device shadow
+
+The IoT Core module exports the thing name as the `thing_name` output and the
+Volttron ECS task now injects this value into the VEN container via the
+`IOT_THING_NAME` environment variable (the Docker Compose definition accepts
+the same variable for local testing). When this variable is present the VEN:
+
+- Publishes its current status, metering sample and reporting interval to the
+  thing shadow’s `state.reported` document.
+- Subscribes to `$aws/things/<thing>/shadow/update/delta`, applies recognised
+  fields such as `report_interval_seconds` and `target_power_kw`, then writes
+  the acknowledged values back to `state.reported` so the delta is cleared.
+- Requests the current shadow document on start-up so any stored desired state
+  is honoured immediately.
+
+Use the AWS CLI (v2) to exercise the behaviour once Terraform has been
+applied:
+
+```bash
+export THING_NAME=$(terraform output -raw thing_name)
+
+# Push a desired-state change (e.g. faster reporting and a 1.2 kW target)
+aws iot-data update-thing-shadow \
+  --region us-west-2 \
+  --thing-name "$THING_NAME" \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{"state":{"desired":{"report_interval_seconds":5,"target_power_kw":1.2}}}' \
+  update-response.json
+
+# Retrieve the VEN's reported shadow document
+aws iot-data get-thing-shadow \
+  --region us-west-2 \
+  --thing-name "$THING_NAME" \
+  shadow.json
+
+jq -r '.state.reported' shadow.json
+```
+
+The CLI commands above save the responses to files (`update-response.json` and
+`shadow.json`) so you can inspect the JSON returned by IoT Core. Changing
+`report_interval_seconds` alters how frequently the VEN publishes and
+`target_power_kw` adjusts the centre point of the simulated metering data. You
+can still override the default interval locally by setting the
+`VEN_REPORT_INTERVAL_SECONDS` environment variable if you do not want to rely
+on the shadow.
+
 ### Querying MQTT Logs
 
 After applying Terraform, the rule outputs the S3 bucket and Kinesis stream
@@ -194,6 +240,11 @@ Re-running `terraform apply` will recreate the services when needed.
   `IOT_TLS_SERVER_NAME` to the public IoT endpoint so TLS hostname checks still
   succeed. Override these environment variables if you run the containers
   outside this infrastructure.
+- Set `IOT_THING_NAME` so the VEN synchronises with the AWS IoT device shadow.
+  Terraform wires this value into the ECS task definition automatically and the
+  Docker Compose file exposes the same variable for local runs. Override the
+  default reporting cadence without touching the shadow by setting
+  `VEN_REPORT_INTERVAL_SECONDS`.
 - The container applications are minimal examples. Customize `grid-event-gateway/vtn_server.py` and `volttron-ven/ven_agent.py` for your use case.
 
 ## Grid-Event Gateway

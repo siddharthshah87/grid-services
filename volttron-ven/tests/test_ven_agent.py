@@ -46,6 +46,46 @@ def test_main_one_iteration():
     with mock.patch("time.sleep"):
         module.main(iterations=1)
     assert mock_client.publish.call_count >= 2
+    mock_client.message_callback_add.assert_any_call(module.MQTT_TOPIC_EVENTS, module.on_event)
+    mock_client.subscribe.assert_any_call(module.MQTT_TOPIC_EVENTS)
+
+
+def test_shadow_delta_updates_interval_and_target():
+    mock_client = mock.Mock()
+    module = load_module(mock_client, {"IOT_THING_NAME": "demo-thing"})
+
+    delta_msg = {"state": {"report_interval_seconds": 7, "target_power_kw": "1.5"}}
+    msg = type("M", (), {"payload": json.dumps(delta_msg).encode()})()
+
+    module.on_shadow_delta(mock_client, None, msg)
+
+    assert module.REPORT_INTERVAL_SECONDS == 7
+    assert module._shadow_target_power_kw == 1.5
+
+    topic, payload, *_ = mock_client.publish.call_args_list[-1][0]
+    assert topic == module.SHADOW_TOPIC_UPDATE
+    reported = json.loads(payload)["state"]["reported"]
+    assert reported["report_interval_seconds"] == 7
+    assert reported["target_power_kw"] == 1.5
+    assert "status" in reported and "last_shadow_delta_ts" in reported["status"]
+
+
+def test_main_requests_shadow_sync_when_thing_configured():
+    mock_client = mock.Mock()
+    module = load_module(mock_client, {"IOT_THING_NAME": "demo-thing"})
+
+    with mock.patch("time.sleep"):
+        module.main(iterations=1)
+
+    mock_client.message_callback_add.assert_any_call(module.MQTT_TOPIC_EVENTS, module.on_event)
+    mock_client.message_callback_add.assert_any_call(module.SHADOW_TOPIC_DELTA, module.on_shadow_delta)
+    mock_client.subscribe.assert_any_call(module.SHADOW_TOPIC_DELTA)
+    mock_client.subscribe.assert_any_call(module.SHADOW_TOPIC_GET_ACCEPTED)
+    mock_client.subscribe.assert_any_call(module.SHADOW_TOPIC_GET_REJECTED)
+
+    publish_topics = [call[0][0] for call in mock_client.publish.call_args_list]
+    assert publish_topics[0] == module.SHADOW_TOPIC_GET
+    assert module.SHADOW_TOPIC_UPDATE in publish_topics
 
 
 def test_openapi_spec_has_health():
