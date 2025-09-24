@@ -8,6 +8,7 @@ import signal
 import tempfile
 import pathlib
 import threading
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import paho.mqtt.client as mqtt
 import boto3
@@ -82,6 +83,17 @@ def _materialise_pem(*var_names: str) -> str | None:
             return str(pem_path)
         return val
     return None
+
+
+def _format_timestamp(timestamp: float | None) -> str | None:
+    if timestamp is None:
+        return None
+
+    return (
+        datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
 
 
 def _dnsname_matches(pattern: str, hostname: str) -> bool:
@@ -195,6 +207,9 @@ elif ".vpce." in MQTT_CONNECT_HOST:
 client.tls_insecure_set(manual_hostname_override)
 
 connected = False
+_last_connect_time: float | None = None
+_last_disconnect_time: float | None = None
+_last_publish_time: float | None = None
 _reconnect_lock = threading.Lock()
 _reconnect_in_progress = False
 
@@ -209,7 +224,7 @@ def _manual_hostname_verification(mqtt_client: mqtt.Client) -> None:
 
 
 def _on_connect(_client, _userdata, _flags, rc, *_args):
-    global connected
+    global connected, _last_connect_time
     if rc == 0:
         try:
             _manual_hostname_verification(_client)
@@ -219,6 +234,7 @@ def _on_connect(_client, _userdata, _flags, rc, *_args):
             _client.disconnect()
             return
         connected = True
+        _last_connect_time = time.time()
     else:
         connected = False
 
@@ -227,8 +243,9 @@ def _on_connect(_client, _userdata, _flags, rc, *_args):
 
 
 def _on_disconnect(_client, _userdata, rc):
-    global connected, _reconnect_in_progress
+    global connected, _reconnect_in_progress, _last_disconnect_time
     connected = False
+    _last_disconnect_time = time.time()
     reason = "graceful" if rc == mqtt.MQTT_ERR_SUCCESS else f"unexpected (code {rc})"
     print(f"MQTT disconnected: {reason}", file=sys.stderr)
 
@@ -296,6 +313,33 @@ signal.signal(signal.SIGTERM, _shutdown)
 client.loop_start()
 
 # ── simple /health endpoint -------------------------------------------
+def health_snapshot() -> tuple[int, dict]:
+    """Return a status code and JSON payload describing service health."""
+    payload = {
+        "ok": connected,
+        "status": "connected" if connected else "disconnected",
+        "detail": (
+            "MQTT connection established"
+            if connected
+            else "MQTT client disconnected; background reconnect active"
+        ),
+        "reconnect_in_progress": _reconnect_in_progress,
+        "manual_tls_hostname_override": manual_hostname_override,
+        "mqtt_connect_host": MQTT_CONNECT_HOST,
+        "mqtt_port": MQTT_PORT,
+        "tls_server_hostname": TLS_SERVER_HOSTNAME,
+    }
+
+    if _last_connect_time is not None:
+        payload["last_connected_at"] = _format_timestamp(_last_connect_time)
+    if _last_disconnect_time is not None:
+        payload["last_disconnect_at"] = _format_timestamp(_last_disconnect_time)
+    if _last_publish_time is not None:
+        payload["last_publish_at"] = _format_timestamp(_last_publish_time)
+
+    return 200, payload
+
+
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/openapi.json":
@@ -312,11 +356,11 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.wfile.write(SWAGGER_HTML.encode())
             return
 
-        status = 200 if connected else 503
+        status, payload = health_snapshot()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(json.dumps({"ok": connected}).encode())
+        self.wfile.write(json.dumps(payload).encode())
 
 def _start_health_server():
     HTTPServer(("0.0.0.0", HEALTH_PORT), HealthHandler).serve_forever()
@@ -333,6 +377,7 @@ def on_event(_client, _userdata, msg):
 
 # ── main loop ──────────────────────────────────────────────────────────
 def main(iterations: int | None = None) -> None:
+    global _last_publish_time
     client.subscribe(MQTT_TOPIC_EVENTS)
     client.on_message = on_event
 
@@ -344,6 +389,7 @@ def main(iterations: int | None = None) -> None:
             "power_kw": round(random.uniform(0.5, 2.0), 2),
         }), qos=1)
         print("Published VEN status and metering data to MQTT")
+        _last_publish_time = time.time()
 
         count += 1
         if iterations is not None and count >= iterations:

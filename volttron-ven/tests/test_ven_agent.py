@@ -53,6 +53,40 @@ def test_openapi_spec_has_health():
     assert "/health" in module.OPENAPI_SPEC["paths"]
 
 
+def test_health_snapshot_reports_disconnected_state():
+    mock_client = mock.Mock()
+    module = load_module(mock_client)
+    module.connected = False
+    module._reconnect_in_progress = True
+    module._last_disconnect_time = 0
+
+    status, payload = module.health_snapshot()
+    assert status == 200
+    assert payload["ok"] is False
+    assert payload["status"] == "disconnected"
+    assert payload["reconnect_in_progress"] is True
+    assert payload["last_disconnect_at"] == "1970-01-01T00:00:00Z"
+    assert "last_connected_at" not in payload
+
+
+def test_health_snapshot_reports_connected_state():
+    mock_client = mock.Mock()
+    module = load_module(mock_client)
+    module.connected = True
+    module._reconnect_in_progress = False
+    module._last_connect_time = 0
+    module._last_publish_time = 0
+
+    status, payload = module.health_snapshot()
+    assert status == 200
+    assert payload["ok"] is True
+    assert payload["status"] == "connected"
+    assert payload["manual_tls_hostname_override"] is False
+    assert payload["last_connected_at"] == "1970-01-01T00:00:00Z"
+    assert payload["last_publish_at"] == "1970-01-01T00:00:00Z"
+    assert payload["detail"].startswith("MQTT connection established")
+
+
 def test_tls_hostname_override_enables_manual_check():
     mock_client = mock.Mock()
     mock_socket = mock.Mock()
