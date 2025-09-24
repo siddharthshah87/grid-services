@@ -1,5 +1,5 @@
-import os
 import json
+import os
 import importlib.util
 from pathlib import Path
 from unittest import mock
@@ -8,7 +8,7 @@ import pytest
 MODULE_PATH = Path(__file__).resolve().parents[1] / "vtn_server.py"
 
 
-def load_module(mock_client):
+def load_module(mock_client, env_overrides=None):
     env = {
         "CERT_BUNDLE_JSON": json.dumps({
             "ca.crt": "CA",
@@ -19,6 +19,8 @@ def load_module(mock_client):
         # runs don't conflict over the same port.
         "VENS_PORT": "0",
     }
+    if env_overrides:
+        env.update(env_overrides)
     with mock.patch.dict(os.environ, env, clear=False), \
             mock.patch("paho.mqtt.client.Client", return_value=mock_client):
         spec = importlib.util.spec_from_file_location("vtn_server", MODULE_PATH)
@@ -51,4 +53,28 @@ def test_handle_event_request_publishes():
 def test_openapi_spec_has_health():
     module = load_module(mock.Mock())
     assert "/health" in module.OPENAPI_SPEC["paths"]
+
+
+def test_tls_hostname_override_enables_manual_check():
+    mock_client = mock.Mock()
+    mock_socket = mock.Mock()
+    mock_socket.getpeercert.return_value = {
+        "subject": ((("commonName", "va1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com"),),),
+        "subjectAltName": (("DNS", "va1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com"),),
+    }
+    mock_client.socket.return_value = mock_socket
+
+    module = load_module(mock_client, {
+        "IOT_CONNECT_HOST": "vpce-test.iot.internal",
+        "IOT_TLS_SERVER_NAME": "va1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com",
+    })
+
+    assert module.manual_hostname_override is True
+    mock_client.tls_insecure_set.assert_called_with(True)
+    mock_client.connect.assert_called_once_with(
+        "vpce-test.iot.internal", module.MQTT_PORT, keepalive=60
+    )
+    mock_client.socket.assert_called_once()
+    mock_socket.getpeercert.assert_called_once()
+    mock_client.disconnect.assert_not_called()
 
