@@ -160,6 +160,13 @@ HEALTH_PORT           = int(os.getenv("HEALTH_PORT", "8000"))
 TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME","ven-mqtt-certs")
 AWS_REGION            = os.getenv("AWS_REGION", "us-west-2")
 MQTT_PORT             = int(os.getenv("MQTT_PORT", "8883"))
+CLIENT_ID             = (
+    os.getenv("IOT_CLIENT_ID")
+    or os.getenv("CLIENT_ID")
+    or os.getenv("AWS_IOT_THING_NAME")
+    or os.getenv("THING_NAME")
+    or "volttron_thing"
+)
 
 # ── TLS setup ──────────────────────────────────────────────────────────
 CA_CERT = CLIENT_CERT = PRIVATE_KEY = None
@@ -184,7 +191,7 @@ if not all([CA_CERT, CLIENT_CERT, PRIVATE_KEY]):
     sys.exit(1)
 
 # ── MQTT setup ─────────────────────────────────────────────────────────
-client = mqtt.Client(protocol=mqtt.MQTTv311)
+client = mqtt.Client(client_id=CLIENT_ID, protocol=mqtt.MQTTv311)
 client.tls_set(
     ca_certs=CA_CERT,
     certfile=CLIENT_CERT,
@@ -239,7 +246,7 @@ def _on_connect(_client, _userdata, _flags, rc, *_args):
         connected = False
 
     status = "established" if connected else f"failed (code {rc})"
-    print(f"MQTT connection {status}")
+    print(f"MQTT connection {status} as client_id='{CLIENT_ID}'")
 
 
 def _on_disconnect(_client, _userdata, rc):
