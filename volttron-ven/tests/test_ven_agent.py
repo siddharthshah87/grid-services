@@ -67,11 +67,12 @@ def test_tls_hostname_override_enables_manual_check():
     })
 
     assert module.manual_hostname_override is True
+    mock_client.reconnect_delay_set.assert_called_once_with(min_delay=1, max_delay=60)
     mock_client.tls_insecure_set.assert_called_with(True)
     mock_client.connect.assert_called_once_with(
         "vpce-test.iot.internal", module.MQTT_PORT, 60
     )
+    module.client.on_connect(mock_client, None, None, 0)
     mock_client.socket.assert_called_once()
     mock_socket.getpeercert.assert_called_once()
     mock_client.disconnect.assert_not_called()
-

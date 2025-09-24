@@ -145,7 +145,7 @@ except ValueError:
     MQTT_MAX_CONNECT_ATTEMPTS = 5
 MQTT_MAX_CONNECT_ATTEMPTS = max(1, MQTT_MAX_CONNECT_ATTEMPTS)
 HEALTH_PORT           = int(os.getenv("HEALTH_PORT", "8000"))
-TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME", "dev-volttron-tls")
+TLS_SECRET_NAME       = os.getenv("TLS_SECRET_NAME","ven-mqtt-certs")
 AWS_REGION            = os.getenv("AWS_REGION", "us-west-2")
 MQTT_PORT             = int(os.getenv("MQTT_PORT", "8883"))
 
@@ -179,6 +179,7 @@ client.tls_set(
     keyfile=PRIVATE_KEY,
     tls_version=ssl.PROTOCOL_TLSv1_2,
 )
+client.reconnect_delay_set(min_delay=1, max_delay=60)
 manual_hostname_override = TLS_SERVER_HOSTNAME != MQTT_CONNECT_HOST
 if manual_hostname_override:
     print(
@@ -194,19 +195,72 @@ elif ".vpce." in MQTT_CONNECT_HOST:
 client.tls_insecure_set(manual_hostname_override)
 
 connected = False
+_reconnect_lock = threading.Lock()
+_reconnect_in_progress = False
+
+
+def _manual_hostname_verification(mqtt_client: mqtt.Client) -> None:
+    if not manual_hostname_override:
+        return
+    try:
+        _ensure_expected_server_hostname(mqtt_client, TLS_SERVER_HOSTNAME)
+    except ssl.CertificateError as err:
+        raise ssl.SSLError(str(err)) from err
+
 
 def _on_connect(_client, _userdata, _flags, rc, *_args):
     global connected
-    connected = rc == 0
+    if rc == 0:
+        try:
+            _manual_hostname_verification(_client)
+        except ssl.SSLError as err:
+            connected = False
+            print(f"MQTT connection failed TLS hostname check: {err}", file=sys.stderr)
+            _client.disconnect()
+            return
+        connected = True
+    else:
+        connected = False
+
     status = "established" if connected else f"failed (code {rc})"
     print(f"MQTT connection {status}")
 
 
 def _on_disconnect(_client, _userdata, rc):
-    global connected
+    global connected, _reconnect_in_progress
     connected = False
     reason = "graceful" if rc == mqtt.MQTT_ERR_SUCCESS else f"unexpected (code {rc})"
     print(f"MQTT disconnected: {reason}", file=sys.stderr)
+
+    if rc == mqtt.MQTT_ERR_SUCCESS:
+        return
+
+    def _attempt_reconnect():
+        global _reconnect_in_progress
+        with _reconnect_lock:
+            if _reconnect_in_progress:
+                return
+            _reconnect_in_progress = True
+
+        try:
+            delay = 1
+            for attempt in range(1, MQTT_MAX_CONNECT_ATTEMPTS + 1):
+                try:
+                    _client.reconnect()
+                    return
+                except Exception as err:  # pragma: no cover - informational
+                    print(
+                        f"MQTT reconnect failed (try {attempt}/{MQTT_MAX_CONNECT_ATTEMPTS}): {err}",
+                        file=sys.stderr,
+                    )
+                    time.sleep(min(delay, 30))
+                    delay *= 2
+            print("❌ Could not reconnect to MQTT broker", file=sys.stderr)
+        finally:
+            with _reconnect_lock:
+                _reconnect_in_progress = False
+
+    threading.Thread(target=_attempt_reconnect, daemon=True).start()
 
 client.on_connect = _on_connect
 client.on_disconnect = _on_disconnect
@@ -214,8 +268,6 @@ client.on_disconnect = _on_disconnect
 for attempt in range(1, MQTT_MAX_CONNECT_ATTEMPTS + 1):
     try:
         client.connect(MQTT_CONNECT_HOST, MQTT_PORT, 60)
-        if manual_hostname_override:
-            _ensure_expected_server_hostname(client, TLS_SERVER_HOSTNAME)
         break
     except Exception as e:
         if client.is_connected():
