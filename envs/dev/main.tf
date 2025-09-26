@@ -171,6 +171,8 @@ module "volttron_alb" {
   listener_port     = 80
   target_port       = 8000
   health_check_path = "/health"
+  enable_https      = true
+  acm_cert_arn      = aws_acm_certificate_validation.ven.certificate_arn
 }
 
 # Ingress rules allowing traffic from the ALBs to the ECS tasks
@@ -340,4 +342,3 @@ module "ecs_service_frontend" {
   backend_api_url = "http://${module.backend_alb.dns_name}"
   aws_region      = var.aws_region
 }
-

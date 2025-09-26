@@ -26,6 +26,26 @@ OPENAPI_SPEC = {
                 "summary": "Health check",
                 "responses": {"200": {"description": "Service healthy"}}
             }
+        },
+        "/config": {
+            "post": {
+                "summary": "Update VEN behaviour (interval/target)",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "report_interval_seconds": {"type": "integer", "minimum": 1},
+                                    "target_power_kw": {"type": "number"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {"200": {"description": "Applied and published"}}
+            }
         }
     },
 }
@@ -303,6 +323,14 @@ def _shadow_merge_report(updates: dict[str, Any]) -> None:
     payload = json.dumps({"state": {"reported": snapshot}})
     client.publish(SHADOW_TOPIC_UPDATE, payload, qos=1)
     print(f"Published thing shadow update: {payload}")
+
+
+def _shadow_publish_desired(desired: dict[str, Any]) -> None:
+    if not SHADOW_TOPIC_UPDATE or not desired:
+        return
+    payload = json.dumps({"state": {"desired": desired}})
+    client.publish(SHADOW_TOPIC_UPDATE, payload, qos=1)
+    print(f"Published desired shadow update: {desired}")
 
 
 def _manual_hostname_verification(mqtt_client: mqtt.Client) -> None:
@@ -597,6 +625,49 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(payload).encode())
+
+    def do_POST(self):
+        if self.path != "/config":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        raw = self.rfile.read(length) if length else b"{}"
+        try:
+            body = json.loads(raw.decode() or "{}")
+        except json.JSONDecodeError:
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(b"Invalid JSON")
+            return
+
+        # Accept only known keys
+        desired: dict[str, Any] = {}
+        if isinstance(body, dict):
+            if "report_interval_seconds" in body:
+                try:
+                    desired["report_interval_seconds"] = max(1, int(body["report_interval_seconds"]))
+                except (TypeError, ValueError):
+                    pass
+            if "target_power_kw" in body:
+                try:
+                    desired["target_power_kw"] = float(body["target_power_kw"])
+                except (TypeError, ValueError):
+                    pass
+
+        # Apply locally via the same code-path as IoT shadow deltas
+        updates = _apply_shadow_delta(desired)
+        if updates:
+            _shadow_merge_report(updates)
+        # And publish desired so remote shadow reflects the change
+        _shadow_publish_desired(desired)
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        resp = {"applied": desired, "current_interval": REPORT_INTERVAL_SECONDS}
+        self.wfile.write(json.dumps(resp).encode())
 
 def _start_health_server():
     HTTPServer(("0.0.0.0", HEALTH_PORT), HealthHandler).serve_forever()
