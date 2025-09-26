@@ -330,12 +330,17 @@ if IOT_THING_NAME:
     SHADOW_TOPIC_GET = f"$aws/things/{IOT_THING_NAME}/shadow/get"
     SHADOW_TOPIC_GET_ACCEPTED = f"{SHADOW_TOPIC_GET}/accepted"
     SHADOW_TOPIC_GET_REJECTED = f"{SHADOW_TOPIC_GET}/rejected"
+    # Backend control plane topics (custom messaging via IoT Core)
+    BACKEND_CMD_TOPIC = os.getenv("BACKEND_CMD_TOPIC", f"ven/cmd/{IOT_THING_NAME}")
+    BACKEND_ACK_TOPIC = os.getenv("BACKEND_ACK_TOPIC", f"ven/ack/{IOT_THING_NAME}")
 else:
     SHADOW_TOPIC_UPDATE = None
     SHADOW_TOPIC_DELTA = None
     SHADOW_TOPIC_GET = None
     SHADOW_TOPIC_GET_ACCEPTED = None
     SHADOW_TOPIC_GET_REJECTED = None
+    BACKEND_CMD_TOPIC = os.getenv("BACKEND_CMD_TOPIC")
+    BACKEND_ACK_TOPIC = os.getenv("BACKEND_ACK_TOPIC")
     
 CLIENT_ID             = (
     os.getenv("IOT_CLIENT_ID")
@@ -857,6 +862,135 @@ def _log_unhandled_message(_client, _userdata, msg):
         payload = repr(msg.payload)
     print(f"Unhandled MQTT message on {msg.topic}: {payload}")
 
+
+def _publish_ack(op: str, ok: bool, data: dict | None = None, error: str | None = None) -> None:
+    if not BACKEND_ACK_TOPIC:
+        return
+    ack = {
+        "op": op,
+        "ok": ok,
+        "ts": int(time.time()),
+    }
+    if data is not None:
+        ack["data"] = data
+    if error is not None:
+        ack["error"] = error
+    client.publish(BACKEND_ACK_TOPIC, json.dumps(ack), qos=1)
+
+
+def _apply_config_payload(obj: dict[str, Any]) -> dict[str, Any]:
+    """Apply a config dict using the same semantics as /config and shadow deltas.
+
+    Returns the updates that were applied (for echo/ack) and merges them to the
+    reported shadow state.
+    """
+    desired: dict[str, Any] = {}
+    if not isinstance(obj, dict):
+        return {}
+
+    # Accept known keys only; pass-through values are validated in _apply_shadow_delta
+    for fld in (
+        "report_interval_seconds",
+        "target_power_kw",
+        "enabled",
+        "meter_base_min_kw",
+        "meter_base_max_kw",
+        "meter_jitter_pct",
+        "voltage_enabled",
+        "voltage_nominal",
+        "voltage_jitter_pct",
+        "current_enabled",
+        "power_factor",
+    ):
+        if fld in obj:
+            desired[fld] = obj[fld]
+
+    updates = _apply_shadow_delta(desired)
+    if updates:
+        _shadow_merge_report(updates)
+        _shadow_publish_desired(desired)
+    return updates or {}
+
+
+def on_backend_cmd(_client, _userdata, msg):
+    """Handle control-plane commands published by the backend over IoT Core.
+
+    Expected JSON structure (flexible):
+      - { "op": "set", "data": { ... same fields as /config ... } }
+      - { "op": "enable" } or { "op": "disable" }
+      - { "op": "get", "what": "status|config" }
+      - { "op": "ping" }
+      - { "op": "event", "data": { "event_id": "...", "shed_kw": 1.2, "start_ts": 123, "duration_s": 900 } }
+    """
+    op = "unknown"
+    try:
+        payload = json.loads(msg.payload.decode())
+        op = str(payload.get("op") or "set").lower()
+        data = payload.get("data")
+
+        if op == "set":
+            updates = _apply_config_payload(data if isinstance(data, dict) else payload)
+            _publish_ack(op, True, {"applied": updates})
+            return
+        if op == "enable":
+            updates = _apply_config_payload({"enabled": True})
+            _publish_ack(op, True, {"applied": updates})
+            return
+        if op == "disable":
+            updates = _apply_config_payload({"enabled": False})
+            _publish_ack(op, True, {"applied": updates})
+            return
+        if op == "get":
+            what = str(payload.get("what") or "status").lower()
+            if what == "config":
+                with _shadow_state_lock:
+                    cfg = {
+                        "report_interval_seconds": REPORT_INTERVAL_SECONDS,
+                        "target_power_kw": _shadow_target_power_kw,
+                        "enabled": _ven_enabled,
+                        "meter_base_min_kw": _meter_base_min_kw,
+                        "meter_base_max_kw": _meter_base_max_kw,
+                        "meter_jitter_pct": _meter_jitter_pct,
+                        "voltage_enabled": _voltage_enabled,
+                        "voltage_nominal": _voltage_nominal,
+                        "voltage_jitter_pct": _voltage_jitter_pct,
+                        "current_enabled": _current_enabled,
+                        "power_factor": _power_factor,
+                    }
+                _publish_ack(op, True, {"config": cfg})
+            else:
+                _code, status = health_snapshot()
+                _publish_ack(op, True, {"status": status})
+            return
+        if op == "ping":
+            _publish_ack(op, True, {"pong": True, "ts": int(time.time())})
+            return
+        if op == "event":
+            ev = data if isinstance(data, dict) else {}
+            # Record event in shadow and optionally adjust target
+            ev_id = ev.get("event_id") or f"backend_{int(time.time())}"
+            shed_kw = ev.get("shed_kw")
+            updates: dict[str, Any] = {
+                "status": {"last_backend_event_ts": int(time.time())},
+                "events": {"last_backend": {"event_id": ev_id, **ev}},
+            }
+            if isinstance(shed_kw, (int, float)):
+                # For a simple demo, interpret shed_kw as a target power cap
+                updates["target_power_kw"] = max(0.0, float(shed_kw))
+                with _shadow_state_lock:
+                    try:
+                        global _shadow_target_power_kw
+                        _shadow_target_power_kw = float(updates["target_power_kw"])
+                    except Exception:
+                        pass
+            _shadow_merge_report(updates)
+            _publish_ack(op, True, {"event_id": ev_id})
+            return
+
+        _publish_ack(op, False, error=f"unknown op: {op}")
+    except Exception as e:
+        _publish_ack(op, False, error=str(e))
+
 client.on_connect = _on_connect
 client.on_disconnect = _on_disconnect
 client.on_message = _log_unhandled_message
@@ -1093,6 +1227,11 @@ def main(iterations: int | None = None) -> None:
     global _last_publish_time
     client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
     client.subscribe(MQTT_TOPIC_EVENTS)
+
+    # Subscribe to backend control plane topic if configured
+    if BACKEND_CMD_TOPIC:
+        client.message_callback_add(BACKEND_CMD_TOPIC, on_backend_cmd)
+        client.subscribe(BACKEND_CMD_TOPIC)
 
     if SHADOW_TOPIC_DELTA:
         client.message_callback_add(SHADOW_TOPIC_DELTA, on_shadow_delta)
