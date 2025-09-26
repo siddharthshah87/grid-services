@@ -164,9 +164,9 @@ AWS_REGION            = os.getenv("AWS_REGION", "us-west-2")
 MQTT_PORT             = int(os.getenv("MQTT_PORT", "8883"))
 IOT_THING_NAME        = os.getenv("IOT_THING_NAME") or os.getenv("AWS_IOT_THING_NAME")
 try:
-    REPORT_INTERVAL_SECONDS = int(os.getenv("VEN_REPORT_INTERVAL_SECONDS", "10"))
+    REPORT_INTERVAL_SECONDS = int(os.getenv("VEN_REPORT_INTERVAL_SECONDS", "60"))
 except ValueError:
-    REPORT_INTERVAL_SECONDS = 10
+    REPORT_INTERVAL_SECONDS = 60
 REPORT_INTERVAL_SECONDS = max(1, REPORT_INTERVAL_SECONDS)
 
 if IOT_THING_NAME:
@@ -212,28 +212,61 @@ if not all([CA_CERT, CLIENT_CERT, PRIVATE_KEY]):
     )
     sys.exit(1)
 
+def _build_tls_context(
+    ca_path: str, cert_path: str, key_path: str, expected_sni: str | None, connect_host: str
+) -> ssl.SSLContext:
+    """Create an SSLContext that always sends SNI=expected_sni when set.
+
+    - Verifies the server certificate chain against the provided CA.
+    - Keeps hostname verification enabled; when an SNI override is provided
+      it causes Python to validate the certificate against that SNI value.
+    - Ensures AWS IoT PrivateLink works by sending SNI for the public ATS host
+      even when connecting to a VPCE DNS name.
+    """
+    ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_path)
+    ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
+
+    # Enforce TLS 1.2+
+    try:
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+    manual_override = bool(expected_sni) and expected_sni != connect_host
+    if manual_override and hasattr(ctx, "wrap_socket"):
+        # Monkey‑patch wrap_socket to force server_hostname to expected_sni
+        orig_wrap = ctx.wrap_socket  # bound method
+
+        def _wrap_socket_with_sni(sock, *args, **kwargs):  # type: ignore[override]
+            kwargs["server_hostname"] = expected_sni
+            return orig_wrap(sock, *args, **kwargs)
+
+        ctx.wrap_socket = _wrap_socket_with_sni  # type: ignore[assignment]
+
+    # Leave check_hostname=True so Python validates against server_hostname (SNI)
+    ctx.check_hostname = True
+    ctx.verify_mode = ssl.CERT_REQUIRED
+    return ctx
+
 # ── MQTT setup ─────────────────────────────────────────────────────────
 client = mqtt.Client(client_id=CLIENT_ID, protocol=mqtt.MQTTv311)
-client.tls_set(
-    ca_certs=CA_CERT,
-    certfile=CLIENT_CERT,
-    keyfile=PRIVATE_KEY,
-    tls_version=ssl.PROTOCOL_TLSv1_2,
-)
-client.reconnect_delay_set(min_delay=1, max_delay=60)
+
 manual_hostname_override = TLS_SERVER_HOSTNAME != MQTT_CONNECT_HOST
 if manual_hostname_override:
     print(
-        "🔐 TLS hostname override enabled: "
-        f"connecting to {MQTT_CONNECT_HOST} but verifying certificate for {TLS_SERVER_HOSTNAME}"
+        "🔐 TLS SNI override enabled: "
+        f"connecting to {MQTT_CONNECT_HOST} but sending SNI/cert validation for {TLS_SERVER_HOSTNAME}"
     )
 elif ".vpce." in MQTT_CONNECT_HOST:
     print(
-        "⚠️ Connecting to an AWS IoT VPC endpoint without a TLS hostname override. "
+        "⚠️ Connecting to an AWS IoT VPC endpoint without a TLS SNI override. "
         "Set IOT_TLS_SERVER_NAME to your IoT data endpoint to enable certificate checks.",
         file=sys.stderr,
     )
-client.tls_insecure_set(manual_hostname_override)
+
+_tls_ctx = _build_tls_context(CA_CERT, CLIENT_CERT, PRIVATE_KEY, TLS_SERVER_HOSTNAME, MQTT_CONNECT_HOST)
+client.tls_set_context(_tls_ctx)
+client.reconnect_delay_set(min_delay=1, max_delay=60)
 
 connected = False
 _last_connect_time: float | None = None
@@ -273,6 +306,9 @@ def _shadow_merge_report(updates: dict[str, Any]) -> None:
 
 
 def _manual_hostname_verification(mqtt_client: mqtt.Client) -> None:
+    # With the SNI-forcing TLS context, Python already validated the
+    # certificate against TLS_SERVER_HOSTNAME. Keep this as a belt‑and‑braces
+    # check, but it should never fail unless the broker rotates certs mid‑session.
     if not manual_hostname_override:
         return
     try:

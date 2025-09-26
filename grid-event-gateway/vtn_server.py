@@ -167,6 +167,26 @@ else:
 mqttc = mqtt.Client(protocol=mqtt.MQTTv5)
 manual_hostname_override = False
 
+def _build_tls_context(ca_path: str, cert_path: str, key_path: str, expected_sni: str | None, connect_host: str) -> ssl.SSLContext:
+    ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_path)
+    ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
+    try:
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    manual = bool(expected_sni) and expected_sni != connect_host
+    if manual and hasattr(ctx, "wrap_socket"):
+        orig = ctx.wrap_socket
+
+        def _wrap_socket_with_sni(sock, *args, **kwargs):  # type: ignore[override]
+            kwargs["server_hostname"] = expected_sni
+            return orig(sock, *args, **kwargs)
+
+        ctx.wrap_socket = _wrap_socket_with_sni  # type: ignore[assignment]
+    ctx.check_hostname = True
+    ctx.verify_mode = ssl.CERT_REQUIRED
+    return ctx
+
 if CA_CERT_PEM and CLIENT_CERT_PEM and PRIVATE_KEY_PEM:
     # ── materialise PEM strings to disk ---------------------------------
     tmp_dir = tempfile.TemporaryDirectory(prefix="vtn_cert_")
@@ -197,21 +217,21 @@ if CA_CERT_PEM and CLIENT_CERT_PEM and PRIVATE_KEY_PEM:
             print(f"🧹 Deleted temp cert: {p}")
         tmp_dir.cleanup()
 
-    mqttc.tls_set(ca_certs=ca_path, certfile=cert_path, keyfile=key_path)
-
     manual_hostname_override = TLS_SERVER_HOSTNAME != MQTT_CONNECT_HOST
     if manual_hostname_override:
         print(
-            "🔐 TLS hostname override enabled: "
-            f"connecting to {MQTT_CONNECT_HOST} but verifying certificate for {TLS_SERVER_HOSTNAME}"
+            "🔐 TLS SNI override enabled: "
+            f"connecting to {MQTT_CONNECT_HOST} but sending SNI/cert validation for {TLS_SERVER_HOSTNAME}"
         )
     elif ".vpce." in MQTT_CONNECT_HOST:
         print(
-            "⚠️ Connecting to an AWS IoT VPC endpoint without a TLS hostname override. "
+            "⚠️ Connecting to an AWS IoT VPC endpoint without a TLS SNI override. "
             "Set IOT_TLS_SERVER_NAME to your IoT data endpoint to enable certificate checks.",
             file=sys.stderr,
         )
-    mqttc.tls_insecure_set(manual_hostname_override)
+
+    _ctx = _build_tls_context(ca_path, cert_path, key_path, TLS_SERVER_HOSTNAME, MQTT_CONNECT_HOST)
+    mqttc.tls_set_context(_ctx)
 
 # ── MQTT client ----------------------------------------------------------
 mqtt_connected = False
@@ -287,4 +307,3 @@ if __name__ == "__main__":
     print(" Starting VTN ‣ http://0.0.0.0:8080/OpenADR2/Simple/2.0b")
     print("********************************************************************************")
     asyncio.run(vtn.run())   # <-- key change: bind to 0.0.0.0
-
