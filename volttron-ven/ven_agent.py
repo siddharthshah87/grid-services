@@ -42,7 +42,8 @@ OPENAPI_SPEC = {
                                 "type": "object",
                                 "properties": {
                                     "report_interval_seconds": {"type": "integer", "minimum": 1},
-                                    "target_power_kw": {"type": "number"}
+                                    "target_power_kw": {"type": "number"},
+                                    "enabled": {"type": "boolean"}
                                 }
                             }
                         }
@@ -97,14 +98,17 @@ CONFIG_UI_HTML = """
       const j = await r.json();
       document.getElementById('interval').value = j.report_interval_seconds ?? '';
       document.getElementById('target').value   = j.target_power_kw ?? '';
+      document.getElementById('enabled').checked = !!j.enabled;
       document.getElementById('status').textContent = 'Current: ' + JSON.stringify(j);
     }
     async function applyChanges(){
       const interval = document.getElementById('interval').value;
       const target   = document.getElementById('target').value;
+      const enabled  = document.getElementById('enabled').checked;
       const body = {};
       if(interval) body.report_interval_seconds = Number(interval);
       if(target)   body.target_power_kw = Number(target);
+      body.enabled = enabled;
       const r = await fetch('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)});
       const j = await r.json().catch(()=>({}));
       document.getElementById('status').textContent = 'Response: ' + JSON.stringify(j);
@@ -115,6 +119,7 @@ CONFIG_UI_HTML = """
   <body>
     <h1>VOLTTRON VEN Control</h1>
     <div class="row">
+      <label><input id="enabled" type="checkbox"/> Enabled</label>
       <label>Report interval (seconds) <input id="interval" type="number" min="1" step="1" /></label>
       <label>Target power (kW) <input id="target" type="number" step="0.01" /></label>
     </div>
@@ -359,6 +364,7 @@ _shadow_reported_state: dict[str, Any] = {
     "shadow_errors": {}
 }
 _shadow_target_power_kw: float | None = None
+_ven_enabled: bool = True
 
 
 def _merge_dict(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
@@ -440,7 +446,7 @@ def _on_disconnect(_client, _userdata, rc):
         "status": {"mqtt_connected": False, "last_disconnect_code": rc}
     })
 
-    if rc == mqtt.MQTT_ERR_SUCCESS:
+    if rc == mqtt.MQTT_ERR_SUCCESS or not _ven_enabled:
         return
 
     def _attempt_reconnect():
@@ -471,6 +477,62 @@ def _on_disconnect(_client, _userdata, rc):
     threading.Thread(target=_attempt_reconnect, daemon=True).start()
 
 
+def _subscribe_topics() -> None:
+    client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
+    client.subscribe(MQTT_TOPIC_EVENTS)
+
+    if SHADOW_TOPIC_DELTA:
+        client.message_callback_add(SHADOW_TOPIC_DELTA, on_shadow_delta)
+        client.subscribe(SHADOW_TOPIC_DELTA)
+
+        if SHADOW_TOPIC_GET_ACCEPTED:
+            client.message_callback_add(SHADOW_TOPIC_GET_ACCEPTED, on_shadow_get_accepted)
+            client.subscribe(SHADOW_TOPIC_GET_ACCEPTED)
+
+        if SHADOW_TOPIC_GET_REJECTED:
+            client.message_callback_add(SHADOW_TOPIC_GET_REJECTED, on_shadow_get_rejected)
+            client.subscribe(SHADOW_TOPIC_GET_REJECTED)
+
+        _shadow_request_sync()
+    else:
+        if not IOT_THING_NAME:
+            print("⚠️ IOT_THING_NAME not set; device shadow sync disabled.")
+
+
+def _ven_disable() -> None:
+    global _ven_enabled, connected
+    _ven_enabled = False
+    try:
+        client.loop_stop()
+    except Exception:
+        pass
+    try:
+        client.disconnect()
+    except Exception:
+        pass
+    connected = False
+
+
+def _ven_enable() -> None:
+    global _ven_enabled
+    if _ven_enabled:
+        return
+    _ven_enabled = True
+    # Try to connect and start loop, then resubscribe
+    for attempt in range(1, MQTT_MAX_CONNECT_ATTEMPTS + 1):
+        try:
+            client.connect(MQTT_CONNECT_HOST, MQTT_PORT, 60)
+            break
+        except Exception as e:
+            print(
+                f"MQTT connect (re-enable) failed (try {attempt}/{MQTT_MAX_CONNECT_ATTEMPTS}): {e}",
+                file=sys.stderr,
+            )
+            time.sleep(min(2 ** attempt, 30))
+    client.loop_start()
+    _subscribe_topics()
+
+
 def _shadow_request_sync() -> None:
     if not SHADOW_TOPIC_GET:
         return
@@ -479,7 +541,7 @@ def _shadow_request_sync() -> None:
 
 
 def _sync_reported_state(reported: dict[str, Any]) -> None:
-    global REPORT_INTERVAL_SECONDS, _shadow_target_power_kw
+    global REPORT_INTERVAL_SECONDS, _shadow_target_power_kw, _ven_enabled
     if not isinstance(reported, dict):
         return
 
@@ -495,9 +557,19 @@ def _sync_reported_state(reported: dict[str, Any]) -> None:
         except (TypeError, ValueError):
             pass
 
+    if "enabled" in reported:
+        try:
+            desired_enabled = bool(reported["enabled"])
+            if desired_enabled and not _ven_enabled:
+                _ven_enable()
+            elif not desired_enabled and _ven_enabled:
+                _ven_disable()
+        except Exception:
+            pass
+
 
 def _apply_shadow_delta(delta: dict[str, Any]) -> dict[str, Any]:
-    global REPORT_INTERVAL_SECONDS, _shadow_target_power_kw
+    global REPORT_INTERVAL_SECONDS, _shadow_target_power_kw, _ven_enabled
 
     updates: dict[str, Any] = {}
     errors: dict[str, str] = {}
@@ -517,6 +589,16 @@ def _apply_shadow_delta(delta: dict[str, Any]) -> dict[str, Any]:
                 updates[key] = _shadow_target_power_kw
             except (TypeError, ValueError):
                 errors[key] = f"invalid target_power_kw: {value}"
+        elif key == "enabled":
+            try:
+                desired_enabled = bool(value)
+                if desired_enabled and not _ven_enabled:
+                    _ven_enable()
+                elif not desired_enabled and _ven_enabled:
+                    _ven_disable()
+                updates[key] = desired_enabled
+            except Exception:
+                errors[key] = f"invalid enabled: {value}"
         else:
             updates[key] = value
 
@@ -650,6 +732,7 @@ def health_snapshot() -> tuple[int, dict]:
         "mqtt_connect_host": MQTT_CONNECT_HOST,
         "mqtt_port": MQTT_PORT,
         "tls_server_hostname": TLS_SERVER_HOSTNAME,
+        "enabled": _ven_enabled,
     }
 
     if _last_connect_time is not None:
@@ -690,6 +773,7 @@ class HealthHandler(BaseHTTPRequestHandler):
                 current = {
                     "report_interval_seconds": REPORT_INTERVAL_SECONDS,
                     "target_power_kw": _shadow_target_power_kw,
+                    "enabled": _ven_enabled,
                 }
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -732,6 +816,11 @@ class HealthHandler(BaseHTTPRequestHandler):
                     desired["target_power_kw"] = float(body["target_power_kw"])
                 except (TypeError, ValueError):
                     pass
+            if "enabled" in body:
+                try:
+                    desired["enabled"] = bool(body["enabled"])
+                except Exception:
+                    pass
 
         # Apply locally via the same code-path as IoT shadow deltas
         updates = _apply_shadow_delta(desired)
@@ -743,7 +832,9 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        resp = {"applied": desired, "current_interval": REPORT_INTERVAL_SECONDS}
+        with _shadow_state_lock:
+            now_enabled = _ven_enabled
+        resp = {"applied": desired, "current_interval": REPORT_INTERVAL_SECONDS, "enabled": now_enabled}
         self.wfile.write(json.dumps(resp).encode())
 
 def _start_health_server():
