@@ -923,10 +923,13 @@ def health_snapshot() -> tuple[int, dict]:
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
 
         if path == "/openapi.json":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(json.dumps(OPENAPI_SPEC).encode())
             return
@@ -934,6 +937,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         if path == "/docs":
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
+            self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(SWAGGER_HTML.encode())
             return
@@ -941,6 +945,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         if path in ("/", "/ui"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
+            self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(CONFIG_UI_HTML.encode())
             return
@@ -973,7 +978,10 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(payload).encode())
 
     def do_POST(self):
-        if self.path != "/config":
+        path = urlparse(self.path).path
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
+        if path != "/config":
             self.send_response(404)
             self.end_headers()
             return
