@@ -28,6 +28,10 @@ OPENAPI_SPEC = {
             }
         },
         "/config": {
+            "get": {
+                "summary": "Get current VEN configuration",
+                "responses": {"200": {"description": "Current settings"}}
+            },
             "post": {
                 "summary": "Update VEN behaviour (interval/target)",
                 "requestBody": {
@@ -65,6 +69,55 @@ SWAGGER_HTML = """
   </script>
 </body>
 </html>
+"""
+
+CONFIG_UI_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>VEN Control</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.4; }
+    label { display: block; margin-top: 1rem; }
+    input { padding: 0.4rem; font-size: 1rem; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
+    .row { display: flex; gap: 1rem; align-items: center; }
+    .status { margin-top: 1rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+  <script>
+    async function loadCurrent(){
+      const r = await fetch('/config');
+      if(!r.ok) return;
+      const j = await r.json();
+      document.getElementById('interval').value = j.report_interval_seconds ?? '';
+      document.getElementById('target').value   = j.target_power_kw ?? '';
+      document.getElementById('status').textContent = 'Current: ' + JSON.stringify(j);
+    }
+    async function applyChanges(){
+      const interval = document.getElementById('interval').value;
+      const target   = document.getElementById('target').value;
+      const body = {};
+      if(interval) body.report_interval_seconds = Number(interval);
+      if(target)   body.target_power_kw = Number(target);
+      const r = await fetch('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)});
+      const j = await r.json().catch(()=>({}));
+      document.getElementById('status').textContent = 'Response: ' + JSON.stringify(j);
+    }
+    window.addEventListener('DOMContentLoaded', loadCurrent);
+  </script>
+  </head>
+  <body>
+    <h1>VOLTTRON VEN Control</h1>
+    <div class="row">
+      <label>Report interval (seconds) <input id="interval" type="number" min="1" step="1" /></label>
+      <label>Target power (kW) <input id="target" type="number" step="0.01" /></label>
+    </div>
+    <button onclick="applyChanges()">Apply</button>
+    <div id="status" class="status"></div>
+    <p>API docs at <a href="/docs">/docs</a></p>
+  </body>
+  </html>
 """
 
 # ── helpers ────────────────────────────────────────────────────────────
@@ -618,6 +671,25 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html")
             self.end_headers()
             self.wfile.write(SWAGGER_HTML.encode())
+            return
+
+        if self.path == "/ui":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(CONFIG_UI_HTML.encode())
+            return
+
+        if self.path == "/config":
+            with _shadow_state_lock:
+                current = {
+                    "report_interval_seconds": REPORT_INTERVAL_SECONDS,
+                    "target_power_kw": _shadow_target_power_kw,
+                }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(current).encode())
             return
 
         status, payload = health_snapshot()
