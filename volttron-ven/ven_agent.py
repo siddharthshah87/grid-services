@@ -109,6 +109,16 @@ CONFIG_UI_HTML = """
     button { background: var(--accent); color:#fff; border:0; border-radius:8px; padding:8px 14px; cursor:pointer; }
     button.secondary { background:#222; }
     .status { margin-top: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space:pre-wrap; }
+    /* Live panel styles */
+    .panelbox { background:#111; color:#fff; border-radius:12px; padding:16px; box-shadow:inset 0 0 0 2px #000, 0 10px 24px rgba(0,0,0,.25); }
+    .led { display:inline-block; width:12px; height:12px; border-radius:50%; box-shadow:0 0 6px rgba(0,0,0,.5); margin-right:6px; vertical-align:middle; }
+    .ok { background:#2ecc71; }
+    .bad { background:#e74c3c; }
+    .meter { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .big { font-size:2.2rem; font-weight:700; letter-spacing: .5px; }
+    .muted { color:#bbb; }
+    .kv { display:flex; gap:12px; flex-wrap:wrap; }
+    .kv div { background:rgba(255,255,255,.05); padding:8px 10px; border-radius:8px; min-width: 120px; text-align:center; }
   </style>
   <script>
     async function loadCurrent(){
@@ -154,7 +164,26 @@ CONFIG_UI_HTML = """
       const j = await r.json().catch(()=>({}));
       document.getElementById('status').textContent = 'Response: ' + JSON.stringify(j, null, 2);
     }
-    window.addEventListener('DOMContentLoaded', loadCurrent);
+    async function refreshLive(){
+      try {
+        const r = await fetch('/live');
+        if(!r.ok) return;
+        const j = await r.json();
+        const enabled = !!(j.config && j.config.enabled);
+        const connected = !!(j.status && j.status.ok);
+        document.getElementById('led-enabled').className = 'led ' + (enabled? 'ok':'bad');
+        document.getElementById('led-mqtt').className = 'led ' + (connected? 'ok':'bad');
+        document.getElementById('live-power').textContent = j.metering && j.metering.power_kw != null ? j.metering.power_kw.toFixed(2) : '--';
+        document.getElementById('live-voltage').textContent = j.metering && j.metering.voltage_v != null ? j.metering.voltage_v.toFixed(1) : '--';
+        document.getElementById('live-current').textContent = j.metering && j.metering.current_a != null ? j.metering.current_a.toFixed(2) : '--';
+        document.getElementById('live-target').textContent = (j.config && j.config.target_power_kw != null) ? j.config.target_power_kw : '--';
+        document.getElementById('live-interval').textContent = (j.config && j.config.report_interval_seconds) ? j.config.report_interval_seconds : '--';
+        const last = (j.events && j.events.event_id) ? `${j.events.event_id}` : '—';
+        document.getElementById('live-event').textContent = last;
+        document.getElementById('live-last-publish').textContent = j.status && j.status.last_publish_at ? j.status.last_publish_at : '—';
+      } catch(e){ /* ignore */ }
+    }
+    window.addEventListener('DOMContentLoaded', ()=>{ loadCurrent(); refreshLive(); setInterval(refreshLive, 2000); });
   </script>
   </head>
   <body>
@@ -165,6 +194,27 @@ CONFIG_UI_HTML = """
     </header>
     <main>
       <div class="grid">
+        <section class="card panelbox">
+          <h2 style="color:#ddd; margin-bottom:12px;">Virtual Panel</h2>
+          <div class="meter">
+            <div>
+              <div class="muted">Total Power</div>
+              <div class="big"><span id="live-power">--</span> kW</div>
+            </div>
+            <div class="kv">
+              <div><span class="muted">Voltage</span><br/><strong><span id="live-voltage">--</span> V</strong></div>
+              <div><span class="muted">Current</span><br/><strong><span id="live-current">--</span> A</strong></div>
+              <div><span class="muted">Target</span><br/><strong><span id="live-target">--</span> kW</strong></div>
+              <div><span class="muted">Interval</span><br/><strong><span id="live-interval">--</span> s</strong></div>
+            </div>
+          </div>
+          <div style="margin-top:10px; color:#ccc; display:flex; align-items:center; gap:16px;">
+            <div><span id="led-enabled" class="led bad"></span> Enabled</div>
+            <div><span id="led-mqtt" class="led bad"></span> MQTT</div>
+            <div>Last event: <strong id="live-event">—</strong></div>
+            <div>Last publish: <span id="live-last-publish">—</span></div>
+          </div>
+        </section>
         <section class="card">
           <h2>General</h2>
           <div class="field"><label>Enabled</label><input id="enabled" type="checkbox"/></div>
@@ -454,6 +504,9 @@ _voltage_jitter_pct: float = 0.02  # ±2%
 
 _current_enabled: bool = False
 _power_factor: float = 1.0  # 0 < pf <= 1
+
+# latest metering snapshot for UI/live endpoint
+_last_metering_sample: dict[str, Any] | None = None
 
 
 def _merge_dict(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
@@ -1108,6 +1161,35 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(current).encode())
             return
 
+        if path == "/live":
+            code, status = health_snapshot()
+            with _shadow_state_lock:
+                cfg = {
+                    "report_interval_seconds": REPORT_INTERVAL_SECONDS,
+                    "target_power_kw": _shadow_target_power_kw,
+                    "enabled": _ven_enabled,
+                }
+                events = None
+                try:
+                    evs = _shadow_reported_state.get("events") if isinstance(_shadow_reported_state, dict) else None
+                    if isinstance(evs, dict):
+                        # prefer backend event if present
+                        events = evs.get("last_backend") or evs.get("last")
+                except Exception:
+                    events = None
+            live = {
+                "status": status,
+                "config": cfg,
+                "metering": _last_metering_sample,
+                "events": events,
+            }
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(json.dumps(live).encode())
+            return
+
         status, payload = health_snapshot()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -1280,10 +1362,16 @@ def main(iterations: int | None = None) -> None:
             amps = (power_kw * 1000.0) / (v_for_current * pf)
             metering_payload["current_a"] = round(max(0.0, amps), 2)
 
-        client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
+    client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
         client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
         print("Published VEN status and metering data to MQTT")
         _last_publish_time = time.time()
+        # store last metering for /live UI endpoint
+        try:
+            global _last_metering_sample
+            _last_metering_sample = dict(metering_payload)
+        except Exception:
+            pass
         with _shadow_state_lock:
             target_power_kw = _shadow_target_power_kw
 
