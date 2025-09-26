@@ -43,7 +43,15 @@ OPENAPI_SPEC = {
                                 "properties": {
                                     "report_interval_seconds": {"type": "integer", "minimum": 1},
                                     "target_power_kw": {"type": "number"},
-                                    "enabled": {"type": "boolean"}
+                                    "enabled": {"type": "boolean"},
+                                    "meter_base_min_kw": {"type": "number", "minimum": 0},
+                                    "meter_base_max_kw": {"type": "number", "minimum": 0},
+                                    "meter_jitter_pct": {"type": "number", "minimum": 0, "maximum": 1},
+                                    "voltage_enabled": {"type": "boolean"},
+                                    "voltage_nominal": {"type": "number", "minimum": 1},
+                                    "voltage_jitter_pct": {"type": "number", "minimum": 0, "maximum": 1},
+                                    "current_enabled": {"type": "boolean"},
+                                    "power_factor": {"type": "number", "minimum": 0.05, "maximum": 1}
                                 }
                             }
                         }
@@ -81,15 +89,25 @@ CONFIG_UI_HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8"/>
+  <meta charset=\"utf-8\"/>
   <title>VEN Control</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.4; }
-    label { display: block; margin-top: 1rem; }
-    input { padding: 0.4rem; font-size: 1rem; }
-    button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
-    .row { display: flex; gap: 1rem; align-items: center; }
-    .status { margin-top: 1rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    :root { --bg:#0b5; --card:#fff; --muted:#666; --accent:#0b5; }
+    body { font-family: system-ui, sans-serif; margin: 0; line-height: 1.4; background:#f6f8fa; }
+    header { background: var(--bg); color:#fff; padding:12px 16px; position:sticky; top:0; }
+    header a { color:#fff; margin-left: 12px; text-decoration: underline; }
+    main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+    .card { background: var(--card); border-radius: 10px; padding:16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .card h2 { margin:0 0 8px; font-size:1.1rem; }
+    .field { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:8px 0; }
+    .field label { color: var(--muted); }
+    .field input[type=\"number\"] { width: 140px; padding: 6px 8px; border:1px solid #ddd; border-radius:8px; }
+    .field input[type=\"checkbox\"] { transform: scale(1.2); }
+    .actions { display:flex; gap:12px; margin-top:12px; }
+    button { background: var(--accent); color:#fff; border:0; border-radius:8px; padding:8px 14px; cursor:pointer; }
+    button.secondary { background:#222; }
+    .status { margin-top: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space:pre-wrap; }
   </style>
   <script>
     async function loadCurrent(){
@@ -99,7 +117,18 @@ CONFIG_UI_HTML = """
       document.getElementById('interval').value = j.report_interval_seconds ?? '';
       document.getElementById('target').value   = j.target_power_kw ?? '';
       document.getElementById('enabled').checked = !!j.enabled;
-      document.getElementById('status').textContent = 'Current: ' + JSON.stringify(j);
+      // Metering knobs
+      document.getElementById('base_min').value = j.meter_base_min_kw ?? 0.5;
+      document.getElementById('base_max').value = j.meter_base_max_kw ?? 2.0;
+      document.getElementById('jitter').value   = (j.meter_jitter_pct ?? 0.05);
+      // Voltage
+      document.getElementById('v_enabled').checked = !!j.voltage_enabled;
+      document.getElementById('v_nom').value = j.voltage_nominal ?? 120.0;
+      document.getElementById('v_jitter').value = (j.voltage_jitter_pct ?? 0.02);
+      // Current
+      document.getElementById('i_enabled').checked = !!j.current_enabled;
+      document.getElementById('pf').value = j.power_factor ?? 1.0;
+      document.getElementById('status').textContent = 'Current: ' + JSON.stringify(j, null, 2);
     }
     async function applyChanges(){
       const interval = document.getElementById('interval').value;
@@ -109,23 +138,65 @@ CONFIG_UI_HTML = """
       if(interval) body.report_interval_seconds = Number(interval);
       if(target)   body.target_power_kw = Number(target);
       body.enabled = enabled;
+      // Metering knobs
+      body.meter_base_min_kw = Number(document.getElementById('base_min').value);
+      body.meter_base_max_kw = Number(document.getElementById('base_max').value);
+      body.meter_jitter_pct  = Number(document.getElementById('jitter').value);
+      // Voltage knobs
+      body.voltage_enabled   = document.getElementById('v_enabled').checked;
+      body.voltage_nominal   = Number(document.getElementById('v_nom').value);
+      body.voltage_jitter_pct= Number(document.getElementById('v_jitter').value);
+      // Current knobs
+      body.current_enabled   = document.getElementById('i_enabled').checked;
+      body.power_factor      = Number(document.getElementById('pf').value);
       const r = await fetch('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)});
       const j = await r.json().catch(()=>({}));
-      document.getElementById('status').textContent = 'Response: ' + JSON.stringify(j);
+      document.getElementById('status').textContent = 'Response: ' + JSON.stringify(j, null, 2);
     }
     window.addEventListener('DOMContentLoaded', loadCurrent);
   </script>
   </head>
   <body>
-    <h1>VOLTTRON VEN Control</h1>
-    <div class="row">
-      <label><input id="enabled" type="checkbox"/> Enabled</label>
-      <label>Report interval (seconds) <input id="interval" type="number" min="1" step="1" /></label>
-      <label>Target power (kW) <input id="target" type="number" step="0.01" /></label>
-    </div>
-    <button onclick="applyChanges()">Apply</button>
-    <div id="status" class="status"></div>
-    <p>API docs at <a href="/docs">/docs</a></p>
+    <header>
+      <strong>VOLTTRON VEN Control</strong>
+      <a href="/docs">API Docs</a>
+      <a href="/config">Current Config</a>
+    </header>
+    <main>
+      <div class="grid">
+        <section class="card">
+          <h2>General</h2>
+          <div class="field"><label>Enabled</label><input id="enabled" type="checkbox"/></div>
+          <div class="field"><label>Report interval (s)</label><input id="interval" type="number" min="1" step="1" /></div>
+          <div class="field"><label>Target power (kW)</label><input id="target" type="number" step="0.01" /></div>
+        </section>
+
+        <section class="card">
+          <h2>Power Generation</h2>
+          <div class="field"><label>Base min (kW)</label><input id="base_min" type="number" step="0.01" min="0" /></div>
+          <div class="field"><label>Base max (kW)</label><input id="base_max" type="number" step="0.01" min="0" /></div>
+          <div class="field"><label>Jitter (%) [0..1]</label><input id="jitter" type="number" step="0.005" min="0" max="1" /></div>
+        </section>
+
+        <section class="card">
+          <h2>Voltage (optional)</h2>
+          <div class="field"><label>Include voltage</label><input id="v_enabled" type="checkbox"/></div>
+          <div class="field"><label>Nominal (V)</label><input id="v_nom" type="number" step="0.1" min="1" /></div>
+          <div class="field"><label>Jitter (%) [0..1]</label><input id="v_jitter" type="number" step="0.005" min="0" max="1" /></div>
+        </section>
+
+        <section class="card">
+          <h2>Current (optional)</h2>
+          <div class="field"><label>Include current</label><input id="i_enabled" type="checkbox"/></div>
+          <div class="field"><label>Power factor</label><input id="pf" type="number" step="0.01" min="0.05" max="1" /></div>
+        </section>
+      </div>
+      <div class="actions">
+        <button onclick="applyChanges()">Apply</button>
+        <button class="secondary" onclick="loadCurrent()">Reload</button>
+      </div>
+      <div id="status" class="status"></div>
+    </main>
   </body>
   </html>
 """
@@ -366,6 +437,18 @@ _shadow_reported_state: dict[str, Any] = {
 _shadow_target_power_kw: float | None = None
 _ven_enabled: bool = True
 
+# ── Metering configuration knobs (tunable at runtime) -----------------------
+_meter_base_min_kw: float = 0.5
+_meter_base_max_kw: float = 2.0
+_meter_jitter_pct: float = 0.05  # ±5% around target when set
+
+_voltage_enabled: bool = False
+_voltage_nominal: float = 120.0
+_voltage_jitter_pct: float = 0.02  # ±2%
+
+_current_enabled: bool = False
+_power_factor: float = 1.0  # 0 < pf <= 1
+
 
 def _merge_dict(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
     for key, value in updates.items():
@@ -542,6 +625,9 @@ def _shadow_request_sync() -> None:
 
 def _sync_reported_state(reported: dict[str, Any]) -> None:
     global REPORT_INTERVAL_SECONDS, _shadow_target_power_kw, _ven_enabled
+    global _meter_base_min_kw, _meter_base_max_kw, _meter_jitter_pct
+    global _voltage_enabled, _voltage_nominal, _voltage_jitter_pct
+    global _current_enabled, _power_factor
     if not isinstance(reported, dict):
         return
 
@@ -567,9 +653,44 @@ def _sync_reported_state(reported: dict[str, Any]) -> None:
         except Exception:
             pass
 
+    # Metering knobs
+    try:
+        if "meter_base_min_kw" in reported:
+            _meter_base_min_kw = max(0.0, float(reported["meter_base_min_kw"]))
+        if "meter_base_max_kw" in reported:
+            _meter_base_max_kw = max(_meter_base_min_kw, float(reported["meter_base_max_kw"]))
+        if "meter_jitter_pct" in reported:
+            val = float(reported["meter_jitter_pct"])  # e.g., 0.05 = 5%
+            _meter_jitter_pct = max(0.0, min(1.0, val))
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        if "voltage_enabled" in reported:
+            _voltage_enabled = bool(reported["voltage_enabled"])
+        if "voltage_nominal" in reported:
+            _voltage_nominal = max(1.0, float(reported["voltage_nominal"]))
+        if "voltage_jitter_pct" in reported:
+            val = float(reported["voltage_jitter_pct"])  # 0..1
+            _voltage_jitter_pct = max(0.0, min(1.0, val))
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        if "current_enabled" in reported:
+            _current_enabled = bool(reported["current_enabled"])
+        if "power_factor" in reported:
+            val = float(reported["power_factor"])  # 0 < pf <= 1
+            _power_factor = max(0.05, min(1.0, val))
+    except (TypeError, ValueError):
+        pass
+
 
 def _apply_shadow_delta(delta: dict[str, Any]) -> dict[str, Any]:
     global REPORT_INTERVAL_SECONDS, _shadow_target_power_kw, _ven_enabled
+    global _meter_base_min_kw, _meter_base_max_kw, _meter_jitter_pct
+    global _voltage_enabled, _voltage_nominal, _voltage_jitter_pct
+    global _current_enabled, _power_factor
 
     updates: dict[str, Any] = {}
     errors: dict[str, str] = {}
@@ -599,6 +720,59 @@ def _apply_shadow_delta(delta: dict[str, Any]) -> dict[str, Any]:
                 updates[key] = desired_enabled
             except Exception:
                 errors[key] = f"invalid enabled: {value}"
+        elif key == "meter_base_min_kw":
+            try:
+                _meter_base_min_kw = max(0.0, float(value))
+                if _meter_base_max_kw < _meter_base_min_kw:
+                    _meter_base_max_kw = _meter_base_min_kw
+                updates[key] = _meter_base_min_kw
+            except (TypeError, ValueError):
+                errors[key] = f"invalid meter_base_min_kw: {value}"
+        elif key == "meter_base_max_kw":
+            try:
+                _meter_base_max_kw = max(_meter_base_min_kw, float(value))
+                updates[key] = _meter_base_max_kw
+            except (TypeError, ValueError):
+                errors[key] = f"invalid meter_base_max_kw: {value}"
+        elif key == "meter_jitter_pct":
+            try:
+                val = float(value)
+                _meter_jitter_pct = max(0.0, min(1.0, val))
+                updates[key] = _meter_jitter_pct
+            except (TypeError, ValueError):
+                errors[key] = f"invalid meter_jitter_pct: {value}"
+        elif key == "voltage_enabled":
+            try:
+                _voltage_enabled = bool(value)
+                updates[key] = _voltage_enabled
+            except Exception:
+                errors[key] = f"invalid voltage_enabled: {value}"
+        elif key == "voltage_nominal":
+            try:
+                _voltage_nominal = max(1.0, float(value))
+                updates[key] = _voltage_nominal
+            except (TypeError, ValueError):
+                errors[key] = f"invalid voltage_nominal: {value}"
+        elif key == "voltage_jitter_pct":
+            try:
+                val = float(value)
+                _voltage_jitter_pct = max(0.0, min(1.0, val))
+                updates[key] = _voltage_jitter_pct
+            except (TypeError, ValueError):
+                errors[key] = f"invalid voltage_jitter_pct: {value}"
+        elif key == "current_enabled":
+            try:
+                _current_enabled = bool(value)
+                updates[key] = _current_enabled
+            except Exception:
+                errors[key] = f"invalid current_enabled: {value}"
+        elif key == "power_factor":
+            try:
+                val = float(value)
+                _power_factor = max(0.05, min(1.0, val))
+                updates[key] = _power_factor
+            except (TypeError, ValueError):
+                errors[key] = f"invalid power_factor: {value}"
         else:
             updates[key] = value
 
@@ -774,6 +948,14 @@ class HealthHandler(BaseHTTPRequestHandler):
                     "report_interval_seconds": REPORT_INTERVAL_SECONDS,
                     "target_power_kw": _shadow_target_power_kw,
                     "enabled": _ven_enabled,
+                    "meter_base_min_kw": _meter_base_min_kw,
+                    "meter_base_max_kw": _meter_base_max_kw,
+                    "meter_jitter_pct": _meter_jitter_pct,
+                    "voltage_enabled": _voltage_enabled,
+                    "voltage_nominal": _voltage_nominal,
+                    "voltage_jitter_pct": _voltage_jitter_pct,
+                    "current_enabled": _current_enabled,
+                    "power_factor": _power_factor,
                 }
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -821,6 +1003,18 @@ class HealthHandler(BaseHTTPRequestHandler):
                     desired["enabled"] = bool(body["enabled"])
                 except Exception:
                     pass
+            for fld in (
+                "meter_base_min_kw",
+                "meter_base_max_kw",
+                "meter_jitter_pct",
+                "voltage_enabled",
+                "voltage_nominal",
+                "voltage_jitter_pct",
+                "current_enabled",
+                "power_factor",
+            ):
+                if fld in body:
+                    desired[fld] = body[fld]
 
         # Apply locally via the same code-path as IoT shadow deltas
         updates = _apply_shadow_delta(desired)
@@ -849,10 +1043,23 @@ def _next_power_reading() -> float:
         target = _shadow_target_power_kw
 
     if target is None:
-        return round(random.uniform(0.5, 2.0), 2)
+        # Base range when no target provided
+        low, high = _meter_base_min_kw, _meter_base_max_kw
+        if high < low:
+            high = low
+        return round(random.uniform(low, high), 2)
 
-    jitter = random.uniform(-0.05, 0.05)
-    return round(max(0.0, target + jitter), 2)
+    # Jitter as a percentage of target (+/-)
+    jitter = random.uniform(-_meter_jitter_pct, _meter_jitter_pct)
+    return round(max(0.0, target * (1.0 + jitter)), 2)
+
+
+def _next_voltage_reading() -> float:
+    with _shadow_state_lock:
+        nominal = _voltage_nominal
+        jit = _voltage_jitter_pct
+    jitter = random.uniform(-jit, jit)
+    return round(max(1.0, nominal * (1.0 + jitter)), 1)
 
 
 def on_event(_client, _userdata, msg):
@@ -898,10 +1105,25 @@ def main(iterations: int | None = None) -> None:
 
         now = int(time.time())
         status_payload = {"ven": "ready"}
-        metering_payload = {
-            "timestamp": now,
-            "power_kw": _next_power_reading(),
-        }
+        # Build metering payload with optional fields
+        power_kw = _next_power_reading()
+        metering_payload = {"timestamp": now, "power_kw": power_kw}
+        with _shadow_state_lock:
+            include_v = _voltage_enabled
+            include_i = _current_enabled
+            v_nom = _voltage_nominal
+            pf = _power_factor
+
+        if include_v:
+            metering_payload["voltage_v"] = _next_voltage_reading()
+            v_for_current = metering_payload["voltage_v"]
+        else:
+            v_for_current = v_nom
+
+        if include_i and v_for_current > 0 and pf > 0:
+            # P(kW) = V(V) * I(A) * PF / 1000  => I = P*1000/(V*PF)
+            amps = (power_kw * 1000.0) / (v_for_current * pf)
+            metering_payload["current_a"] = round(max(0.0, amps), 2)
 
         client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
         client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
@@ -922,6 +1144,20 @@ def main(iterations: int | None = None) -> None:
 
         if target_power_kw is not None:
             shadow_update["target_power_kw"] = target_power_kw
+
+        # Include current knob configuration in reported state for visibility.
+        with _shadow_state_lock:
+            shadow_update.update({
+                "enabled": _ven_enabled,
+                "meter_base_min_kw": _meter_base_min_kw,
+                "meter_base_max_kw": _meter_base_max_kw,
+                "meter_jitter_pct": _meter_jitter_pct,
+                "voltage_enabled": _voltage_enabled,
+                "voltage_nominal": _voltage_nominal,
+                "voltage_jitter_pct": _voltage_jitter_pct,
+                "current_enabled": _current_enabled,
+                "power_factor": _power_factor,
+            })
 
         _shadow_merge_report(shadow_update)
 
