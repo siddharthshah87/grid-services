@@ -189,6 +189,14 @@ CONFIG_UI_HTML = """
       const j = await r.json().catch(()=>({}));
       document.getElementById('status').textContent = 'Response: ' + JSON.stringify(j, null, 2);
     }
+    function applyPreset(){
+      const name = document.getElementById('preset').value;
+      fetch('/presets/apply', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name}) })
+        .then(()=>{ loadCurrent(); refreshLive(); })
+        .catch(()=>{});
+    }
+    function startVen(){ fetch('/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({enabled:true})}).then(()=>refreshLive()).catch(()=>{}); }
+    function stopVen(){ fetch('/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({enabled:false})}).then(()=>refreshLive()).catch(()=>{}); }
     async function refreshLive(){
       try {
         const r = await fetch('/live');
@@ -245,6 +253,10 @@ CONFIG_UI_HTML = """
         const last = (j.events && j.events.event_id) ? `${j.events.event_id}` : '—';
         document.getElementById('live-event').textContent = last;
         document.getElementById('live-last-publish').textContent = j.status && j.status.last_publish_at ? j.status.last_publish_at : '—';
+        if(document.getElementById('live-batt-soc')){
+          const soc = j.metering && j.metering.battery_soc != null ? (j.metering.battery_soc*100).toFixed(0) : '--';
+          document.getElementById('live-batt-soc').textContent = soc + '%';
+        }
         renderCircuits(j.metering && j.metering.circuits);
       } catch(e){ /* ignore */ }
     }
@@ -271,6 +283,7 @@ CONFIG_UI_HTML = """
               <div><span class="muted">Current</span><br/><strong><span id="live-current">--</span> A</strong></div>
               <div><span class="muted">Target</span><br/><strong><span id="live-target">--</span> kW</strong></div>
               <div><span class="muted">Interval</span><br/><strong><span id="live-interval">--</span> s</strong></div>
+              <div><span class="muted">Battery SOC</span><br/><strong><span id="live-batt-soc">--</span></strong></div>
             </div>
           </div>
           <div style="margin-top:10px; color:#ccc; display:flex; align-items:center; gap:16px;">
@@ -278,6 +291,7 @@ CONFIG_UI_HTML = """
             <div><span id="led-mqtt" class="led bad"></span> MQTT</div>
             <div>Last event: <strong id="live-event">—</strong></div>
             <div>Last publish: <span id="live-last-publish">—</span></div>
+            <div class="actions"><button onclick="startVen()">Start</button><button class="secondary" onclick="stopVen()">Stop</button></div>
           </div>
         </section>
 
@@ -287,6 +301,16 @@ CONFIG_UI_HTML = """
         </section>
         <section class="card">
           <h2>General</h2>
+          <div class="field"><label>Preset</label>
+            <div>
+              <select id="preset">
+                <option value="normal">Normal</option>
+                <option value="dr_aggressive">DR Aggressive</option>
+                <option value="pv_self_use">PV Self-Use</option>
+              </select>
+              <button onclick="applyPreset()">Apply Preset</button>
+            </div>
+          </div>
           <div class="field"><label>Enabled</label><input id="enabled" type="checkbox"/></div>
           <div class="field"><label>Report interval (s)</label><input id="interval" type="number" min="1" step="1" /></div>
           <div class="field"><label>Target power (kW)</label><input id="target" type="number" step="0.01" /></div>
@@ -591,6 +615,11 @@ _circuits: list[dict[str, Any]] = [
     {"id": "misc1",   "name": "House",      "type": "misc",   "enabled": True,  "rated_kw": 1.0, "current_kw": 0.0},
 ]
 
+_circuit_model_enabled: bool = True
+_battery_capacity_kwh: float = 13.5
+_battery_soc: float = 0.5  # 0..1
+
+
 def _circuits_snapshot() -> list[dict[str, Any]]:
     with _shadow_state_lock:
         return [
@@ -625,6 +654,117 @@ def _distribute_power_to_circuits(total_kw: float) -> list[dict[str, Any]]:
             if c not in enabled:
                 c["current_kw"] = 0.0
         return _circuits_snapshot()
+
+
+def _pv_curve_factor(ts_utc: int) -> float:
+    """Simple diurnal PV factor based on UTC time; peaks at 12:00 local-ish.
+    This is a placeholder bell-shaped curve in [0,1]."""
+    # Use hour of day in UTC; approximate local midday by shifting -8h (Pacific)
+    hour = (ts_utc // 3600) % 24
+    local_hour = (hour - 8) % 24
+    # Bell curve centered at 12:00 with width ~6 hours
+    x = (local_hour - 12) / 6.0
+    import math
+    val = math.exp(-x * x)
+    return float(max(0.0, min(1.0, val)))
+
+
+def _compute_panel_step(now_ts: int) -> dict[str, Any]:
+    """Compute per-circuit kW and aggregate net power for this step.
+
+    Returns a dict with keys: power_kw, circuits, battery_soc.
+    """
+    if not _circuit_model_enabled:
+        # Fallback: keep previous behavior
+        total = _next_power_reading()
+        circuits = _distribute_power_to_circuits(total)
+        return {"power_kw": total, "circuits": circuits, "battery_soc": _battery_soc}
+
+    # Gather references
+    with _shadow_state_lock:
+        target = _shadow_target_power_kw
+        batt = next((c for c in _circuits if c["type"] == "battery"), None)
+        pv = next((c for c in _circuits if c["type"] == "pv"), None)
+        ev = next((c for c in _circuits if c["type"] == "ev"), None)
+        hvac = next((c for c in _circuits if c["type"] == "hvac"), None)
+        heater = next((c for c in _circuits if c["type"] == "heater"), None)
+        house = next((c for c in _circuits if c["type"] == "misc"), None)
+
+    # Base: zero out current_kw
+    for c in _circuits:
+        c["current_kw"] = 0.0
+
+    # House load (misc): between base min/max with jitter
+    import random as _r
+    base_low, base_high = _meter_base_min_kw, max(_meter_base_min_kw, _meter_base_max_kw)
+    house_kw = 0.0
+    if house and house.get("enabled", True):
+        house_kw = round(_r.uniform(base_low, base_high), 2)
+        house["current_kw"] = house_kw
+
+    # HVAC: duty between 0.2..0.8 of rated
+    hvac_kw = 0.0
+    if hvac and hvac.get("enabled", True):
+        duty = max(0.0, min(1.0, 0.5 + _r.uniform(-0.3, 0.3)))
+        hvac_kw = round(hvac.get("rated_kw", 0.0) * duty, 2)
+        hvac["current_kw"] = hvac_kw
+
+    # Heater: bursty low duty 0..0.5
+    heater_kw = 0.0
+    if heater and heater.get("enabled", True):
+        duty = max(0.0, min(0.5, _r.uniform(0.0, 0.5)))
+        heater_kw = round(heater.get("rated_kw", 0.0) * duty, 2)
+        heater["current_kw"] = heater_kw
+
+    # EV: simple on/off at rated when enabled
+    ev_kw = 0.0
+    if ev and ev.get("enabled", False):
+        ev_kw = round(ev.get("rated_kw", 0.0), 2)
+        ev["current_kw"] = ev_kw
+
+    # PV generation: rated * curve factor
+    pv_gen = 0.0
+    if pv and pv.get("enabled", False):
+        pv_gen = round(pv.get("rated_kw", 0.0) * _pv_curve_factor(now_ts), 2)
+        pv["current_kw"] = -pv_gen  # represent as negative load (generation)
+
+    # Pre-battery net load
+    load_kw = house_kw + hvac_kw + heater_kw + ev_kw
+    net_kw_before_batt = max(0.0, load_kw - pv_gen)
+
+    # Battery action: attempt to move net toward target
+    batt_flow = 0.0  # positive=discharge (reduce grid draw), negative=charge
+    if batt and batt.get("enabled", False):
+        batt_max = float(batt.get("rated_kw", 0.0))
+        if target is not None:
+            # If above target, discharge; if below target, (optionally) charge
+            diff = net_kw_before_batt - float(target)
+            if diff > 0.05:  # above target: discharge up to diff
+                batt_flow = min(batt_max, diff)
+            elif diff < -0.5:  # well below target: charge up to -diff/2
+                batt_flow = -min(batt_max, (-diff) * 0.5)
+        else:
+            # Idle or mild smoothing (optional): do nothing
+            batt_flow = 0.0
+
+        # Update SOC (simple integrator)
+        global _battery_soc
+        step_h = max(1.0, REPORT_INTERVAL_SECONDS) / 3600.0
+        energy_delta_kwh = batt_flow * step_h
+        _battery_soc = max(0.0, min(1.0, _battery_soc + (energy_delta_kwh / max(0.1, _battery_capacity_kwh))))
+
+        # Clamp by available energy
+        if batt_flow > 0 and _battery_soc <= 0.01:
+            batt_flow = 0.0
+        if batt_flow < 0 and _battery_soc >= 0.99:
+            batt_flow = 0.0
+
+        batt["current_kw"] = -batt_flow  # negative means discharging reduces grid draw
+
+    # Final net grid power (kW)
+    power_kw = round(max(0.0, net_kw_before_batt - max(0.0, batt_flow)), 2)
+
+    return {"power_kw": power_kw, "circuits": _circuits_snapshot(), "battery_soc": _battery_soc}
 
 
 def _merge_dict(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
@@ -1083,6 +1223,74 @@ def _apply_config_payload(obj: dict[str, Any]) -> dict[str, Any]:
     return updates or {}
 
 
+def _apply_preset(name: str) -> dict[str, Any]:
+    """Apply a named preset: adjust config and circuit toggles.
+
+    Returns a summary of changes.
+    """
+    name = (name or "").lower()
+    changes: dict[str, Any] = {}
+    # Default: normal
+    if name in ("", "normal"):
+        desired = {
+            "enabled": True,
+            "report_interval_seconds": max(5, REPORT_INTERVAL_SECONDS),
+            "meter_jitter_pct": _meter_jitter_pct,
+        }
+        changes["config"] = _apply_config_payload(desired)
+        # circuits
+        with _shadow_state_lock:
+            for c in _circuits:
+                if c["type"] in ("hvac", "heater", "misc", "pv"):
+                    c["enabled"] = True
+                else:
+                    c["enabled"] = False
+        changes["circuits"] = _circuits_snapshot()
+        return changes
+
+    if name in ("dr", "dr_aggressive"):
+        desired = {
+            "enabled": True,
+            "report_interval_seconds": 10,
+            "target_power_kw": 1.0,
+            "meter_jitter_pct": 0.02,
+        }
+        changes["config"] = _apply_config_payload(desired)
+        with _shadow_state_lock:
+            for c in _circuits:
+                if c["type"] in ("ev", "heater"):
+                    c["enabled"] = False
+                elif c["type"] in ("hvac", "misc"):
+                    c["enabled"] = True
+                elif c["type"] == "battery":
+                    c["enabled"] = True
+                elif c["type"] == "pv":
+                    c["enabled"] = True
+        changes["circuits"] = _circuits_snapshot()
+        return changes
+
+    if name in ("pv", "pv_self_use"):
+        desired = {
+            "enabled": True,
+            "report_interval_seconds": 30,
+            "meter_jitter_pct": 0.03,
+        }
+        changes["config"] = _apply_config_payload(desired)
+        with _shadow_state_lock:
+            for c in _circuits:
+                if c["type"] == "pv":
+                    c["enabled"] = True
+                elif c["type"] == "battery":
+                    c["enabled"] = True
+                else:
+                    c["enabled"] = True if c["type"] in ("misc", "hvac") else False
+        changes["circuits"] = _circuits_snapshot()
+        return changes
+
+    # Unknown preset: no-op
+    return {"error": f"unknown preset: {name}"}
+
+
 def on_backend_cmd(_client, _userdata, msg):
     """Handle control-plane commands published by the backend over IoT Core.
 
@@ -1316,6 +1524,18 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(data).encode())
             return
 
+        if path == "/presets":
+            presets = [
+                {"name": "normal", "title": "Normal", "desc": "Balanced defaults"},
+                {"name": "dr_aggressive", "title": "DR Aggressive", "desc": "Minimize grid draw"},
+                {"name": "pv_self_use", "title": "PV Self-Use", "desc": "Prefer charging battery"},
+            ]
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"presets": presets}).encode())
+            return
+
         # /circuits/{id}
         if path.startswith("/circuits/"):
             cid = path.split("/", 2)[2]
@@ -1395,7 +1615,7 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(resp).encode())
             return
 
-        # /circuits/{id} update (currently supports enabled boolean)
+        # /circuits/{id} update (supports enabled, rated_kw)
         if path.startswith("/circuits/"):
             cid = path.split("/", 2)[2]
             length = int(self.headers.get("Content-Length", 0) or 0)
@@ -1439,6 +1659,22 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"circuit": updated}).encode())
+            return
+
+        if path == "/presets/apply":
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                body = json.loads(raw.decode() or "{}")
+                name = str(body.get("name") or "").lower()
+            except Exception:
+                name = ""
+
+            applied = _apply_preset(name)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"applied": applied, "preset": name}).encode())
             return
 
         self.send_response(404)
@@ -1581,7 +1817,9 @@ def main(iterations: int | None = None) -> None:
         now = int(time.time())
         status_payload = {"ven": "ready"}
         # Build metering payload with optional fields
-        power_kw = _next_power_reading()
+        # Compute panel step via circuit model
+        step = _compute_panel_step(now)
+        power_kw = step["power_kw"]
         metering_payload = {"timestamp": now, "power_kw": power_kw}
         with _shadow_state_lock:
             include_v = _voltage_enabled
@@ -1600,8 +1838,9 @@ def main(iterations: int | None = None) -> None:
             amps = (power_kw * 1000.0) / (v_for_current * pf)
             metering_payload["current_a"] = round(max(0.0, amps), 2)
 
-        # Compute simple per-circuit breakdown for UI/telemetry
-        metering_payload["circuits"] = _distribute_power_to_circuits(power_kw)
+        # Attach per-circuit snapshot and battery SOC
+        metering_payload["circuits"] = step.get("circuits")
+        metering_payload["battery_soc"] = step.get("battery_soc")
 
     client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
         client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
