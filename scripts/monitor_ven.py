@@ -6,7 +6,7 @@ import sys
 import paho.mqtt.client as mqtt
 
 
-DEFAULT_IOT_ENDPOINT = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
+DEFAULT_IOT_ENDPOINT = "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com"
 
 
 def main() -> None:

@@ -10,6 +10,9 @@ variable "mqtt_topic_responses" {}
 variable "mqtt_topic_metering" {}
 variable "mqtt_topic_status" {}
 variable "iot_endpoint" {}
+variable "iot_connect_host" { default = null }
+variable "iot_tls_server_name" { default = null }
+variable "iot_thing_name" { default = null }
 variable "container_port" { default = 22916 }
 variable "target_group_arn" { default = null }
 variable "assign_public_ip" { default = true }
@@ -46,13 +49,24 @@ resource "aws_ecs_task_definition" "this" {
           protocol      = "tcp"
         }
       ]
-      environment = [
-        { name = "MQTT_TOPIC_EVENTS", value = var.mqtt_topic_events },
-        { name = "MQTT_TOPIC_RESPONSES", value = var.mqtt_topic_responses },
-        { name = "MQTT_TOPIC_METERING", value = var.mqtt_topic_metering },
-        { name = "MQTT_TOPIC_STATUS", value = var.mqtt_topic_status },
-        { name = "IOT_ENDPOINT", value = var.iot_endpoint }
-      ]
+      environment = concat(
+        [
+          { name = "MQTT_TOPIC_EVENTS", value = var.mqtt_topic_events },
+          { name = "MQTT_TOPIC_RESPONSES", value = var.mqtt_topic_responses },
+          { name = "MQTT_TOPIC_METERING", value = var.mqtt_topic_metering },
+          { name = "MQTT_TOPIC_STATUS", value = var.mqtt_topic_status },
+          { name = "IOT_ENDPOINT", value = var.iot_endpoint }
+        ],
+        var.iot_connect_host == null ? [] : [
+          { name = "IOT_CONNECT_HOST", value = var.iot_connect_host }
+        ],
+        var.iot_tls_server_name == null ? [] : [
+          { name = "IOT_TLS_SERVER_NAME", value = var.iot_tls_server_name }
+        ],
+        var.iot_thing_name == null ? [] : [
+          { name = "IOT_THING_NAME", value = var.iot_thing_name }
+        ]
+      )
       secrets = [
         {
           name      = "CA_CERT_PEM"

@@ -9,6 +9,7 @@
 from __future__ import annotations
 import json
 import os
+import ssl
 import sys
 import tempfile
 import threading
@@ -79,20 +80,75 @@ def handle_event_request(ven_id: str, payload: dict):
     mqttc.publish(MQTT_TOPIC_EVENTS, json.dumps(message))
     return [{"targets": {"ven_id": ven_id}, **payload}]
 
+
+def _dnsname_matches(pattern: str, hostname: str) -> bool:
+    pattern = pattern.lower()
+    hostname = hostname.lower()
+
+    if pattern.startswith("*."):
+        suffix = pattern[1:]
+        if not suffix or not hostname.endswith(suffix):
+            return False
+        prefix = hostname[: -len(suffix)]
+        return bool(prefix) and "." not in prefix
+
+    return pattern == hostname
+
+
+def _ensure_expected_server_hostname(mqtt_client: mqtt.Client, expected: str) -> None:
+    hostname = expected.strip()
+    if not hostname:
+        raise ssl.SSLError("Expected TLS server hostname not provided")
+
+    sock = mqtt_client.socket()
+    if sock is None:
+        raise ssl.SSLError("TLS socket not available for hostname verification")
+
+    cert = sock.getpeercert()
+    if not cert:
+        raise ssl.SSLError("TLS peer certificate missing")
+
+    dns_names = [value for key, value in cert.get("subjectAltName", ()) if key == "DNS"]
+    if not dns_names:
+        for subject in cert.get("subject", ()):  # fall back to CN when SAN absent
+            for key, value in subject:
+                if key.lower() == "commonname":
+                    dns_names.append(value)
+
+    if not dns_names:
+        raise ssl.CertificateError("TLS certificate does not present any DNS names")
+
+    for pattern in dns_names:
+        if _dnsname_matches(pattern, hostname):
+            return
+
+    raise ssl.CertificateError(
+        f"Hostname '{hostname}' does not match certificate names: {dns_names}"
+    )
+
 # ── ENV ------------------------------------------------------------------
 MQTT_TOPIC_METERING  = os.getenv("MQTT_TOPIC_METERING", "volttron/metering")
 MQTT_TOPIC_EVENTS    = os.getenv("MQTT_TOPIC_EVENTS",   "openadr/event")
 MQTT_TOPIC_RESPONSES = os.getenv("MQTT_TOPIC_RESPONSES","openadr/response")
-DEFAULT_IOT_ENDPOINT = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
+DEFAULT_IOT_ENDPOINT = "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com"
 IOT_ENDPOINT         = os.getenv("IOT_ENDPOINT",        DEFAULT_IOT_ENDPOINT)
+MQTT_CONNECT_HOST    = (
+    os.getenv("IOT_CONNECT_HOST")
+    or os.getenv("MQTT_CONNECT_HOST")
+    or IOT_ENDPOINT
+)
+TLS_SERVER_HOSTNAME  = (
+    os.getenv("IOT_TLS_SERVER_NAME")
+    or os.getenv("MQTT_TLS_SERVER_NAME")
+    or IOT_ENDPOINT
+)
 VENS_PORT            = int(os.getenv("VENS_PORT", 8081))
 
-MQTT_PORT = int(
-    os.getenv(
-        "MQTT_PORT",
-        "8883" if IOT_ENDPOINT != "localhost" else "1883",
-    )
-)
+default_mqtt_port = "8883"
+if IOT_ENDPOINT == "localhost" or MQTT_CONNECT_HOST == "localhost":
+    default_mqtt_port = "1883"
+
+MQTT_PORT = int(os.getenv("MQTT_PORT", default_mqtt_port))
 
 bundle_json = os.getenv("CERT_BUNDLE_JSON")
 CA_CERT_PEM = CLIENT_CERT_PEM = PRIVATE_KEY_PEM = None
@@ -109,6 +165,27 @@ else:
     print("⚠️ CERT_BUNDLE_JSON not provided; using insecure MQTT connection", file=sys.stderr)
 
 mqttc = mqtt.Client(protocol=mqtt.MQTTv5)
+manual_hostname_override = False
+
+def _build_tls_context(ca_path: str, cert_path: str, key_path: str, expected_sni: str | None, connect_host: str) -> ssl.SSLContext:
+    ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_path)
+    ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
+    try:
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    manual = bool(expected_sni) and expected_sni != connect_host
+    if manual and hasattr(ctx, "wrap_socket"):
+        orig = ctx.wrap_socket
+
+        def _wrap_socket_with_sni(sock, *args, **kwargs):  # type: ignore[override]
+            kwargs["server_hostname"] = expected_sni
+            return orig(sock, *args, **kwargs)
+
+        ctx.wrap_socket = _wrap_socket_with_sni  # type: ignore[assignment]
+    ctx.check_hostname = True
+    ctx.verify_mode = ssl.CERT_REQUIRED
+    return ctx
 
 if CA_CERT_PEM and CLIENT_CERT_PEM and PRIVATE_KEY_PEM:
     # ── materialise PEM strings to disk ---------------------------------
@@ -140,7 +217,21 @@ if CA_CERT_PEM and CLIENT_CERT_PEM and PRIVATE_KEY_PEM:
             print(f"🧹 Deleted temp cert: {p}")
         tmp_dir.cleanup()
 
-    mqttc.tls_set(ca_certs=ca_path, certfile=cert_path, keyfile=key_path)
+    manual_hostname_override = TLS_SERVER_HOSTNAME != MQTT_CONNECT_HOST
+    if manual_hostname_override:
+        print(
+            "🔐 TLS SNI override enabled: "
+            f"connecting to {MQTT_CONNECT_HOST} but sending SNI/cert validation for {TLS_SERVER_HOSTNAME}"
+        )
+    elif ".vpce." in MQTT_CONNECT_HOST:
+        print(
+            "⚠️ Connecting to an AWS IoT VPC endpoint without a TLS SNI override. "
+            "Set IOT_TLS_SERVER_NAME to your IoT data endpoint to enable certificate checks.",
+            file=sys.stderr,
+        )
+
+    _ctx = _build_tls_context(ca_path, cert_path, key_path, TLS_SERVER_HOSTNAME, MQTT_CONNECT_HOST)
+    mqttc.tls_set_context(_ctx)
 
 # ── MQTT client ----------------------------------------------------------
 mqtt_connected = False
@@ -153,9 +244,16 @@ mqttc.on_connect = _on_connect
 
 for attempt in range(1, 6):
     try:
-        mqttc.connect(IOT_ENDPOINT, MQTT_PORT, keepalive=60)
+        mqttc.connect(MQTT_CONNECT_HOST, MQTT_PORT, keepalive=60)
+        if manual_hostname_override:
+            _ensure_expected_server_hostname(mqttc, TLS_SERVER_HOSTNAME)
         break
     except Exception as e:
+        if mqttc.is_connected():
+            try:
+                mqttc.disconnect()
+            except Exception:
+                pass
         print(f"MQTT connect failed (try {attempt}/5): {e}", file=sys.stderr)
         time.sleep(min(2 ** attempt, 30))
 mqttc.loop_start()
@@ -209,4 +307,3 @@ if __name__ == "__main__":
     print(" Starting VTN ‣ http://0.0.0.0:8080/OpenADR2/Simple/2.0b")
     print("********************************************************************************")
     asyncio.run(vtn.run())   # <-- key change: bind to 0.0.0.0
-

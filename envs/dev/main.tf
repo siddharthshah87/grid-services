@@ -81,7 +81,9 @@ module "ecs_service_grid_event_gateway" {
   mqtt_topic_events    = "oadr/event/ven1"
   mqtt_topic_responses = "oadr/response/ven1"
   mqtt_topic_metering  = "oadr/meter/ven1"
-  iot_endpoint         = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
+  iot_endpoint         = module.iot_core.endpoint
+  iot_connect_host     = module.vpc.iot_data_endpoint_dns
+  iot_tls_server_name  = module.iot_core.endpoint
   container_port       = 8080
   vens_port            = 8081
   target_group_arn     = module.grid_event_gateway_alb.target_group_arn
@@ -115,7 +117,10 @@ module "ecs_service_volttron" {
   mqtt_topic_responses   = "oadr/response/ven1"
   mqtt_topic_metering    = "oadr/meter/ven1"
   mqtt_topic_status      = "ven/status/ven1"
-  iot_endpoint           = "vpce-0d3cb8ea5764b8097-r1j8w787.data.iot.us-west-2.vpce.amazonaws.com"
+  iot_endpoint           = module.iot_core.endpoint
+  iot_connect_host       = module.vpc.iot_data_endpoint_dns
+  iot_tls_server_name    = module.iot_core.endpoint
+  iot_thing_name         = module.iot_core.thing_name
   ca_cert_secret_arn     = "${aws_secretsmanager_secret.volttron_tls.arn}:ca_cert::"
   client_cert_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:client_cert::"
   private_key_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:private_key::"
@@ -166,6 +171,8 @@ module "volttron_alb" {
   listener_port     = 80
   target_port       = 8000
   health_check_path = "/health"
+  enable_https      = true
+  acm_cert_arn      = aws_acm_certificate_validation.ven.certificate_arn
 }
 
 # Ingress rules allowing traffic from the ALBs to the ECS tasks
@@ -335,4 +342,3 @@ module "ecs_service_frontend" {
   backend_api_url = "http://${module.backend_alb.dns_name}"
   aws_region      = var.aws_region
 }
-

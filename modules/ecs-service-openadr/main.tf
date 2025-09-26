@@ -10,6 +10,8 @@ variable "mqtt_topic_events" {}
 variable "mqtt_topic_responses" {}
 variable "mqtt_topic_metering" {}
 variable "iot_endpoint" {}
+variable "iot_connect_host" { default = null }
+variable "iot_tls_server_name" { default = null }
 variable "target_group_arn" {}
 variable "assign_public_ip" { default = true }
 variable "cpu" { default = "256" }
@@ -44,13 +46,21 @@ resource "aws_ecs_task_definition" "this" {
           protocol      = "tcp"
         }
       ]
-      environment = [
-        { name = "MQTT_TOPIC_EVENTS", value = var.mqtt_topic_events },
-        { name = "MQTT_TOPIC_RESPONSES", value = var.mqtt_topic_responses },
-        { name = "MQTT_TOPIC_METERING", value = var.mqtt_topic_metering },
-        { name = "IOT_ENDPOINT", value = var.iot_endpoint },
-        { name = "VENS_PORT", value = tostring(var.vens_port) }
-      ]
+      environment = concat(
+        [
+          { name = "MQTT_TOPIC_EVENTS", value = var.mqtt_topic_events },
+          { name = "MQTT_TOPIC_RESPONSES", value = var.mqtt_topic_responses },
+          { name = "MQTT_TOPIC_METERING", value = var.mqtt_topic_metering },
+          { name = "IOT_ENDPOINT", value = var.iot_endpoint },
+          { name = "VENS_PORT", value = tostring(var.vens_port) }
+        ],
+        var.iot_connect_host == null ? [] : [
+          { name = "IOT_CONNECT_HOST", value = var.iot_connect_host }
+        ],
+        var.iot_tls_server_name == null ? [] : [
+          { name = "IOT_TLS_SERVER_NAME", value = var.iot_tls_server_name }
+        ]
+      )
       secrets = var.environment_secrets
       logConfiguration = {
         logDriver = "awslogs"
