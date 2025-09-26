@@ -11,6 +11,7 @@ import threading
 from copy import deepcopy
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlparse
 from typing import Any
 import paho.mqtt.client as mqtt
 import boto3
@@ -921,28 +922,30 @@ def health_snapshot() -> tuple[int, dict]:
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/openapi.json":
+        path = urlparse(self.path).path
+
+        if path == "/openapi.json":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(OPENAPI_SPEC).encode())
             return
 
-        if self.path == "/docs":
+        if path == "/docs":
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
             self.wfile.write(SWAGGER_HTML.encode())
             return
 
-        if self.path == "/ui":
+        if path in ("/", "/ui"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
             self.wfile.write(CONFIG_UI_HTML.encode())
             return
 
-        if self.path == "/config":
+        if path == "/config":
             with _shadow_state_lock:
                 current = {
                     "report_interval_seconds": REPORT_INTERVAL_SECONDS,
