@@ -60,6 +60,31 @@ OPENAPI_SPEC = {
                 },
                 "responses": {"200": {"description": "Applied and published"}}
             }
+        },
+        "/live": {
+            "get": {
+                "summary": "Live panel snapshot (status+config+metering)",
+                "responses": {"200": {"description": "Live snapshot"}}
+            }
+        },
+        "/circuits": {
+            "get": {
+                "summary": "List circuits",
+                "responses": {"200": {"description": "Circuits list"}}
+            }
+        },
+        "/circuits/{id}": {
+            "get": {
+                "summary": "Get a circuit by id",
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "Circuit detail"}, "404": {"description": "Not found"}}
+            },
+            "post": {
+                "summary": "Update a circuit (enabled, rated_kw)",
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "requestBody": {"required": False, "content": {"application/json": {"schema": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "rated_kw": {"type": "number", "minimum": 0}}}}}},
+                "responses": {"200": {"description": "Updated"}, "404": {"description": "Not found"}}
+            }
         }
     },
 }
@@ -183,6 +208,46 @@ CONFIG_UI_HTML = """
         document.getElementById('live-last-publish').textContent = j.status && j.status.last_publish_at ? j.status.last_publish_at : '—';
       } catch(e){ /* ignore */ }
     }
+    function toggleCircuit(id, enabled){
+      fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({enabled}) })
+        .then(()=>refreshLive()).catch(()=>{});
+    }
+    function renderCircuits(list){
+      const box = document.getElementById('circuits');
+      if(!box) return;
+      box.innerHTML = '';
+      (list||[]).forEach(c => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML = `
+          <h2>${c.name} <span class="muted" style="font-weight:400">(${c.type||''})</span></h2>
+          <div class="field"><label>Status</label><input type="checkbox" ${c.enabled? 'checked':''} onchange="toggleCircuit('${c.id}', this.checked)"></div>
+          <div class="field"><label>Rated</label><div>${(c.rated_kw??0).toFixed ? c.rated_kw.toFixed(2) : c.rated_kw} kW</div></div>
+          <div class="field"><label>Now</label><div><strong>${(c.current_kw??0).toFixed ? c.current_kw.toFixed(2) : c.current_kw}</strong> kW</div></div>
+        `;
+        box.appendChild(el);
+      });
+    }
+    async function refreshLive(){
+      try {
+        const r = await fetch('/live');
+        if(!r.ok) return;
+        const j = await r.json();
+        const enabled = !!(j.config && j.config.enabled);
+        const connected = !!(j.status && j.status.ok);
+        document.getElementById('led-enabled').className = 'led ' + (enabled? 'ok':'bad');
+        document.getElementById('led-mqtt').className = 'led ' + (connected? 'ok':'bad');
+        document.getElementById('live-power').textContent = j.metering && j.metering.power_kw != null ? j.metering.power_kw.toFixed(2) : '--';
+        document.getElementById('live-voltage').textContent = j.metering && j.metering.voltage_v != null ? j.metering.voltage_v.toFixed(1) : '--';
+        document.getElementById('live-current').textContent = j.metering && j.metering.current_a != null ? j.metering.current_a.toFixed(2) : '--';
+        document.getElementById('live-target').textContent = (j.config && j.config.target_power_kw != null) ? j.config.target_power_kw : '--';
+        document.getElementById('live-interval').textContent = (j.config && j.config.report_interval_seconds) ? j.config.report_interval_seconds : '--';
+        const last = (j.events && j.events.event_id) ? `${j.events.event_id}` : '—';
+        document.getElementById('live-event').textContent = last;
+        document.getElementById('live-last-publish').textContent = j.status && j.status.last_publish_at ? j.status.last_publish_at : '—';
+        renderCircuits(j.metering && j.metering.circuits);
+      } catch(e){ /* ignore */ }
+    }
     window.addEventListener('DOMContentLoaded', ()=>{ loadCurrent(); refreshLive(); setInterval(refreshLive, 2000); });
   </script>
   </head>
@@ -214,6 +279,11 @@ CONFIG_UI_HTML = """
             <div>Last event: <strong id="live-event">—</strong></div>
             <div>Last publish: <span id="live-last-publish">—</span></div>
           </div>
+        </section>
+
+        <section class="card">
+          <h2>Circuits</h2>
+          <div id="circuits" class="grid"></div>
         </section>
         <section class="card">
           <h2>General</h2>
@@ -507,6 +577,54 @@ _power_factor: float = 1.0  # 0 < pf <= 1
 
 # latest metering snapshot for UI/live endpoint
 _last_metering_sample: dict[str, Any] | None = None
+
+# ── Simple circuit model (placeholder) --------------------------------------
+# Default circuits with types. These are displayed on the UI and can be
+# toggled on/off. For now, metered total power is split among enabled circuits
+# in proportion to their rated_kw to provide a plausible per-circuit breakdown.
+_circuits: list[dict[str, Any]] = [
+    {"id": "hvac1",   "name": "HVAC",       "type": "hvac",   "enabled": True,  "rated_kw": 3.5, "current_kw": 0.0},
+    {"id": "heater1", "name": "Heater",     "type": "heater", "enabled": True,  "rated_kw": 1.5, "current_kw": 0.0},
+    {"id": "ev1",     "name": "EV Charger", "type": "ev",     "enabled": False, "rated_kw": 7.2, "current_kw": 0.0},
+    {"id": "batt1",   "name": "Battery",    "type": "battery","enabled": False, "rated_kw": 5.0, "current_kw": 0.0},
+    {"id": "pv1",     "name": "Solar PV",   "type": "pv",     "enabled": False, "rated_kw": 6.0, "current_kw": 0.0},
+    {"id": "misc1",   "name": "House",      "type": "misc",   "enabled": True,  "rated_kw": 1.0, "current_kw": 0.0},
+]
+
+def _circuits_snapshot() -> list[dict[str, Any]]:
+    with _shadow_state_lock:
+        return [
+            {
+                "id": c["id"],
+                "name": c["name"],
+                "type": c.get("type"),
+                "enabled": bool(c.get("enabled", True)),
+                "rated_kw": float(c.get("rated_kw", 0.0)),
+                "current_kw": float(c.get("current_kw", 0.0)),
+            }
+            for c in _circuits
+        ]
+
+def _distribute_power_to_circuits(total_kw: float) -> list[dict[str, Any]]:
+    """Proportionally split total_kw across enabled circuits by rated_kw.
+
+    Updates _circuits current_kw and returns a snapshot for reporting.
+    """
+    with _shadow_state_lock:
+        enabled = [c for c in _circuits if c.get("enabled", True) and c.get("rated_kw", 0.0) > 0]
+        if not enabled or total_kw <= 0:
+            for c in _circuits:
+                c["current_kw"] = 0.0
+            return _circuits_snapshot()
+
+        weight_sum = sum(float(c.get("rated_kw", 0.0)) for c in enabled)
+        for c in enabled:
+            share = float(c.get("rated_kw", 0.0)) / weight_sum if weight_sum > 0 else 0.0
+            c["current_kw"] = round(max(0.0, total_kw * share), 2)
+        for c in _circuits:
+            if c not in enabled:
+                c["current_kw"] = 0.0
+        return _circuits_snapshot()
 
 
 def _merge_dict(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
@@ -1190,6 +1308,30 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(live).encode())
             return
 
+        if path == "/circuits":
+            data = _circuits_snapshot()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
+            return
+
+        # /circuits/{id}
+        if path.startswith("/circuits/"):
+            cid = path.split("/", 2)[2]
+            snap = _circuits_snapshot()
+            for c in snap:
+                if c["id"] == cid:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(c).encode())
+                    return
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b"Circuit not found")
+            return
+
         status, payload = health_snapshot()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -1202,10 +1344,106 @@ class HealthHandler(BaseHTTPRequestHandler):
             path = path.replace("//", "/")
         if path != "/" and path.endswith("/"):
             path = path.rstrip("/")
-        if path != "/config":
-            self.send_response(404)
+        if path == "/config":
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                body = json.loads(raw.decode() or "{}")
+            except json.JSONDecodeError:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"Invalid JSON")
+                return
+
+            # Accept only known keys
+            desired: dict[str, Any] = {}
+            if isinstance(body, dict):
+                if "report_interval_seconds" in body:
+                    try:
+                        desired["report_interval_seconds"] = max(1, int(body["report_interval_seconds"]))
+                    except (TypeError, ValueError):
+                        pass
+                if "target_power_kw" in body:
+                    try:
+                        desired["target_power_kw"] = float(body["target_power_kw"])
+                    except (TypeError, ValueError):
+                        pass
+                if "enabled" in body:
+                    try:
+                        desired["enabled"] = bool(body["enabled"])
+                    except Exception:
+                        pass
+                for fld in (
+                    "meter_base_min_kw", "meter_base_max_kw", "meter_jitter_pct",
+                    "voltage_enabled", "voltage_nominal", "voltage_jitter_pct",
+                    "current_enabled", "power_factor",
+                ):
+                    if fld in body:
+                        desired[fld] = body[fld]
+
+            updates = _apply_shadow_delta(desired)
+            if updates:
+                _shadow_merge_report(updates)
+            _shadow_publish_desired(desired)
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
             self.end_headers()
+            with _shadow_state_lock:
+                now_enabled = _ven_enabled
+            resp = {"applied": desired, "current_interval": REPORT_INTERVAL_SECONDS, "enabled": now_enabled}
+            self.wfile.write(json.dumps(resp).encode())
             return
+
+        # /circuits/{id} update (currently supports enabled boolean)
+        if path.startswith("/circuits/"):
+            cid = path.split("/", 2)[2]
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                body = json.loads(raw.decode() or "{}")
+            except json.JSONDecodeError:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"Invalid JSON")
+                return
+            updated = None
+            with _shadow_state_lock:
+                for c in _circuits:
+                    if c["id"] == cid:
+                        if isinstance(body, dict) and "enabled" in body:
+                            try:
+                                c["enabled"] = bool(body["enabled"])
+                            except Exception:
+                                pass
+                        if isinstance(body, dict) and "rated_kw" in body:
+                            try:
+                                c["rated_kw"] = max(0.0, float(body["rated_kw"]))
+                            except Exception:
+                                pass
+                        updated = {
+                            "id": c["id"],
+                            "name": c["name"],
+                            "type": c.get("type"),
+                            "enabled": bool(c.get("enabled", True)),
+                            "rated_kw": float(c.get("rated_kw", 0.0)),
+                            "current_kw": float(c.get("current_kw", 0.0)),
+                        }
+                        break
+            if updated is None:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Circuit not found")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"circuit": updated}).encode())
+            return
+
+        self.send_response(404)
+        self.end_headers()
+        self.wfile.write(b"Not found")
 
         length = int(self.headers.get("Content-Length", 0) or 0)
         raw = self.rfile.read(length) if length else b"{}"
@@ -1361,6 +1599,9 @@ def main(iterations: int | None = None) -> None:
             # P(kW) = V(V) * I(A) * PF / 1000  => I = P*1000/(V*PF)
             amps = (power_kw * 1000.0) / (v_for_current * pf)
             metering_payload["current_a"] = round(max(0.0, amps), 2)
+
+        # Compute simple per-circuit breakdown for UI/telemetry
+        metering_payload["circuits"] = _distribute_power_to_circuits(power_kw)
 
     client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
         client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
