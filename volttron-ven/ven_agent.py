@@ -36,7 +36,7 @@ OPENAPI_SPEC = {
             "post": {
                 "summary": "Update VEN behaviour (interval/target)",
                 "requestBody": {
-                    "required": false,
+                    "required": False,
                     "content": {
                         "application/json": {
                             "schema": {
@@ -923,6 +923,9 @@ def health_snapshot() -> tuple[int, dict]:
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
+        # Normalize duplicate slashes and trailing slashes (except root)
+        while "//" in path:
+            path = path.replace("//", "/")
         if path != "/" and path.endswith("/"):
             path = path.rstrip("/")
 
@@ -979,6 +982,8 @@ class HealthHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        while "//" in path:
+            path = path.replace("//", "/")
         if path != "/" and path.endswith("/"):
             path = path.rstrip("/")
         if path != "/config":
