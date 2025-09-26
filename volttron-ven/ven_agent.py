@@ -890,6 +890,12 @@ def main(iterations: int | None = None) -> None:
 
     count = 0
     while True:
+        # If VEN is disabled, do not publish or interact with MQTT.
+        # Sleep briefly to keep CPU low, and allow /config UI to re-enable.
+        if not _ven_enabled:
+            time.sleep(1)
+            continue
+
         now = int(time.time())
         status_payload = {"ven": "ready"}
         metering_payload = {
