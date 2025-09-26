@@ -1,5 +1,6 @@
+const viteEnv = (import.meta as any)?.env || {};
 export const API_BASE: string =
-  (import.meta as any)?.env?.VITE_API_BASE_URL || "http://localhost:8000";
+  viteEnv.VITE_BACKEND_API_URL || viteEnv.VITE_API_BASE_URL || "http://localhost:8000";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -44,4 +45,3 @@ export async function apiDelete<T>(path: string): Promise<T> {
   if (res.status === 204) return undefined as unknown as T;
   return handleResponse<T>(res);
 }
-
