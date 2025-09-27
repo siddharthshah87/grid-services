@@ -2,7 +2,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { 
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { apiGet } from '@/lib/api';
+import { useState } from 'react';
+import type { Ven } from '@/hooks/useApi';
+import {
   MapPin, 
   Zap, 
   CheckCircle, 
@@ -10,78 +14,24 @@ import {
   Settings,
   Activity
 } from 'lucide-react';
-
-interface VenData {
-  id: string;
-  name: string;
-  location: string;
-  status: 'online' | 'offline' | 'maintenance';
-  controllablePower: number; // kW
-  currentPower: number; // kW
-  address: string;
-  lastSeen: string;
-  responseTime: number; // ms
-}
+import { useVenSummary } from '@/hooks/useApi';
 
 export const VenList = () => {
-  // Mock VEN data - in real app this would come from API
-  const vens: VenData[] = [
-    {
-      id: 'VEN-001',
-      name: 'Residential Block A',
-      location: 'Downtown District',
-      status: 'online',
-      controllablePower: 85.4,
-      currentPower: 67.2,
-      address: '123 Main St, Grid Sector 1',
-      lastSeen: '2 mins ago',
-      responseTime: 145
-    },
-    {
-      id: 'VEN-002', 
-      name: 'Commercial Plaza',
-      location: 'Business District',
-      status: 'online',
-      controllablePower: 120.8,
-      currentPower: 98.5,
-      address: '456 Commerce Ave, Grid Sector 2',
-      lastSeen: '1 min ago',
-      responseTime: 89
-    },
-    {
-      id: 'VEN-003',
-      name: 'Industrial Complex',
-      location: 'Manufacturing Zone',
-      status: 'maintenance',
-      controllablePower: 245.0,
-      currentPower: 0,
-      address: '789 Industrial Blvd, Grid Sector 3',
-      lastSeen: '15 mins ago',
-      responseTime: 0
-    },
-    {
-      id: 'VEN-004',
-      name: 'Residential Block B',
-      location: 'Suburban Area',
-      status: 'online',
-      controllablePower: 62.3,
-      currentPower: 45.1,
-      address: '321 Oak Street, Grid Sector 4',
-      lastSeen: '30 secs ago',
-      responseTime: 234
-    },
-    {
-      id: 'VEN-005',
-      name: 'Shopping Center',
-      location: 'Retail District',
-      status: 'offline',
-      controllablePower: 95.7,
-      currentPower: 0,
-      address: '654 Shopping Blvd, Grid Sector 5',
-      lastSeen: '25 mins ago',
-      responseTime: 0
+  const { data: vens, isLoading } = useVenSummary();
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<Ven | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const handleDetails = async (id: string) => {
+    try {
+      setLoadingDetail(true);
+      const ven = await apiGet<Ven>(`/api/vens/${id}`);
+      setDetail(ven);
+      setOpen(true);
+    } finally {
+      setLoadingDetail(false);
     }
-  ];
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -113,7 +63,7 @@ export const VenList = () => {
   return (
     <ScrollArea className="h-[500px]">
       <div className="p-4 space-y-3">
-        {vens.map((ven) => (
+        {(vens || []).map((ven) => (
           <Card key={ven.id} className="transition-all duration-200 hover:shadow-energy border-l-4 border-l-primary/30">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
@@ -167,30 +117,66 @@ export const VenList = () => {
                   size="sm" 
                   variant="outline"
                   className="text-xs h-7"
-                  disabled={ven.status !== 'online'}
-                >
-                  Configure
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  className="text-xs h-7"
-                  disabled={ven.status !== 'online'}
-                >
-                  Send ADR
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  className="text-xs h-7"
+                  onClick={() => handleDetails(ven.id)}
                 >
                   Details
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="text-xs h-7"
+                  onClick={() => window.dispatchEvent(new CustomEvent('focus-ven', { detail: { id: ven.id } }))}
+                >
+                  View on Map
                 </Button>
               </div>
             </CardContent>
           </Card>
         ))}
+        {isLoading && (
+          <div className="p-4 text-sm text-muted-foreground">Loading VENs…</div>
+        )}
       </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>VEN Details</DialogTitle>
+            <DialogDescription>Full information for the selected VEN</DialogDescription>
+          </DialogHeader>
+          {loadingDetail && <div className="text-sm text-muted-foreground">Loading…</div>}
+          {detail && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div><span className="text-muted-foreground">Name</span><div className="font-medium">{detail.name}</div></div>
+                <div><span className="text-muted-foreground">ID</span><div className="font-medium">{detail.id}</div></div>
+                <div><span className="text-muted-foreground">Status</span><div className="font-medium capitalize">{detail.status}</div></div>
+                <div><span className="text-muted-foreground">Location</span><div className="font-medium">{detail.location.lat.toFixed(4)}, {detail.location.lon.toFixed(4)}</div></div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><span className="text-muted-foreground">Current Power</span><div className="font-medium">{detail.metrics.currentPowerKw.toFixed(1)} kW</div></div>
+                <div><span className="text-muted-foreground">Controllable</span><div className="font-medium">{detail.metrics.shedAvailabilityKw.toFixed(1)} kW</div></div>
+              </div>
+              <div className="pt-2 border-t">
+                <div className="font-semibold mb-2">Loads</div>
+                <div className="space-y-1">
+                  {(detail.loads || []).map(l => (
+                    <div key={l.id} className="grid grid-cols-5 gap-2 text-xs bg-muted/20 p-2 rounded">
+                      <div className="font-medium">{l.type}</div>
+                      <div><span className="text-muted-foreground">Cap</span> {l.capacityKw} kW</div>
+                      <div><span className="text-muted-foreground">Shed</span> {l.shedCapabilityKw} kW</div>
+                      <div><span className="text-muted-foreground">Now</span> {l.currentPowerKw} kW</div>
+                      <div className="truncate">{l.name || ''}</div>
+                    </div>
+                  ))}
+                  {(detail.loads || []).length === 0 && (
+                    <div className="text-muted-foreground text-xs">No loads available</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </ScrollArea>
   );
 };

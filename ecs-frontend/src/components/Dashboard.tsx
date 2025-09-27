@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,20 +18,29 @@ import {
   AlertTriangle,
   CheckCircle
 } from 'lucide-react';
+import { useNetworkStats } from '@/hooks/useApi';
+import { formatPowerKw } from '@/lib/utils';
 
 export const Dashboard = () => {
   const [activeView, setActiveView] = useState('list');
+  const [mapFocusId, setMapFocusId] = useState<string | undefined>(undefined);
 
-  // Mock data - in real app this would come from API
-  const networkStats = {
-    totalVens: 245,
-    onlineVens: 238,
-    totalControllablePower: 15.8, // MW
-    currentLoadReduction: 2.3, // MW
-    networkEfficiency: 94.2, // %
-    averageHousePower: 3.2, // kW last hour
-    totalHousePowerToday: 1247.6 // kWh
-  };
+  const { data: stats, isLoading } = useNetworkStats();
+  const onlineCount = stats?.onlineVens ?? 0;
+  const totalVens = stats?.venCount ?? 0;
+
+  // When a component (e.g., VenList) requests focusing a VEN, switch to the map
+  // and pass a focusId prop to MapView to avoid global event loops.
+  useEffect(() => {
+    const onFocusVen = (e: Event) => {
+      const id = (e as CustomEvent<{ id: string }>).detail?.id;
+      if (!id) return;
+      setActiveView('map');
+      setMapFocusId(id);
+    };
+    window.addEventListener('focus-ven', onFocusVen as EventListener);
+    return () => window.removeEventListener('focus-ven', onFocusVen as EventListener);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background p-6 space-y-6">
@@ -67,10 +76,10 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {networkStats.onlineVens}/{networkStats.totalVens}
+              {isLoading ? '…' : `${onlineCount}/${totalVens}`}
             </div>
             <p className="text-xs text-muted-foreground">
-              VENs Online ({networkStats.networkEfficiency}% efficiency)
+              VENs Online ({stats?.networkEfficiency ?? 0}% efficiency)
             </p>
           </CardContent>
         </Card>
@@ -82,7 +91,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {networkStats.totalControllablePower} MW
+              {isLoading ? '…' : formatPowerKw(stats?.controllablePowerKw)}
             </div>
             <p className="text-xs text-muted-foreground">
               Available for load shedding
@@ -97,7 +106,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">
-              {networkStats.currentLoadReduction} MW
+              {isLoading ? '…' : formatPowerKw(stats?.currentLoadReductionKw)}
             </div>
             <p className="text-xs text-muted-foreground">
               Current load reduction
@@ -112,7 +121,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">
-              {networkStats.averageHousePower} kW
+              {isLoading ? '…' : formatPowerKw(stats?.averageHousePower)}
             </div>
             <p className="text-xs text-muted-foreground">
               Last hour average
@@ -152,14 +161,14 @@ export const Dashboard = () => {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {activeView === 'list' ? <VenList /> : <MapView />}
+              {activeView === 'list' ? <VenList /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
             </CardContent>
           </Card>
         </div>
 
         {/* Sidebar Controls */}
         <div className="space-y-6">
-          <PowerMetrics networkStats={networkStats} />
+          <PowerMetrics networkStats={stats} />
           <AdrControls />
         </div>
       </div>

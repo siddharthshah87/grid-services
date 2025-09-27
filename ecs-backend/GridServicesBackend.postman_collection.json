@@ -1,0 +1,395 @@
+{
+  "info": {
+    "name": "Grid Services Backend (Spec)",
+    "_postman_id": "00000000-0000-0000-0000-000000000001",
+    "description": "Postman collection for the Grid Services Backend API served by ecs-backend/app. Endpoints mounted under /api conform to docs/backend-api.md and docs/backend-api.yaml.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats",
+      "item": [
+        {
+          "name": "GET /api/stats/network",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/network",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "network"]
+            }
+          }
+        },
+        {
+          "name": "GET /api/stats/loads",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/loads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "loads"]
+            }
+          }
+        },
+        {
+          "name": "GET /api/stats/network/history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/network/history?granularity=5m",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "network", "history"],
+              "query": [
+                {"key": "start", "value": ""},
+                {"key": "end", "value": ""},
+                {"key": "granularity", "value": "5m"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "VENs",
+      "item": [
+        {
+          "name": "GET /api/vens",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vens",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens"]
+            }
+          }
+        },
+        {
+          "name": "POST /api/vens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Main Street Facility\",\n  \"location\": { \"lat\": 37.42, \"lon\": -122.08 }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vens",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens"]
+            }
+          }
+        },
+        {
+          "name": "GET /api/vens/:venId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/:venId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", ":venId"],
+              "variable": [{"key": "venId", "value": "ven-101"}]
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/vens/:venId",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"maintenance\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/:venId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", ":venId"],
+              "variable": [{"key": "venId", "value": "ven-101"}]
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/vens/:venId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/:venId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", ":venId"],
+              "variable": [{"key": "venId", "value": "ven-103"}]
+            }
+          }
+        },
+        {
+          "name": "GET /api/vens/:venId/loads",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/:venId/loads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", ":venId", "loads"],
+              "variable": [{"key": "venId", "value": "ven-101"}]
+            }
+          }
+        },
+        {
+          "name": "GET /api/vens/:venId/loads/:loadId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/:venId/loads/:loadId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", ":venId", "loads", ":loadId"],
+              "variable": [
+                {"key": "venId", "value": "ven-101"},
+                {"key": "loadId", "value": "ld-101-a"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/vens/:venId/loads/:loadId",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPowerKw\": 3.2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/:venId/loads/:loadId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", ":venId", "loads", ":loadId"],
+              "variable": [
+                {"key": "venId", "value": "ven-101"},
+                {"key": "loadId", "value": "ld-101-a"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/vens/:venId/loads/:loadId/commands/shed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountKw\": 1.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/:venId/loads/:loadId/commands/shed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", ":venId", "loads", ":loadId", "commands", "shed"],
+              "variable": [
+                {"key": "venId", "value": "ven-101"},
+                {"key": "loadId", "value": "ld-101-a"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/vens/:venId/history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/:venId/history?granularity=5m",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", ":venId", "history"],
+              "query": [
+                {"key": "start", "value": ""},
+                {"key": "end", "value": ""},
+                {"key": "granularity", "value": "5m"}
+              ],
+              "variable": [{"key": "venId", "value": "ven-101"}]
+            }
+          }
+        },
+        {
+          "name": "GET /api/vens/:venId/loads/:loadId/history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/:venId/loads/:loadId/history?granularity=5m",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", ":venId", "loads", ":loadId", "history"],
+              "query": [
+                {"key": "start", "value": ""},
+                {"key": "end", "value": ""},
+                {"key": "granularity", "value": "5m"}
+              ],
+              "variable": [
+                {"key": "venId", "value": "ven-101"},
+                {"key": "loadId", "value": "ld-101-a"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/vens/summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vens/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vens", "summary"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "GET /api/events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events"]
+            }
+          }
+        },
+        {
+          "name": "POST /api/events",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startTime\": \"2024-07-10T15:00:00Z\",\n  \"endTime\": \"2024-07-10T17:00:00Z\",\n  \"requestedReductionKw\": 500\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events"]
+            }
+          }
+        },
+        {
+          "name": "GET /api/events/:eventId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/:eventId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", ":eventId"],
+              "variable": [{"key": "eventId", "value": "evt-1"}]
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/events/:eventId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/:eventId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", ":eventId"],
+              "variable": [{"key": "eventId", "value": "evt-1"}]
+            }
+          }
+        },
+        {
+          "name": "POST /api/events/:eventId/stop",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/:eventId/stop",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", ":eventId", "stop"],
+              "variable": [{"key": "eventId", "value": "evt-1"}]
+            }
+          }
+        },
+        {
+          "name": "GET /api/events/current",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/current",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", "current"]
+            }
+          }
+        },
+        {
+          "name": "GET /api/events/history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", "history"],
+              "query": [
+                {"key": "start", "value": ""},
+                {"key": "end", "value": ""}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/events/:eventId/metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/:eventId/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", ":eventId", "metrics"],
+              "variable": [{"key": "eventId", "value": "evt-1"}]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" }
+  ]
+}

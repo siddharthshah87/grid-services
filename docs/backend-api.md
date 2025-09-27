@@ -4,15 +4,15 @@ This document summarizes backend API endpoints required to support the Smart Gri
 
 ## Data Model
 
-- **NetworkStats** – summary metrics such as `venCount`, `controllablePowerKw`, `potentialLoadReductionKw`, `efficiencyPercent`, and `householdUsageKw`.
-- **VEN** – a Virtual End Node with `id`, `name`, `status`, `location {lat, lon}`, `loads[]`, and `metrics` describing current power, shed availability, and Shed status (event id, shed load ids)
+- **NetworkStats** – summary metrics such as `venCount`, `controllablePowerKw`, `potentialLoadReductionKw`, and `householdUsageKw`. This shall give overall status of the VEN network. These data are expected to be aggregated in the backend returned here for overview data.
+- **VEN** – a Virtual End Node with `id`, `name`, `status`, `location {lat, lon}`, `loads[]`, and `metrics` describing current power, shed availability, and Shed status (ADR event id, shed load's ids)
 - **Load** – device attached to a VEN with `id`, `type`, `capacityKw`, `shedCapabilityKw`, and `currentPowerKw`.
 - **Event** – ADR event with `id`, `status`, `startTime`, `endTime`, (`requestedReductionKw`, and `actualReductionKw` -- need to confirm if openADR specifies)
-- **TimeseriesPoint** – VENB level - system level `{timestamp, used powerKw, shed powerKw}` used in historical responses.
+- **TimeseriesPoint** – VEN level and system level `{timestamp, used powerKw, shed powerKw(what was requested and id)}` used in historical responses.
 
 ## Network Statistics
 
-- `GET /stats/network` – current network metrics (VEN counts, controllable power, load reduction, efficiency, household usage).
+- `GET /stats/network` – current network metrics aligned to `NetworkStats` (VEN count, controllable power, potential load reduction, household usage).
 - `GET /stats/loads` – aggregated capability and usage by load type (EV, solar generation, HVAC, etc.).
 - `GET /stats/network/history` – historical network metrics with `start`, `end`, and optional `granularity` query parameters.
 
@@ -27,20 +27,19 @@ GET /stats/network
   "venCount": 42,
   "controllablePowerKw": 1200,
   "potentialLoadReductionKw": 300,
-  "efficiencyPercent": 95.2,
   "householdUsageKw": 890
 }
 ```
 
 ## VEN Management
 
-- `GET /vens` – list registered Virtual End Nodes including status, power data, and coordinates for mapping.
+- `GET /vens` – list registered Virtual End Nodes including `id`, `name`, `status`, `location` (lat, lon), `loads[]`, and `metrics` (see below) for mapping and quick stats.
 - `POST /vens` – register a new VEN.
 - `GET /vens/{venId}` – fetch detailed VEN information.
 - `PATCH /vens/{venId}` – update VEN configuration.
 - `DELETE /vens/{venId}` – remove a VEN.
 - `GET /vens/{venId}/loads` – list controllable loads attached to a VEN.
-- `GET /vens/{venId}/loads/{loadId}` – detailed load data (capacity, shed capability, current power).
+- `GET /vens/{venId}/loads/{loadId}` – detailed load data with fields `capacityKw`, `shedCapabilityKw`, and `currentPowerKw`.
 - `PATCH /vens/{venId}/loads/{loadId}` – update load metadata or configuration.
 - `POST /vens/{venId}/loads/{loadId}/commands/shed` – issue a shed command for a specific load.
 - `GET /vens/{venId}/history` – historical metrics for a VEN.
@@ -70,7 +69,12 @@ POST /vens
   "status": "active",
   "location": { "lat": 37.42, "lon": -122.08 },
   "loads": [],
-  "metrics": { "currentPowerKw": 12.4, "shedAvailabilityKw": 5.0 }
+  "metrics": {
+    "currentPowerKw": 12.4,
+    "shedAvailabilityKw": 5.0,
+    "activeEventId": "evt-1",
+    "shedLoadIds": []
+  }
 }
 ```
 
@@ -108,15 +112,16 @@ POST /events
   "status": "scheduled",
   "startTime": "2024-07-10T15:00:00Z",
   "endTime": "2024-07-10T17:00:00Z",
-  "requestedReductionKw": 500
+  "requestedReductionKw": 500,
+  "actualReductionKw": 0
 }
 ```
 
 ## Historical Queries
 
-- `GET /stats/network/history` – network level history.
-- `GET /vens/{venId}/history` – VEN level history.
-- `GET /vens/{venId}/loads/{loadId}/history` – load level history.
+- `GET /stats/network/history` – network level history. Returns an array of `TimeseriesPoint` aligned to the data model.
+- `GET /vens/{venId}/history` – VEN level history. Returns an array of `TimeseriesPoint` aligned to the data model.
+- `GET /vens/{venId}/loads/{loadId}/history` – load level history. Returns an array of `TimeseriesPoint` aligned to the data model.
 
 ### Example
 
@@ -127,11 +132,20 @@ GET /vens/ven-123/history?start=2024-07-10T15:00:00Z&end=2024-07-10T17:00:00Z&gr
 ```json
 {
   "points": [
-    { "timestamp": "2024-07-10T15:00:00Z", "powerKw": 5.2 },
-    { "timestamp": "2024-07-10T15:05:00Z", "powerKw": 5.0 }
+    {
+      "timestamp": "2024-07-10T15:00:00Z",
+      "usedPowerKw": 5.2,
+      "shedPowerKw": 0.0
+    },
+    {
+      "timestamp": "2024-07-10T15:05:00Z",
+      "usedPowerKw": 5.0,
+      "shedPowerKw": 0.0
+    }
   ]
 }
 ```
 
-The accompanying `backend-api.yaml` file provides the formal Swagger/OpenAPI specification for these endpoints, including schema definitions for network statistics, VENs, loads, events, and historical time-series responses.
+Note: Where a point falls within an ADR event window, implementations may also include the associated `eventId` and/or `requestedReductionKw` to annotate shed context per point.
 
+The OpenAPI specification for these endpoints should mirror the models above. If maintained separately, ensure schema definitions for network statistics, VENs, loads, events, and time-series responses are kept in sync with this document.

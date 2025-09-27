@@ -9,25 +9,17 @@ import {
   ArrowUpCircle,
   ArrowDownCircle
 } from 'lucide-react';
+import type { BackendNetworkStats } from '@/hooks/useApi';
+import { formatPowerKw } from '@/lib/utils';
 
-interface NetworkStats {
-  totalVens: number;
-  onlineVens: number;
-  totalControllablePower: number;
-  currentLoadReduction: number;
-  networkEfficiency: number;
-  averageHousePower: number;
-  totalHousePowerToday: number;
-}
-
-interface PowerMetricsProps {
-  networkStats: NetworkStats;
-}
+interface PowerMetricsProps { networkStats?: BackendNetworkStats | null }
 
 export const PowerMetrics = ({ networkStats }: PowerMetricsProps) => {
-  const loadReductionPercentage = (networkStats.currentLoadReduction / networkStats.totalControllablePower) * 100;
-  const efficiencyColor = networkStats.networkEfficiency > 90 ? 'text-success' : 
-                         networkStats.networkEfficiency > 75 ? 'text-warning' : 'text-destructive';
+  const totalKw = networkStats?.controllablePowerKw ?? 0;
+  const currentRedKw = networkStats?.currentLoadReductionKw ?? 0;
+  const loadReductionPercentage = totalKw > 0 ? (currentRedKw / totalKw) * 100 : 0;
+  const efficiency = networkStats?.networkEfficiency ?? 0;
+  const efficiencyColor = efficiency > 90 ? 'text-success' : efficiency > 75 ? 'text-warning' : 'text-destructive';
 
   return (
     <div className="space-y-4">
@@ -45,22 +37,20 @@ export const PowerMetrics = ({ networkStats }: PowerMetricsProps) => {
         <CardContent className="space-y-3">
           <div className="flex justify-between items-end">
             <div>
-              <div className="text-2xl font-bold text-primary">
-                {networkStats.totalControllablePower} MW
-              </div>
+              <div className="text-2xl font-bold text-primary">{formatPowerKw(totalKw)}</div>
               <div className="text-sm text-muted-foreground">
                 Maximum available
               </div>
             </div>
             <Badge variant="outline" className="border-success text-success">
-              {networkStats.networkEfficiency}% efficient
+              {efficiency}% efficient
             </Badge>
           </div>
           
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Current Reduction</span>
-              <span className="font-medium">{networkStats.currentLoadReduction} MW</span>
+              <span className="font-medium">{formatPowerKw(currentRedKw)}</span>
             </div>
             <Progress value={loadReductionPercentage} className="h-2" />
             <div className="text-xs text-muted-foreground">
@@ -85,7 +75,7 @@ export const PowerMetrics = ({ networkStats }: PowerMetricsProps) => {
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center p-2 bg-muted/30 rounded-lg">
               <div className="text-lg font-bold text-accent">
-                {networkStats.averageHousePower} kW
+                {formatPowerKw(networkStats?.averageHousePower ?? 0)}
               </div>
               <div className="text-xs text-muted-foreground">
                 Last Hour Avg
@@ -93,7 +83,7 @@ export const PowerMetrics = ({ networkStats }: PowerMetricsProps) => {
             </div>
             <div className="text-center p-2 bg-muted/30 rounded-lg">
               <div className="text-lg font-bold text-accent">
-                {networkStats.totalHousePowerToday} kWh
+                {(networkStats?.totalHousePowerToday ?? 0).toFixed(1)} kWh
               </div>
               <div className="text-xs text-muted-foreground">
                 Today Total
@@ -127,7 +117,7 @@ export const PowerMetrics = ({ networkStats }: PowerMetricsProps) => {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Peak Shaving Potential</span>
               <span className="font-medium text-warning">
-                {(networkStats.totalControllablePower * 0.7).toFixed(1)} MW
+                {formatPowerKw(totalKw * 0.7)}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -139,7 +129,7 @@ export const PowerMetrics = ({ networkStats }: PowerMetricsProps) => {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Reliability Score</span>
               <span className={`font-medium ${efficiencyColor}`}>
-                {networkStats.networkEfficiency}/100
+                {efficiency}/100
               </span>
             </div>
           </div>
