@@ -1,6 +1,21 @@
-const viteEnv = (import.meta as any)?.env || {};
-export const API_BASE: string =
-  viteEnv.VITE_BACKEND_API_URL || viteEnv.VITE_API_BASE_URL || "http://localhost:8000";
+// TEMP: Hardcode backend API base for validation
+export const API_BASE: string = "http://backend-alb-948465488.us-west-2.elb.amazonaws.com";
+
+// Debug: print which backend URL the frontend resolved
+try {
+  const rawBack = undefined as any;
+  const rawAlt = undefined as any;
+  if (typeof window !== "undefined") {
+    // eslint-disable-next-line no-console
+    console.info("[Frontend] Hardcoded API_BASE override in use");
+    // eslint-disable-next-line no-console
+    console.info("[Frontend] VITE_API_BASE_URL:", rawAlt);
+    // eslint-disable-next-line no-console
+    console.info("[Frontend] API_BASE (resolved):", API_BASE);
+    // Expose for quick checks in dev tools
+    (window as any).__API_BASE__ = API_BASE;
+  }
+} catch {}
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
