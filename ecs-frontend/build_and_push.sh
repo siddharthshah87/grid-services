@@ -16,9 +16,16 @@ eval "$LOGIN_CMD" | docker login --username AWS --password-stdin "$REPO_URI"
 
 # Build args
 BUILD_ARGS=()
-if [[ -n "${BACKEND_API_URL:-}" ]]; then
-  BUILD_ARGS+=(--build-arg "BACKEND_API_URL=$BACKEND_API_URL")
+# Default backend API if not provided
+if [[ -z "${BACKEND_API_URL:-}" ]]; then
+  DEFAULT_BACKEND_API_URL="http://backend-alb-948465488.us-west-2.elb.amazonaws.com"
+  echo "BACKEND_API_URL not provided. Using default: $DEFAULT_BACKEND_API_URL"
+  BACKEND_API_URL="$DEFAULT_BACKEND_API_URL"
+else
+  echo "Using BACKEND_API_URL: $BACKEND_API_URL"
 fi
+
+BUILD_ARGS+=(--build-arg "BACKEND_API_URL=$BACKEND_API_URL")
 
 # Build & push in one go
 docker build \
@@ -27,4 +34,3 @@ docker build \
   .
 
 docker push "$REPO_URI"
-
