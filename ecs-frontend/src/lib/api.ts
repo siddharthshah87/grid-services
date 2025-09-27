@@ -1,5 +1,5 @@
-// TEMP: Hardcode backend API base for validation
-export const API_BASE: string = "http://backend-alb-948465488.us-west-2.elb.amazonaws.com";
+// Use same-origin base and rely on Nginx to proxy /api to backend (avoids mixed content)
+export const API_BASE: string = "";
 
 // Debug: print which backend URL the frontend resolved
 try {
@@ -7,7 +7,7 @@ try {
   const rawAlt = undefined as any;
   if (typeof window !== "undefined") {
     // eslint-disable-next-line no-console
-    console.info("[Frontend] Hardcoded API_BASE override in use");
+    console.info("[Frontend] Using same-origin API base with Nginx /api proxy");
     // eslint-disable-next-line no-console
     console.info("[Frontend] VITE_API_BASE_URL:", rawAlt);
     // eslint-disable-next-line no-console
