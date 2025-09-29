@@ -12,8 +12,9 @@
     <style>
       :root { --bg:#0b5; --card:#fff; --muted:#666; --accent:#0b5; }
       body { font-family: system-ui, sans-serif; margin: 0; line-height: 1.4; background:#f6f8fa; }
-      header { background: var(--bg); color:#fff; padding:12px 16px; position:sticky; top:0; }
+      header { background: var(--bg); color:#fff; padding:12px 16px; position:sticky; top:0; display:flex; align-items:center; gap:12px; }
       header a { color:#fff; margin-left: 12px; text-decoration: underline; }
+      .build { margin-left:auto; font-size:.8rem; opacity:.9; }
       main { padding:16px; max-width: 1024px; margin: 0 auto; }
       .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
       .card { background: var(--card); border-radius:12px; padding:16px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
@@ -71,7 +72,15 @@
           setText('live-last-publish', j.status && j.status.last_publish_at ? j.status.last_publish_at : '—');
         }catch(e){}
       }
-      window.addEventListener('DOMContentLoaded', ()=>{ loadCurrent(); refreshLive(); setInterval(refreshLive, 2000); });
+      async function showBuild(){
+        try{
+          const r = await fetch('/openapi.json');
+          const j = await r.json();
+          const v = (j && j.info && (j.info["x-build"] || j.info.version)) || '';
+          const el = document.getElementById('build-id'); if(el) el.textContent = v;
+        }catch(e){ const el = document.getElementById('build-id'); if(el) el.textContent = 'n/a'; }
+      }
+      window.addEventListener('DOMContentLoaded', ()=>{ showBuild(); loadCurrent(); refreshLive(); setInterval(refreshLive, 2000); });
     </script>
   </head>
   <body>
@@ -79,6 +88,7 @@
       <strong>VOLTTRON VEN Control</strong>
       <a href="/docs">API Docs</a>
       <a href="/config">Current Config</a>
+      <span class="build">Build: <span id="build-id">(loading)</span></span>
     </header>
     <main>
       <div class="grid">
@@ -108,4 +118,3 @@
     </main>
   </body>
 </html>
-

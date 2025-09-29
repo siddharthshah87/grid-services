@@ -18,6 +18,10 @@ import paho.mqtt.client as mqtt
 import boto3
 from botocore.exceptions import ClientError
 
+# Build metadata injected at image build time via Dockerfile args
+APP_BUILD = os.getenv("APP_BUILD", "dev")
+APP_BUILD_DATE = os.getenv("APP_BUILD_DATE", "")
+
 # ── OpenAPI spec --------------------------------------------------------
 OPENAPI_SPEC = {
     "openapi": "3.0.0",
@@ -121,7 +125,7 @@ CONFIG_UI_HTML = """
   <style>
     :root { --bg:#0b5; --card:#fff; --muted:#666; --accent:#0b5; }
     body { font-family: system-ui, sans-serif; margin: 0; line-height: 1.4; background:#f6f8fa; }
-    header { background: var(--bg); color:#fff; padding:12px 16px; position:sticky; top:0; }
+    header { background: var(--bg); color:#fff; padding:12px 16px; position:sticky; top:0; display:flex; align-items:center; gap:12px; }
     header a { color:#fff; margin-left: 12px; text-decoration: underline; }
     main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
     .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
@@ -148,6 +152,7 @@ CONFIG_UI_HTML = """
     .eventbar { background:#222; color:#eee; border-radius:8px; padding:10px 12px; display:flex; gap:16px; align-items:center; margin-top:10px; }
     .pill { background:#0b5; color:#fff; padding:4px 8px; border-radius:999px; font-size:.8rem; }
     .badge { background:#e67e22; color:#fff; padding:2px 6px; border-radius:6px; font-size:.75rem; margin-left:8px; }
+    .build { margin-left:auto; font-size:.8rem; opacity:.9; }
   </style>
   <script>
     async function loadCurrent(){
@@ -294,7 +299,15 @@ CONFIG_UI_HTML = """
         }
       } catch(e){ /* ignore */ }
     }
-    window.addEventListener('DOMContentLoaded', ()=>{ loadCurrent(); refreshLive(); setInterval(refreshLive, 2000); });
+    async function showBuild(){
+      try{
+        const r = await fetch('/openapi.json');
+        const j = await r.json();
+        const v = (j && j.info && (j.info["x-build"] || j.info.version)) || '';
+        const el = document.getElementById('build-id'); if(el) el.textContent = v;
+      }catch(e){ const el = document.getElementById('build-id'); if(el) el.textContent = 'n/a'; }
+    }
+    window.addEventListener('DOMContentLoaded', ()=>{ showBuild(); loadCurrent(); refreshLive(); setInterval(refreshLive, 2000); });
   </script>
   </head>
   <body>
@@ -302,6 +315,7 @@ CONFIG_UI_HTML = """
       <strong>VOLTTRON VEN Control</strong>
       <a href="/docs">API Docs</a>
       <a href="/config">Current Config</a>
+      <span class="build">Build: <span id="build-id">(loading)</span></span>
     </header>
     <main>
       <div class="grid">
@@ -1753,14 +1767,24 @@ class HealthHandler(BaseHTTPRequestHandler):
         if path == "/openapi.json":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
+            self.send_header("X-App-Build", APP_BUILD)
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            self.wfile.write(json.dumps(OPENAPI_SPEC).encode())
+            spec = deepcopy(OPENAPI_SPEC)
+            try:
+                spec.setdefault("info", {})
+                spec["info"]["x-build"] = APP_BUILD
+                if spec["info"].get("version") and APP_BUILD:
+                    spec["info"]["version"] = f"{spec['info']['version']}+{APP_BUILD}"
+            except Exception:
+                pass
+            self.wfile.write(json.dumps(spec).encode())
             return
 
         if path == "/docs":
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
+            self.send_header("X-App-Build", APP_BUILD)
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             html = _load_static_html("docs.html", SWAGGER_HTML)
@@ -1770,6 +1794,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         if path in ("/", "/ui"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
+            self.send_header("X-App-Build", APP_BUILD)
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             html = _load_static_html("ui.html", CONFIG_UI_HTML)

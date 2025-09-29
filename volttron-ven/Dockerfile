@@ -3,6 +3,12 @@
 # ──────────────────────────────────────────────────────────────────────
 FROM python:3.10-slim
 
+# Build metadata
+ARG GIT_SHA=unknown
+ARG BUILD_DATE=unknown
+ENV APP_BUILD=$GIT_SHA \
+    APP_BUILD_DATE=$BUILD_DATE
+
 # ---- system deps (tiny image, so keep it lean) -----------------------
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends ca-certificates && \
@@ -30,4 +36,3 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 8080
 ENTRYPOINT ["/entrypoint.sh"]
-
