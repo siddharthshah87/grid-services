@@ -385,6 +385,31 @@ CONFIG_UI_HTML = """
   </html>
 """
 
+# ── Static assets loader ------------------------------------------------------
+def _load_static_html(filename: str, default_html: str) -> str:
+    """Load an HTML asset from a static directory if present.
+
+    Search order:
+      1) Directory pointed by env VEN_STATIC_DIR
+      2) ./static relative to this file
+    Falls back to the provided default_html if no file is found.
+    """
+    try:
+        base = os.getenv("VEN_STATIC_DIR")
+        paths: list[pathlib.Path] = []
+        if base:
+            paths.append(pathlib.Path(base) / filename)
+        paths.append(pathlib.Path(__file__).resolve().parent / "static" / filename)
+        for p in paths:
+            if p.exists() and p.is_file():
+                try:
+                    return p.read_text(encoding="utf-8")
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return default_html
+
 # ── helpers ────────────────────────────────────────────────────────────
 def fetch_tls_creds_from_secrets(secret_name: str, region_name="us-west-2") -> dict | None:
     """Fetch TLS PEM contents from AWS Secrets Manager and write them to temp files."""
@@ -1738,7 +1763,8 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html")
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            self.wfile.write(SWAGGER_HTML.encode())
+            html = _load_static_html("docs.html", SWAGGER_HTML)
+            self.wfile.write(html.encode("utf-8"))
             return
 
         if path in ("/", "/ui"):
@@ -1746,7 +1772,8 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html")
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            self.wfile.write(CONFIG_UI_HTML.encode())
+            html = _load_static_html("ui.html", CONFIG_UI_HTML)
+            self.wfile.write(html.encode("utf-8"))
             return
 
         if path == "/config":
