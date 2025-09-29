@@ -12,11 +12,18 @@ and observe state via the Thing Shadow and the VEN’s /live HTTP endpoint.
   - `requests` for polling the VEN’s `/live` endpoint
   - `awscrt` and `awsiotsdk` for listening to MQTT acks over WebSockets
 
-Install dependencies:
+Install dependencies (use a virtual environment to avoid Debian’s externally-managed pip error):
 
 ```
-pip install boto3 requests awscrt awsiotsdk
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip setuptools wheel
+pip install -r requirements-dev.txt
 ```
+
+Tip (Debian/Ubuntu): if you hit "externally-managed-environment" when using the
+system Python, use a venv as above. As a last resort you can append
+`--break-system-packages` to pip, but a venv is the recommended approach.
 
 Gather outputs (from `envs/dev`):
 
