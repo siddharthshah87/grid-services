@@ -13,6 +13,10 @@ This repository contains Terraform modules and Dockerized applications to deploy
 - `scripts/` – Helper scripts to install dependencies, authenticate to AWS, create Terraform backend resources, push Docker images, and verify Terraform formatting.
 - `.github/workflows/` – GitHub Actions pipelines for linting, testing, security scanning and Terraform operations.
 
+See `docs/testing.md` for end‑to‑end testing of the VEN control plane, including
+scripts to publish commands, listen for acks, poll the `/live` endpoint, and
+inspect the Thing Shadow.
+
 ## Prerequisites
 
 - **AWS account** with permissions to create the resources described in `envs/dev`.
