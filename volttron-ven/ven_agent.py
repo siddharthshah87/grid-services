@@ -806,6 +806,7 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
 
     Returns a dict with keys: power_kw, circuits, battery_soc.
     """
+    global _battery_soc
     if not _circuit_model_enabled:
         # Fallback: keep previous behavior
         total = _next_power_reading()
@@ -905,7 +906,6 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
             batt_flow = 0.0
 
         # Update SOC (simple integrator)
-        global _battery_soc
         step_h = max(1.0, REPORT_INTERVAL_SECONDS) / 3600.0
         energy_delta_kwh = batt_flow * step_h
         _battery_soc = max(0.0, min(1.0, _battery_soc + (energy_delta_kwh / max(0.1, _battery_capacity_kwh))))
