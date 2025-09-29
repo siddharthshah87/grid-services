@@ -228,11 +228,13 @@ CONFIG_UI_HTML = """
       const box = document.getElementById('circuits');
       if(!box) return;
       box.innerHTML = '';
+      const shedding = new Set((window.__sheddingIds||[]));
       (list||[]).forEach(c => {
         const el = document.createElement('div');
         el.className = 'card';
+        const shed = shedding.has(c.id) ? '<span class="badge">Shed</span>' : '';
         el.innerHTML = `
-          <h2>${c.name} <span class="muted" style="font-weight:400">(${c.type||''})</span></h2>
+          <h2>${c.name} <span class="muted" style="font-weight:400">(${c.type||''})</span> ${shed}</h2>
           <div class="field"><label>Status</label><input type="checkbox" ${c.enabled? 'checked':''} onchange="toggleCircuit('${c.id}', this.checked)"></div>
           <div class="field"><label>Rated</label><div>${(c.rated_kw??0).toFixed ? c.rated_kw.toFixed(2) : c.rated_kw} kW</div></div>
           <div class="field"><label>Now</label><div><strong>${(c.current_kw??0).toFixed ? c.current_kw.toFixed(2) : c.current_kw}</strong> kW</div></div>
@@ -261,7 +263,35 @@ CONFIG_UI_HTML = """
           const soc = j.metering && j.metering.battery_soc != null ? (j.metering.battery_soc*100).toFixed(0) : '--';
           document.getElementById('live-batt-soc').textContent = soc + '%';
         }
+        window.__sheddingIds = j.sheddingLoadIds || [];
         renderCircuits(j.metering && j.metering.circuits);
+        // Update event banners
+        const eb = document.getElementById('eventbar');
+        if(eb){
+          const ae = j.activeEvent;
+          if(ae && ae.eventId){
+            const mins = Math.floor((ae.remainingS||0)/60), secs = (ae.remainingS||0)%60;
+            const req = ae.requestedReductionKw != null ? ae.requestedReductionKw : '--';
+            const shed = j.metering && j.metering.shedPowerKw != null ? j.metering.shedPowerKw.toFixed(2) : '--';
+            eb.innerHTML = `<span class="pill">Event ${ae.eventId}</span>
+                            <span>Time left: <strong>${mins}:${secs.toString().padStart(2,'0')}</strong></span>
+                            <span>Requested: <strong>${req} kW</strong></span>
+                            <span>Current shed: <strong>${shed} kW</strong></span>`;
+          } else {
+            eb.innerHTML = '<span class="muted">No active event</span>';
+          }
+        }
+        const ed = document.getElementById('eventdone');
+        if(ed){
+          const s = j.lastEventSummary;
+          if(s && s.eventId){
+            ed.innerHTML = `<span class="pill">Event ${s.eventId} complete</span>
+                            <span>Actual reduction: <strong>${s.actualReductionKw ?? '--'} kW</strong></span>
+                            <span>Delivered: <strong>${s.deliveredKwh ?? '--'} kWh</strong></span>`;
+          } else {
+            ed.innerHTML = '<span class="muted">No recent event summary</span>';
+          }
+        }
       } catch(e){ /* ignore */ }
     }
     window.addEventListener('DOMContentLoaded', ()=>{ loadCurrent(); refreshLive(); setInterval(refreshLive, 2000); });
@@ -1771,6 +1801,14 @@ class HealthHandler(BaseHTTPRequestHandler):
                         "endTs": ae.get("end_ts"),
                         "remainingS": rem,
                     }
+                # Last event summary for end-of-event banner
+                last_event_summary = None
+                try:
+                    mets = _shadow_reported_state.get("metrics") if isinstance(_shadow_reported_state, dict) else None
+                    if isinstance(mets, dict):
+                        last_event_summary = mets.get("lastEventSummary")
+                except Exception:
+                    last_event_summary = None
             live = {
                 "status": status,
                 "config": cfg,
@@ -1779,6 +1817,7 @@ class HealthHandler(BaseHTTPRequestHandler):
                 "loads": loads_live,
                 "activeEvent": active_event,
                 "sheddingLoadIds": [lid for lid, lim in _load_limits.items() if int(lim.get("until", 0)) > int(time.time())],
+                "lastEventSummary": last_event_summary,
             }
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
