@@ -12,7 +12,8 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
-from typing import Any
+from typing import Any, Deque
+from collections import deque
 import paho.mqtt.client as mqtt
 import boto3
 from botocore.exceptions import ClientError
@@ -144,6 +145,9 @@ CONFIG_UI_HTML = """
     .muted { color:#bbb; }
     .kv { display:flex; gap:12px; flex-wrap:wrap; }
     .kv div { background:rgba(255,255,255,.05); padding:8px 10px; border-radius:8px; min-width: 120px; text-align:center; }
+    .eventbar { background:#222; color:#eee; border-radius:8px; padding:10px 12px; display:flex; gap:16px; align-items:center; margin-top:10px; }
+    .pill { background:#0b5; color:#fff; padding:4px 8px; border-radius:999px; font-size:.8rem; }
+    .badge { background:#e67e22; color:#fff; padding:2px 6px; border-radius:6px; font-size:.75rem; margin-left:8px; }
   </style>
   <script>
     async function loadCurrent(){
@@ -298,6 +302,11 @@ CONFIG_UI_HTML = """
         <section class="card">
           <h2>Circuits</h2>
           <div id="circuits" class="grid"></div>
+        </section>
+
+        <section class="card">
+          <h2>Event</h2>
+          <div id="eventbar" class="eventbar"><span class="muted">No active event</span></div>
         </section>
         <section class="card">
           <h2>General</h2>
@@ -468,6 +477,9 @@ except ValueError:
     REPORT_INTERVAL_SECONDS = 60
 REPORT_INTERVAL_SECONDS = max(1, REPORT_INTERVAL_SECONDS)
 
+SCHEMA_VERSION = "1.0"
+VEN_ID = IOT_THING_NAME or CLIENT_ID
+
 if IOT_THING_NAME:
     SHADOW_TOPIC_UPDATE = f"$aws/things/{IOT_THING_NAME}/shadow/update"
     SHADOW_TOPIC_DELTA = f"{SHADOW_TOPIC_UPDATE}/delta"
@@ -615,9 +627,31 @@ _circuits: list[dict[str, Any]] = [
     {"id": "misc1",   "name": "House",      "type": "misc",   "enabled": True,  "rated_kw": 1.0, "current_kw": 0.0},
 ]
 
+# Per-load priority (lower number = more critical, shed later). Defaults:
+_circuit_priority: dict[str, int] = {"hvac": 1, "misc": 1, "heater": 2, "ev": 3, "battery": 2, "pv": 0}
+
+# Optional per-load limit (kW) until timestamp for shed commands
+_load_limits: dict[str, dict[str, float]] = {}  # {id: {"limit_kw": float, "until": ts}}
+
+# Optional panel temp target during shedPanel (kW) with expiry
+_panel_temp_target_kw: float | None = None
+_panel_temp_until_ts: int | None = None
+
 _circuit_model_enabled: bool = True
 _battery_capacity_kwh: float = 13.5
 _battery_soc: float = 0.5  # 0..1
+
+# Event tracking and baseline history
+_power_history: Deque[tuple[int, float]] = deque(maxlen=360)
+_active_event: dict[str, Any] | None = None  # {event_id,start_ts,end_ts,requested_kw,baseline_kw,delivered_kwh,summary_done}
+
+# Optional richer loads publish channel for backend (less frequent than metering)
+BACKEND_LOADS_TOPIC = os.getenv("BACKEND_LOADS_TOPIC") or (f"ven/loads/{IOT_THING_NAME}" if IOT_THING_NAME else None)
+try:
+    LOADS_PUBLISH_EVERY = int(os.getenv("LOADS_PUBLISH_EVERY", "6"))
+except ValueError:
+    LOADS_PUBLISH_EVERY = 6
+_loads_pub_counter = 0
 
 
 def _circuits_snapshot() -> list[dict[str, Any]]:
@@ -629,10 +663,39 @@ def _circuits_snapshot() -> list[dict[str, Any]]:
                 "type": c.get("type"),
                 "enabled": bool(c.get("enabled", True)),
                 "rated_kw": float(c.get("rated_kw", 0.0)),
+                "capacityKw": float(c.get("rated_kw", 0.0)),
                 "current_kw": float(c.get("current_kw", 0.0)),
+                "currentPowerKw": float(c.get("current_kw", 0.0)),
+                "shedCapabilityKw": _shed_capability_for(c),
+                "priority": int(_circuit_priority.get(c.get("type", "misc"), 5)),
             }
             for c in _circuits
         ]
+
+def _shed_capability_for(c: dict[str, Any]) -> float:
+    try:
+        typ = c.get("type")
+        kw = float(c.get("current_kw", 0.0))
+        rated = float(c.get("rated_kw", 0.0))
+        if not c.get("enabled", True):
+            return 0.0
+        if typ == "hvac":
+            floor = 0.2 * rated
+            return round(max(0.0, kw - floor), 2)
+        if typ == "heater":
+            return round(kw, 2)
+        if typ == "ev":
+            return round(kw, 2)
+        if typ == "misc":
+            floor = 0.3 * rated
+            return round(max(0.0, kw - floor), 2)
+        if typ == "pv":
+            return 0.0
+        if typ == "battery":
+            return round(rated, 2)
+    except Exception:
+        return 0.0
+    return 0.0
 
 def _distribute_power_to_circuits(total_kw: float) -> list[dict[str, Any]]:
     """Proportionally split total_kw across enabled circuits by rated_kw.
@@ -694,12 +757,24 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
     for c in _circuits:
         c["current_kw"] = 0.0
 
+    # Determine active per-load limit
+    def effective_limit(load_id: str, default: float) -> float:
+        entry = _load_limits.get(load_id)
+        if not entry:
+            return default
+        if now_ts >= int(entry.get("until", 0)):
+            # expired
+            _load_limits.pop(load_id, None)
+            return default
+        return min(default, float(entry.get("limit_kw", default)))
+
     # House load (misc): between base min/max with jitter
     import random as _r
     base_low, base_high = _meter_base_min_kw, max(_meter_base_min_kw, _meter_base_max_kw)
     house_kw = 0.0
     if house and house.get("enabled", True):
         house_kw = round(_r.uniform(base_low, base_high), 2)
+        house_kw = min(house_kw, effective_limit(house["id"], house_kw))
         house["current_kw"] = house_kw
 
     # HVAC: duty between 0.2..0.8 of rated
@@ -707,6 +782,7 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
     if hvac and hvac.get("enabled", True):
         duty = max(0.0, min(1.0, 0.5 + _r.uniform(-0.3, 0.3)))
         hvac_kw = round(hvac.get("rated_kw", 0.0) * duty, 2)
+        hvac_kw = min(hvac_kw, effective_limit(hvac["id"], hvac_kw))
         hvac["current_kw"] = hvac_kw
 
     # Heater: bursty low duty 0..0.5
@@ -714,12 +790,14 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
     if heater and heater.get("enabled", True):
         duty = max(0.0, min(0.5, _r.uniform(0.0, 0.5)))
         heater_kw = round(heater.get("rated_kw", 0.0) * duty, 2)
+        heater_kw = min(heater_kw, effective_limit(heater["id"], heater_kw))
         heater["current_kw"] = heater_kw
 
     # EV: simple on/off at rated when enabled
     ev_kw = 0.0
     if ev and ev.get("enabled", False):
         ev_kw = round(ev.get("rated_kw", 0.0), 2)
+        ev_kw = min(ev_kw, effective_limit(ev["id"], ev_kw))
         ev["current_kw"] = ev_kw
 
     # PV generation: rated * curve factor
@@ -732,13 +810,23 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
     load_kw = house_kw + hvac_kw + heater_kw + ev_kw
     net_kw_before_batt = max(0.0, load_kw - pv_gen)
 
-    # Battery action: attempt to move net toward target
+    # Battery action: attempt to move net toward effective target
     batt_flow = 0.0  # positive=discharge (reduce grid draw), negative=charge
     if batt and batt.get("enabled", False):
         batt_max = float(batt.get("rated_kw", 0.0))
-        if target is not None:
+        # Temporary target during panel shed may override configured target
+        eff_target = target
+        if _panel_temp_target_kw is not None and _panel_temp_until_ts and now_ts < _panel_temp_until_ts:
+            eff_target = _panel_temp_target_kw
+        else:
+            # clear expired
+            if _panel_temp_until_ts and now_ts >= _panel_temp_until_ts:
+                globals()["_panel_temp_target_kw"] = None
+                globals()["_panel_temp_until_ts"] = None
+
+        if eff_target is not None:
             # If above target, discharge; if below target, (optionally) charge
-            diff = net_kw_before_batt - float(target)
+            diff = net_kw_before_batt - float(eff_target)
             if diff > 0.05:  # above target: discharge up to diff
                 batt_flow = min(batt_max, diff)
             elif diff < -0.5:  # well below target: charge up to -diff/2
@@ -765,6 +853,65 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
     power_kw = round(max(0.0, net_kw_before_batt - max(0.0, batt_flow)), 2)
 
     return {"power_kw": power_kw, "circuits": _circuits_snapshot(), "battery_soc": _battery_soc}
+
+
+def _compute_shed_availability() -> float:
+    """Estimate instantaneous shed availability across loads and storage."""
+    avail = 0.0
+    for c in _circuits:
+        if not c.get("enabled", True):
+            continue
+        typ = c.get("type")
+        kw = float(c.get("current_kw", 0.0))
+        rated = float(c.get("rated_kw", 0.0))
+        if typ == "hvac":
+            floor = 0.2 * rated
+            avail += max(0.0, kw - floor)
+        elif typ == "heater":
+            avail += kw
+        elif typ == "ev":
+            avail += kw
+        elif typ == "misc":
+            floor = 0.3 * rated
+            avail += max(0.0, kw - floor)
+        elif typ == "pv":
+            # cannot shed generation here
+            continue
+        elif typ == "battery":
+            # battery can contribute up to discharge headroom (rated)
+            avail += rated
+    return round(avail, 2)
+
+
+def _maybe_finalize_event(now_ts: int) -> dict[str, Any] | None:
+    """If an active event has ended and no summary yet, compute and return a summary.
+
+    Returns a dict with summary fields or None if not applicable.
+    """
+    global _active_event
+    ev = _active_event
+    if not ev:
+        return None
+    et = int(ev.get("end_ts", 0))
+    if now_ts < et:
+        return None
+    if ev.get("summary_done"):
+        return None
+    st = int(ev.get("start_ts", et))
+    duration_h = max(1e-6, (et - st) / 3600.0)
+    delivered_kwh = float(ev.get("delivered_kwh") or 0.0)
+    actual_reduction_kw = delivered_kwh / duration_h
+    summary = {
+        "eventId": ev.get("event_id"),
+        "requestedReductionKw": ev.get("requested_kw"),
+        "actualReductionKw": round(actual_reduction_kw, 3),
+        "deliveredKwh": round(delivered_kwh, 3),
+        "baselineKw": ev.get("baseline_kw"),
+        "startTs": st,
+        "endTs": et,
+    }
+    ev["summary_done"] = True
+    return summary
 
 
 def _merge_dict(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
@@ -1174,14 +1321,17 @@ def _log_unhandled_message(_client, _userdata, msg):
     print(f"Unhandled MQTT message on {msg.topic}: {payload}")
 
 
-def _publish_ack(op: str, ok: bool, data: dict | None = None, error: str | None = None) -> None:
+def _publish_ack(op: str, ok: bool, data: dict | None = None, error: str | None = None, correlation_id: str | None = None) -> None:
     if not BACKEND_ACK_TOPIC:
         return
     ack = {
         "op": op,
         "ok": ok,
         "ts": int(time.time()),
+        "venId": VEN_ID,
     }
+    if correlation_id:
+        ack["correlationId"] = correlation_id
     if data is not None:
         ack["data"] = data
     if error is not None:
@@ -1302,22 +1452,24 @@ def on_backend_cmd(_client, _userdata, msg):
       - { "op": "event", "data": { "event_id": "...", "shed_kw": 1.2, "start_ts": 123, "duration_s": 900 } }
     """
     op = "unknown"
+    corr = None
     try:
         payload = json.loads(msg.payload.decode())
         op = str(payload.get("op") or "set").lower()
+        corr = payload.get("correlationId")
         data = payload.get("data")
 
-        if op == "set":
+        if op in ("set", "setconfig"):
             updates = _apply_config_payload(data if isinstance(data, dict) else payload)
-            _publish_ack(op, True, {"applied": updates})
+            _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
             return
         if op == "enable":
             updates = _apply_config_payload({"enabled": True})
-            _publish_ack(op, True, {"applied": updates})
+            _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
             return
         if op == "disable":
             updates = _apply_config_payload({"enabled": False})
-            _publish_ack(op, True, {"applied": updates})
+            _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
             return
         if op == "get":
             what = str(payload.get("what") or "status").lower()
@@ -1336,19 +1488,23 @@ def on_backend_cmd(_client, _userdata, msg):
                         "current_enabled": _current_enabled,
                         "power_factor": _power_factor,
                     }
-                _publish_ack(op, True, {"config": cfg})
+                _publish_ack(op, True, {"config": cfg}, correlation_id=corr)
             else:
                 _code, status = health_snapshot()
-                _publish_ack(op, True, {"status": status})
+                _publish_ack(op, True, {"status": status}, correlation_id=corr)
             return
         if op == "ping":
-            _publish_ack(op, True, {"pong": True, "ts": int(time.time())})
+            _publish_ack(op, True, {"pong": True, "ts": int(time.time())}, correlation_id=corr)
             return
         if op == "event":
             ev = data if isinstance(data, dict) else {}
             # Record event in shadow and optionally adjust target
             ev_id = ev.get("event_id") or f"backend_{int(time.time())}"
             shed_kw = ev.get("shed_kw")
+            start_ts = int(ev.get("start_ts") or int(time.time()))
+            duration_s = int(ev.get("duration_s") or 0)
+            end_ts = int(ev.get("end_ts") or (start_ts + duration_s if duration_s > 0 else start_ts))
+            req_kw = ev.get("requestedReductionKw") or ev.get("requested_kw")
             updates: dict[str, Any] = {
                 "status": {"last_backend_event_ts": int(time.time())},
                 "events": {"last_backend": {"event_id": ev_id, **ev}},
@@ -1362,13 +1518,110 @@ def on_backend_cmd(_client, _userdata, msg):
                         _shadow_target_power_kw = float(updates["target_power_kw"])
                     except Exception:
                         pass
+            # Track active event window
+            globals()["_active_event"] = {
+                "event_id": ev_id,
+                "start_ts": start_ts,
+                "end_ts": end_ts,
+                "requested_kw": float(req_kw) if isinstance(req_kw, (int, float)) else None,
+                "baseline_kw": None,
+                "delivered_kwh": 0.0,
+            }
             _shadow_merge_report(updates)
-            _publish_ack(op, True, {"event_id": ev_id})
+            _publish_ack(op, True, {"event_id": ev_id}, correlation_id=corr)
+            return
+        if op == "setload":
+            d = data if isinstance(data, dict) else {}
+            load_id = str(d.get("loadId") or "")
+            if not load_id:
+                _publish_ack(op, False, error="missing loadId", correlation_id=corr)
+                return
+            updated = None
+            with _shadow_state_lock:
+                for c in _circuits:
+                    if c["id"] == load_id:
+                        if "enabled" in d:
+                            c["enabled"] = bool(d.get("enabled"))
+                        if "capacityKw" in d or "rated_kw" in d:
+                            cap = d.get("capacityKw", d.get("rated_kw"))
+                            try:
+                                c["rated_kw"] = max(0.0, float(cap))
+                            except Exception:
+                                pass
+                        if "priority" in d:
+                            try:
+                                _circuit_priority[c.get("type", "misc")] = int(d.get("priority"))
+                            except Exception:
+                                pass
+                        updated = {k: c[k] for k in ("id","name","type","enabled","rated_kw")}
+                        break
+            if updated is None:
+                _publish_ack(op, False, error=f"unknown loadId: {load_id}", correlation_id=corr)
+                return
+            _publish_ack(op, True, {"updated": updated}, correlation_id=corr)
+            return
+        if op == "shedload":
+            d = data if isinstance(data, dict) else {}
+            load_id = str(d.get("loadId") or "")
+            reduce_kw = float(d.get("reduceKw") or 0.0)
+            duration_s = int(d.get("durationS") or 0)
+            if not load_id or reduce_kw <= 0 or duration_s <= 0:
+                _publish_ack(op, False, error="require loadId, reduceKw>0, durationS>0", correlation_id=corr)
+                return
+            now = int(time.time())
+            with _shadow_state_lock:
+                # Determine current expected power and set a limit
+                base_limit = None
+                for c in _circuits:
+                    if c["id"] == load_id and c.get("enabled", True):
+                        cur = float(c.get("current_kw", 0.0))
+                        base_limit = max(0.0, cur - reduce_kw)
+                        _load_limits[load_id] = {"limit_kw": base_limit, "until": now + duration_s}
+                        break
+            if base_limit is None:
+                _publish_ack(op, False, error="load not found or disabled", correlation_id=corr)
+                return
+            _publish_ack(op, True, {"limitKw": base_limit, "until": now + duration_s}, correlation_id=corr)
+            return
+        if op == "shedpanel":
+            d = data if isinstance(data, dict) else {}
+            req = float(d.get("requestedReductionKw") or 0.0)
+            duration_s = int(d.get("durationS") or 0)
+            if req <= 0 or duration_s <= 0:
+                _publish_ack(op, False, error="require requestedReductionKw>0 and durationS>0", correlation_id=corr)
+                return
+            now = int(time.time())
+            # Set temporary panel target based on last metered power
+            eff_target = None
+            if _last_metering_sample and isinstance(_last_metering_sample.get("power_kw"), (int, float)):
+                eff_target = max(0.0, float(_last_metering_sample["power_kw"]) - req)
+            else:
+                eff_target = max(0.0, req)  # fallback
+            globals()["_panel_temp_target_kw"] = eff_target
+            globals()["_panel_temp_until_ts"] = now + duration_s
+            # Simple allocation: impose per-load limits starting with lowest priority (highest number)
+            remaining = req
+            with _shadow_state_lock:
+                loads_sorted = sorted(
+                    [c for c in _circuits if c.get("enabled", True) and c.get("type") not in ("pv",)],
+                    key=lambda c: _circuit_priority.get(c.get("type", "misc"), 5),
+                    reverse=True,
+                )
+                for c in loads_sorted:
+                    if remaining <= 0:
+                        break
+                    cur = float(c.get("current_kw", 0.0))
+                    shed = min(cur, remaining)
+                    new_limit = max(0.0, cur - shed)
+                    _load_limits[c["id"]] = {"limit_kw": new_limit, "until": now + duration_s}
+                    remaining -= shed
+            accepted = req - max(0.0, remaining)
+            _publish_ack(op, True, {"targetKw": eff_target, "acceptedReduceKw": round(accepted,2), "until": now + duration_s}, correlation_id=corr)
             return
 
-        _publish_ack(op, False, error=f"unknown op: {op}")
+        _publish_ack(op, False, error=f"unknown op: {op}", correlation_id=corr)
     except Exception as e:
-        _publish_ack(op, False, error=str(e))
+        _publish_ack(op, False, error=str(e), correlation_id=corr)
 
 client.on_connect = _on_connect
 client.on_disconnect = _on_disconnect
@@ -1503,11 +1756,29 @@ class HealthHandler(BaseHTTPRequestHandler):
                         events = evs.get("last_backend") or evs.get("last")
                 except Exception:
                     events = None
+                loads_live = _circuits_snapshot()
+                # Active event info for UI banner
+                active_event = None
+                if _active_event:
+                    ae = _active_event
+                    rem = max(0, int(ae.get("end_ts", 0)) - int(time.time()))
+                    active_event = {
+                        "eventId": ae.get("event_id"),
+                        "requestedReductionKw": ae.get("requested_kw"),
+                        "baselineKw": ae.get("baseline_kw"),
+                        "deliveredKwh": ae.get("delivered_kwh"),
+                        "startTs": ae.get("start_ts"),
+                        "endTs": ae.get("end_ts"),
+                        "remainingS": rem,
+                    }
             live = {
                 "status": status,
                 "config": cfg,
                 "metering": _last_metering_sample,
                 "events": events,
+                "loads": loads_live,
+                "activeEvent": active_event,
+                "sheddingLoadIds": [lid for lid, lim in _load_limits.items() if int(lim.get("until", 0)) > int(time.time())],
             }
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
@@ -1842,8 +2113,75 @@ def main(iterations: int | None = None) -> None:
         metering_payload["circuits"] = step.get("circuits")
         metering_payload["battery_soc"] = step.get("battery_soc")
 
-    client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
+        # Update history and event-derived metrics
+        try:
+            _power_history.append((now, float(power_kw)))
+        except Exception:
+            pass
+
+        # Determine if within active event window
+        shed_power_kw = 0.0
+        requested_kw = None
+        event_id = None
+        if _active_event:
+            event_id = _active_event.get("event_id")
+            st = int(_active_event.get("start_ts", 0))
+            et = int(_active_event.get("end_ts", 0))
+            if now >= et:
+                # Event ended
+                _active_event["ended_at"] = now
+            if st <= now <= et:
+                requested_kw = _active_event.get("requested_kw")
+                # Compute baseline if missing: avg of last 5 samples before start
+                if _active_event.get("baseline_kw") is None:
+                    prev = [v for (ts, v) in list(_power_history) if ts < st][-5:]
+                    if prev:
+                        _active_event["baseline_kw"] = sum(prev) / len(prev)
+                base = _active_event.get("baseline_kw")
+                if isinstance(base, (int, float)):
+                    shed_power_kw = max(0.0, float(base) - float(power_kw))
+                    # accumulate delivered kWh
+                    step_h = max(1.0, REPORT_INTERVAL_SECONDS) / 3600.0
+                    _active_event["delivered_kwh"] = float(_active_event.get("delivered_kwh") or 0.0) + shed_power_kw * step_h
+
+        # Enrich telemetry
+        telem = {
+            "schemaVersion": SCHEMA_VERSION,
+            "venId": VEN_ID,
+            "timestamp": now,
+            "usedPowerKw": power_kw,
+            "shedPowerKw": round(shed_power_kw, 3),
+        }
+        if requested_kw is not None:
+            telem["requestedReductionKw"] = float(requested_kw)
+        if event_id is not None:
+            telem["eventId"] = str(event_id)
+        telem["loads"] = [
+            {"id": c["id"], "currentPowerKw": float(c.get("current_kw", 0.0))}
+            for c in (step.get("circuits") or [])
+        ]
+        if "battery_soc" in step:
+            telem["batterySoc"] = step["battery_soc"]
+        # Back-compat: keep previous topic payload plus enriched telem keys
+        metering_payload.update(telem)
+
+        client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
         client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
+
+        # Publish richer loads snapshot occasionally (optional)
+        try:
+            global _loads_pub_counter
+            _loads_pub_counter = (_loads_pub_counter + 1) % max(1, LOADS_PUBLISH_EVERY)
+            if BACKEND_LOADS_TOPIC and _loads_pub_counter == 0:
+                loads_msg = {
+                    "schemaVersion": SCHEMA_VERSION,
+                    "venId": VEN_ID,
+                    "timestamp": now,
+                    "loads": loads_snap,
+                }
+                client.publish(BACKEND_LOADS_TOPIC, json.dumps(loads_msg), qos=1)
+        except Exception:
+            pass
         print("Published VEN status and metering data to MQTT")
         _last_publish_time = time.time()
         # store last metering for /live UI endpoint
@@ -1855,6 +2193,19 @@ def main(iterations: int | None = None) -> None:
         with _shadow_state_lock:
             target_power_kw = _shadow_target_power_kw
 
+        # Compute loads and metrics snapshot for shadow
+        loads_snap = _circuits_snapshot()
+        metrics = {
+            "currentPowerKw": power_kw,
+            "shedAvailabilityKw": _compute_shed_availability(),
+        }
+        if step.get("battery_soc") is not None:
+            metrics["batterySoc"] = step.get("battery_soc")
+        if event_id is not None:
+            metrics["activeEventId"] = event_id
+        # Event summary handling
+        event_summary = _maybe_finalize_event(now)
+
         shadow_update = {
             "status": {
                 "ven": "ready",
@@ -1863,7 +2214,13 @@ def main(iterations: int | None = None) -> None:
             },
             "metering": metering_payload,
             "report_interval_seconds": REPORT_INTERVAL_SECONDS,
+            "ven": {"venId": VEN_ID, "enabled": _ven_enabled, "status": "connected" if connected else "disconnected", "lastPublishTs": now},
+            "loads": loads_snap,
+            "metrics": metrics,
+            "schemaVersion": SCHEMA_VERSION,
         }
+        if event_summary:
+            shadow_update.setdefault("metrics", {}).update({"lastEventSummary": event_summary})
 
         if target_power_kw is not None:
             shadow_update["target_power_kw"] = target_power_kw
