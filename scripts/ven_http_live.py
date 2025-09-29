@@ -5,6 +5,9 @@ Usage:
   ./scripts/ven_http_live.py --base-url https://sim.gridcircuit.link --interval 2
 
 Install: pip install requests
+
+This script is defensive about JSON shapes. It tolerates endpoints that return
+strings for status (e.g., "ok") or that flatten fields.
 """
 import argparse
 import json
@@ -30,16 +33,50 @@ def main():
             r = requests.get(url, timeout=5)
             r.raise_for_status()
             j = r.json()
-            used = j.get("metering", {}).get("power_kw")
-            shed = j.get("metering", {}).get("shedPowerKw")
-            ev = j.get("activeEvent") or {}
-            status = "active" if ev.get("eventId") else "idle"
+
+            ok = None
+            power_kw = None
+            shed_kw = None
+            event_status = "idle"
+            event_id = None
+
+            if isinstance(j, dict):
+                status_val = j.get("status")
+                if isinstance(status_val, dict):
+                    ok = status_val.get("ok")
+                elif isinstance(status_val, bool):
+                    ok = status_val
+                elif isinstance(status_val, str):
+                    ok = status_val.strip().lower() in ("ok", "true", "1", "yes")
+
+                met = j.get("metering")
+                if isinstance(met, dict):
+                    power_kw = met.get("power_kw", met.get("powerKw"))
+                    shed_kw = met.get("shedPowerKw", met.get("shed_kw"))
+                # fallbacks for flattened responses
+                power_kw = power_kw if power_kw is not None else j.get("power_kw", j.get("powerKw"))
+                shed_kw = shed_kw if shed_kw is not None else j.get("shed_kw", j.get("shedPowerKw"))
+
+                ev = j.get("activeEvent")
+                if isinstance(ev, dict):
+                    event_id = ev.get("eventId") or ev.get("id")
+                else:
+                    # Some responses may provide a flat event id
+                    event_id = j.get("eventId") or j.get("event")
+                event_status = "active" if event_id else j.get("event_status", "idle")
+            else:
+                # Non-dict top-level JSON (e.g., "ok"); attempt a sensible summary
+                if isinstance(j, bool):
+                    ok = j
+                elif isinstance(j, str):
+                    ok = j.strip().lower() in ("ok", "true", "1", "yes")
+
             print(json.dumps({
-                "ok": j.get("status", {}).get("ok"),
-                "power_kw": used,
-                "shed_kw": shed,
-                "event_status": status,
-                "event": ev.get("eventId"),
+                "ok": ok,
+                "power_kw": power_kw,
+                "shed_kw": shed_kw,
+                "event_status": event_status,
+                "event": event_id,
             }))
             time.sleep(max(1, args.interval))
     except KeyboardInterrupt:
@@ -48,4 +85,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
