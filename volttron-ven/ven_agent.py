@@ -1794,6 +1794,47 @@ def health_snapshot() -> tuple[int, dict]:
 
 
 class HealthHandler(BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        path = urlparse(self.path).path
+        while "//" in path:
+            path = path.replace("//", "/")
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
+
+        # Minimal HEAD handling for common endpoints.
+        if path == "/openapi.json":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            return
+        if path == "/docs":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            return
+        if path in ("/", "/ui"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            return
+        if path == "/health":
+            code, _ = health_snapshot()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            return
+        if path == "/circuits":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            return
+        # Default: 404 for unknown paths
+        self.send_response(404)
+        self.end_headers()
+
     def do_GET(self):
         path = urlparse(self.path).path
         # Normalize duplicate slashes and trailing slashes (except root)
