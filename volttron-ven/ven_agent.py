@@ -667,6 +667,22 @@ _shadow_reported_state: dict[str, Any] = {
 }
 _shadow_target_power_kw: float | None = None
 _ven_enabled: bool = True
+_last_enable_change: dict[str, Any] | None = None  # {ts, to, source}
+ENABLE_DEBOUNCE_SECONDS = 5
+
+# Update context (tracks source of config/shadow changes for logging)
+_UPDATE_SOURCE: str | None = None
+
+def _with_update_source(source: str):
+    class _Ctx:
+        def __enter__(self_inner):
+            global _UPDATE_SOURCE
+            self_inner.prev = _UPDATE_SOURCE
+            _UPDATE_SOURCE = source
+        def __exit__(self_inner, exc_type, exc, tb):
+            global _UPDATE_SOURCE
+            _UPDATE_SOURCE = self_inner.prev
+    return _Ctx()
 
 # ── Metering configuration knobs (tunable at runtime) -----------------------
 _meter_base_min_kw: float = 0.5
@@ -1246,10 +1262,23 @@ def _apply_shadow_delta(delta: dict[str, Any]) -> dict[str, Any]:
         elif key == "enabled":
             try:
                 desired_enabled = bool(value)
-                if desired_enabled and not _ven_enabled:
-                    _ven_enable()
-                elif not desired_enabled and _ven_enabled:
-                    _ven_disable()
+                # Debounce rapid flaps
+                now_ts = int(time.time())
+                if desired_enabled != _ven_enabled:
+                    allow = True
+                    if _last_enable_change and isinstance(_last_enable_change.get("ts"), (int, float)):
+                        if (now_ts - int(_last_enable_change["ts"])) < ENABLE_DEBOUNCE_SECONDS:
+                            allow = False
+                    if allow:
+                        source = _UPDATE_SOURCE or "unknown"
+                        print(f"VEN enable -> {desired_enabled} (source={source})")
+                        if desired_enabled:
+                            _ven_enable()
+                        else:
+                            _ven_disable()
+                        _last_enable_change = {"ts": now_ts, "to": desired_enabled, "source": source}
+                    else:
+                        print("Debounced rapid enable/disable toggle; ignoring")
                 updates[key] = desired_enabled
             except Exception:
                 errors[key] = f"invalid enabled: {value}"
@@ -1336,7 +1365,8 @@ def on_shadow_delta(_client, _userdata, msg):
         return
 
     print(f"Received desired shadow state delta: {delta}")
-    updates = _apply_shadow_delta(delta)
+    with _with_update_source("shadow_delta"):
+        updates = _apply_shadow_delta(delta)
     if updates:
         _shadow_merge_report(updates)
 
@@ -1360,7 +1390,8 @@ def on_shadow_get_accepted(_client, _userdata, msg):
     updates: dict[str, Any] = {"status": {"shadow_version": payload.get("version")}}
 
     if isinstance(desired, dict) and desired:
-        desired_updates = _apply_shadow_delta(desired)
+        with _with_update_source("shadow_get"):
+            desired_updates = _apply_shadow_delta(desired)
         _merge_dict(updates, desired_updates)
     elif isinstance(reported, dict) and reported:
         _sync_reported_state(reported)
@@ -1435,7 +1466,8 @@ def _apply_config_payload(obj: dict[str, Any]) -> dict[str, Any]:
         if fld in obj:
             desired[fld] = obj[fld]
 
-    updates = _apply_shadow_delta(desired)
+    with _with_update_source(_UPDATE_SOURCE or "config"):
+        updates = _apply_shadow_delta(desired)
     if updates:
         _shadow_merge_report(updates)
         _shadow_publish_desired(desired)
@@ -1530,15 +1562,18 @@ def on_backend_cmd(_client, _userdata, msg):
         data = payload.get("data")
 
         if op in ("set", "setconfig"):
-            updates = _apply_config_payload(data if isinstance(data, dict) else payload)
+            with _with_update_source("backend_cmd"):
+                updates = _apply_config_payload(data if isinstance(data, dict) else payload)
             _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
             return
         if op == "enable":
-            updates = _apply_config_payload({"enabled": True})
+            with _with_update_source("backend_cmd"):
+                updates = _apply_config_payload({"enabled": True})
             _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
             return
         if op == "disable":
-            updates = _apply_config_payload({"enabled": False})
+            with _with_update_source("backend_cmd"):
+                updates = _apply_config_payload({"enabled": False})
             _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
             return
         if op == "get":
@@ -1744,6 +1779,9 @@ def health_snapshot() -> tuple[int, dict]:
         "tls_server_hostname": TLS_SERVER_HOSTNAME,
         "enabled": _ven_enabled,
     }
+
+    if _last_enable_change:
+        payload["last_enable_change"] = _last_enable_change
 
     if _last_connect_time is not None:
         payload["last_connected_at"] = _format_timestamp(_last_connect_time)
@@ -2145,7 +2183,7 @@ def main(iterations: int | None = None) -> None:
     global _last_publish_time
     client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
     client.subscribe(MQTT_TOPIC_EVENTS)
-
+    print("✅ MQTT setup complete, starting VEN agent loop")
     # Subscribe to backend control plane topic if configured
     if BACKEND_CMD_TOPIC:
         client.message_callback_add(BACKEND_CMD_TOPIC, on_backend_cmd)
