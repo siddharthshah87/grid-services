@@ -1520,6 +1520,7 @@ def on_backend_cmd(_client, _userdata, msg):
       - { "op": "ping" }
       - { "op": "event", "data": { "event_id": "...", "shed_kw": 1.2, "start_ts": 123, "duration_s": 900 } }
     """
+    global _shadow_target_power_kw
     op = "unknown"
     corr = None
     try:
@@ -1583,7 +1584,6 @@ def on_backend_cmd(_client, _userdata, msg):
                 updates["target_power_kw"] = max(0.0, float(shed_kw))
                 with _shadow_state_lock:
                     try:
-                        global _shadow_target_power_kw
                         _shadow_target_power_kw = float(updates["target_power_kw"])
                     except Exception:
                         pass
