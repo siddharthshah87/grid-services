@@ -11,6 +11,11 @@ import threading
 from copy import deepcopy
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
+try:
+    # Python 3.7+
+    from http.server import ThreadingHTTPServer as _ThreadingHTTPServer  # type: ignore
+except Exception:  # pragma: no cover - fallback for older runtimes
+    _ThreadingHTTPServer = None  # type: ignore
 from urllib.parse import urlparse
 from typing import Any, Deque
 from collections import deque
@@ -2179,7 +2184,15 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(resp).encode())
 
 def _start_health_server():
-    HTTPServer(("0.0.0.0", HEALTH_PORT), HealthHandler).serve_forever()
+_srv_cls = _ThreadingHTTPServer or HTTPServer
+server = _srv_cls(("0.0.0.0", HEALTH_PORT), HealthHandler)
+try:
+    # For ThreadingMixIn-based servers, make threads daemonic so they don't block shutdown
+    if hasattr(server, "daemon_threads"):
+        setattr(server, "daemon_threads", True)
+except Exception:
+    pass
+server.serve_forever()
 
 threading.Thread(target=_start_health_server, daemon=True).start()
 print(f"🩺 Health server running on port {HEALTH_PORT}")
