@@ -234,6 +234,10 @@ CONFIG_UI_HTML = """
       fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({enabled}) })
         .then(()=>refreshLive()).catch(()=>{});
     }
+    function toggleCritical(id, critical){
+      fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({critical}) })
+        .then(()=>refreshLive()).catch(()=>{});
+    }
     function renderCircuits(list){
       const box = document.getElementById('circuits');
       if(!box) return;
@@ -246,6 +250,7 @@ CONFIG_UI_HTML = """
         el.innerHTML = `
           <h2>${c.name} <span class="muted" style="font-weight:400">(${c.type||''})</span> ${shed}</h2>
           <div class="field"><label>Status</label><input type="checkbox" ${c.enabled? 'checked':''} onchange="toggleCircuit('${c.id}', this.checked)"></div>
+          <div class="field"><label>Critical</label><input type="checkbox" ${c.critical? 'checked':''} onchange="toggleCritical('${c.id}', this.checked)"></div>
           <div class="field"><label>Rated</label><div>${(c.rated_kw??0).toFixed ? c.rated_kw.toFixed(2) : c.rated_kw} kW</div></div>
           <div class="field"><label>Now</label><div><strong>${(c.current_kw??0).toFixed ? c.current_kw.toFixed(2) : c.current_kw}</strong> kW</div></div>
         `;
@@ -751,12 +756,14 @@ _last_metering_sample: dict[str, Any] | None = None
 # toggled on/off. For now, metered total power is split among enabled circuits
 # in proportion to their rated_kw to provide a plausible per-circuit breakdown.
 _circuits: list[dict[str, Any]] = [
-    {"id": "hvac1",   "name": "HVAC",       "type": "hvac",   "enabled": True,  "rated_kw": 3.5, "current_kw": 0.0},
-    {"id": "heater1", "name": "Heater",     "type": "heater", "enabled": True,  "rated_kw": 1.5, "current_kw": 0.0},
-    {"id": "ev1",     "name": "EV Charger", "type": "ev",     "enabled": False, "rated_kw": 7.2, "current_kw": 0.0},
-    {"id": "batt1",   "name": "Battery",    "type": "battery","enabled": False, "rated_kw": 5.0, "current_kw": 0.0},
-    {"id": "pv1",     "name": "Solar PV",   "type": "pv",     "enabled": False, "rated_kw": 6.0, "current_kw": 0.0},
-    {"id": "misc1",   "name": "House",      "type": "misc",   "enabled": True,  "rated_kw": 1.0, "current_kw": 0.0},
+    {"id": "hvac1",    "name": "HVAC",        "type": "hvac",    "enabled": True,  "rated_kw": 3.5, "current_kw": 0.0, "critical": True},
+    {"id": "heater1",  "name": "Heater",      "type": "heater",  "enabled": True,  "rated_kw": 1.5, "current_kw": 0.0, "critical": False},
+    {"id": "ev1",      "name": "EV Charger",  "type": "ev",      "enabled": False, "rated_kw": 7.2, "current_kw": 0.0, "critical": False},
+    {"id": "batt1",    "name": "Battery",     "type": "battery", "enabled": False, "rated_kw": 5.0, "current_kw": 0.0, "critical": False},
+    {"id": "pv1",      "name": "Solar PV",    "type": "pv",      "enabled": False, "rated_kw": 6.0, "current_kw": 0.0, "critical": False},
+    {"id": "lights1",  "name": "Lights",      "type": "lights",  "enabled": True,  "rated_kw": 0.4, "current_kw": 0.0, "critical": False},
+    {"id": "fridge1",  "name": "Fridge",      "type": "fridge",  "enabled": True,  "rated_kw": 0.2, "current_kw": 0.0, "critical": True},
+    {"id": "misc1",    "name": "House",       "type": "misc",    "enabled": True,  "rated_kw": 1.0, "current_kw": 0.0, "critical": False},
 ]
 
 # Per-load priority (lower number = more critical, shed later). Defaults:
@@ -799,7 +806,8 @@ def _circuits_snapshot() -> list[dict[str, Any]]:
                 "current_kw": float(c.get("current_kw", 0.0)),
                 "currentPowerKw": float(c.get("current_kw", 0.0)),
                 "shedCapabilityKw": _shed_capability_for(c),
-                "priority": int(_circuit_priority.get(c.get("type", "misc"), 5)),
+                "priority": int(c.get("priority", _circuit_priority.get(c.get("type", "misc"), 5))),
+                "critical": bool(c.get("critical", False)),
             }
             for c in _circuits
         ]
@@ -809,22 +817,28 @@ def _shed_capability_for(c: dict[str, Any]) -> float:
         typ = c.get("type")
         kw = float(c.get("current_kw", 0.0))
         rated = float(c.get("rated_kw", 0.0))
+        crit = bool(c.get("critical", False))
         if not c.get("enabled", True):
             return 0.0
+        # Critical loads have a higher non-shed floor
+        crit_floor_factor = 0.8 if crit else None
         if typ == "hvac":
-            floor = 0.2 * rated
+            floor = (crit_floor_factor or 0.2) * rated
             return round(max(0.0, kw - floor), 2)
         if typ == "heater":
             return round(kw, 2)
         if typ == "ev":
             return round(kw, 2)
         if typ == "misc":
-            floor = 0.3 * rated
+            floor = (crit_floor_factor or 0.3) * rated
             return round(max(0.0, kw - floor), 2)
         if typ == "pv":
             return 0.0
         if typ == "battery":
             return round(rated, 2)
+        if typ in ("lights", "fridge"):
+            floor = (crit_floor_factor or 0.5) * rated
+            return round(max(0.0, kw - floor), 2)
     except Exception:
         return 0.0
     return 0.0
@@ -885,6 +899,8 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
         hvac = next((c for c in _circuits if c["type"] == "hvac"), None)
         heater = next((c for c in _circuits if c["type"] == "heater"), None)
         house = next((c for c in _circuits if c["type"] == "misc"), None)
+        lights = next((c for c in _circuits if c["type"] == "lights"), None)
+        fridge = next((c for c in _circuits if c["type"] == "fridge"), None)
 
     # Base: zero out current_kw
     for c in _circuits:
@@ -933,6 +949,22 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
         ev_kw = min(ev_kw, effective_limit(ev["id"], ev_kw))
         ev["current_kw"] = ev_kw
 
+    # Lights: modest variable draw up to rated
+    if lights and lights.get("enabled", True):
+        lk = round(max(0.0, min(lights.get("rated_kw", 0.0), _r.uniform(0.05, lights.get("rated_kw", 0.0)))), 2)
+        lk = min(lk, effective_limit(lights["id"], lk))
+        lights["current_kw"] = lk
+    else:
+        lk = 0.0
+
+    # Fridge: quasi-constant duty with small jitter
+    if fridge and fridge.get("enabled", True):
+        fk = round(max(0.0, min(fridge.get("rated_kw", 0.0), 0.5 * fridge.get("rated_kw", 0.0) + _r.uniform(-0.02, 0.02))), 2)
+        fk = min(fk, effective_limit(fridge["id"], fk))
+        fridge["current_kw"] = fk
+    else:
+        fk = 0.0
+
     # PV generation: rated * curve factor
     pv_gen = 0.0
     if pv and pv.get("enabled", False):
@@ -940,7 +972,7 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
         pv["current_kw"] = -pv_gen  # represent as negative load (generation)
 
     # Pre-battery net load
-    load_kw = house_kw + hvac_kw + heater_kw + ev_kw
+    load_kw = house_kw + hvac_kw + heater_kw + ev_kw + lk + fk
     net_kw_before_batt = max(0.0, load_kw - pv_gen)
 
     # Battery action: attempt to move net toward effective target
@@ -2137,6 +2169,16 @@ class HealthHandler(BaseHTTPRequestHandler):
                                 c["rated_kw"] = max(0.0, float(body["rated_kw"]))
                             except Exception:
                                 pass
+                        if isinstance(body, dict) and "critical" in body:
+                            try:
+                                c["critical"] = bool(body["critical"])
+                            except Exception:
+                                pass
+                        if isinstance(body, dict) and "priority" in body:
+                            try:
+                                c["priority"] = int(body["priority"])
+                            except Exception:
+                                pass
                         updated = {
                             "id": c["id"],
                             "name": c["name"],
@@ -2144,6 +2186,8 @@ class HealthHandler(BaseHTTPRequestHandler):
                             "enabled": bool(c.get("enabled", True)),
                             "rated_kw": float(c.get("rated_kw", 0.0)),
                             "current_kw": float(c.get("current_kw", 0.0)),
+                            "critical": bool(c.get("critical", False)),
+                            "priority": int(c.get("priority", _circuit_priority.get(c.get("type", "misc"), 5))),
                         }
                         break
             if updated is None:
