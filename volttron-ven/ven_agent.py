@@ -2027,10 +2027,21 @@ class HealthHandler(BaseHTTPRequestHandler):
                     last_event_summary = None
             # Take circuits snapshot outside the lock to avoid re-entrancy.
             loads_live = _circuits_snapshot()
+            # Ensure the UI can render circuits even before the first publish.
+            metering_for_ui = _last_metering_sample if _last_metering_sample else {}
+            try:
+                if not isinstance(metering_for_ui, dict):
+                    metering_for_ui = {}
+                if "circuits" not in metering_for_ui:
+                    metering_for_ui = dict(metering_for_ui)
+                    metering_for_ui["circuits"] = loads_live
+            except Exception:
+                metering_for_ui = {"circuits": loads_live}
+
             live = {
                 "status": status,
                 "config": cfg,
-                "metering": _last_metering_sample,
+                "metering": metering_for_ui,
                 "events": events,
                 "loads": loads_live,
                 "activeEvent": active_event,
