@@ -12,7 +12,7 @@ set -Eeuo pipefail
 REGION="${AWS_REGION:-us-west-2}"
 PROFILE="${AWS_PROFILE:-default}"
 CLUSTER="${1:-hems-ecs-cluster}"
-LOG_LINES="${LOG_LINES:-100}"
+LOG_LINES="${LOG_LINES:-10}"
 TIMEOUT="${TIMEOUT:-20s}"          # per‑AWS‑call cap
 
 # ─── AWS CLI wrapper ──────────────────────────────────────────────────────────
