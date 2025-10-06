@@ -332,7 +332,15 @@ CONFIG_UI_HTML = """
         const el = document.getElementById('build-id'); if(el) el.textContent = v;
       }catch(e){ const el = document.getElementById('build-id'); if(el) el.textContent = 'n/a'; }
     }
-    window.addEventListener('DOMContentLoaded', ()=>{ showBuild(); loadCurrent(); refreshLive(); setInterval(refreshLive, 2000); });
+    window.addEventListener('DOMContentLoaded', ()=>{
+      showBuild();
+      loadCurrent();
+      // Eagerly render circuits once from /circuits so the panel shows loads
+      // immediately, then let /live keep it fresh.
+      fetch('/circuits').then(r=>r.ok?r.json():[]).then(list=>{ try{ renderCircuits(list||[]); }catch(e){} });
+      refreshLive();
+      setInterval(refreshLive, 2000);
+    });
   </script>
   </head>
   <body>
