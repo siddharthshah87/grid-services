@@ -158,6 +158,8 @@ CONFIG_UI_HTML = """
     .pill { background:#0b5; color:#fff; padding:4px 8px; border-radius:999px; font-size:.8rem; }
     .badge { background:#e67e22; color:#fff; padding:2px 6px; border-radius:6px; font-size:.75rem; margin-left:8px; }
     .build { margin-left:auto; font-size:.8rem; opacity:.9; }
+    .gauge { margin-top:10px; width:100%; height:14px; background:#333; border-radius:7px; overflow:hidden; box-shadow: inset 0 0 4px rgba(0,0,0,.5); }
+    .bar { height:100%; background: linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c); width:0%; transition: width .4s ease; }
   </style>
   <script>
     async function loadCurrent(){
@@ -238,6 +240,19 @@ CONFIG_UI_HTML = """
       fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({critical}) })
         .then(()=>refreshLive()).catch(()=>{});
     }
+    function toggleConnected(id, connected){
+      fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({connected}) })
+        .then(()=>refreshLive()).catch(()=>{});
+    }
+    function setMode(id, mode){
+      fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mode}) })
+        .then(()=>refreshLive()).catch(()=>{});
+    }
+    function setFixedKw(id, v){
+      const fixed_kw = Number(v||0);
+      fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({fixed_kw}) })
+        .then(()=>refreshLive()).catch(()=>{});
+    }
     function renderCircuits(list){
       const box = document.getElementById('circuits');
       if(!box) return;
@@ -249,6 +264,16 @@ CONFIG_UI_HTML = """
         const shed = shedding.has(c.id) ? '<span class="badge">Shed</span>' : '';
         el.innerHTML = `
           <h2>${c.name} <span class="muted" style="font-weight:400">(${c.type||''})</span> ${shed}</h2>
+          <div class="field"><label>Connected</label><input type="checkbox" ${c.connected!==false? 'checked':''} onchange="toggleConnected('${c.id}', this.checked)"></div>
+          <div class="field"><label>Mode</label>
+            <div>
+              <select onchange="setMode('${c.id}', this.value)">
+                <option value="dynamic" ${c.mode==='dynamic'?'selected':''}>Dynamic</option>
+                <option value="fixed" ${c.mode==='fixed'?'selected':''}>Fixed</option>
+              </select>
+              <input type="number" step="0.01" min="0" value="${(c.fixedKw??0)}" onblur="setFixedKw('${c.id}', this.value)" style="width:100px; margin-left:8px;" />
+            </div>
+          </div>
           <div class="field"><label>Status</label><input type="checkbox" ${c.enabled? 'checked':''} onchange="toggleCircuit('${c.id}', this.checked)"></div>
           <div class="field"><label>Critical</label><input type="checkbox" ${c.critical? 'checked':''} onchange="toggleCritical('${c.id}', this.checked)"></div>
           <div class="field"><label>Rated</label><div>${(c.rated_kw??0).toFixed ? c.rated_kw.toFixed(2) : c.rated_kw} kW</div></div>
@@ -283,18 +308,28 @@ CONFIG_UI_HTML = """
         // the panel always renders even before the first publish.
         const liveCircuits = (j.metering && j.metering.circuits) || [];
         if(Array.isArray(liveCircuits) && liveCircuits.length > 0){
+          window.__lastCircuits = liveCircuits;
           renderCircuits(liveCircuits);
         } else {
           try {
             const rc = await fetch('/circuits');
             if (rc.ok) {
               const list = await rc.json();
+              window.__lastCircuits = list;
               renderCircuits(list);
             } else {
               renderCircuits([]);
             }
           } catch(e){ renderCircuits([]); }
         }
+        // Update overall draw gauge
+        try{
+          const list = window.__lastCircuits || [];
+          const cap = list.filter(x=>x.connected!==false).reduce((s,c)=> s + (Number(c.rated_kw||0) || 0), 0) || 1;
+          const p = (j.metering && j.metering.power_kw!=null) ? Number(j.metering.power_kw) : 0;
+          const pct = Math.min(100, Math.max(0, (p/cap)*100));
+          const bar = document.getElementById('gauge-bar'); if(bar) bar.style.width = pct.toFixed(0)+'%';
+        }catch(e){}
         // Update event banners
         const eb = document.getElementById('eventbar');
         if(eb){
@@ -367,6 +402,7 @@ CONFIG_UI_HTML = """
               <div><span class="muted">Battery SOC</span><br/><strong><span id="live-batt-soc">--</span></strong></div>
             </div>
           </div>
+          <div class="gauge"><div id="gauge-bar" class="bar"></div></div>
           <div style="margin-top:10px; color:#ccc; display:flex; align-items:center; gap:16px;">
             <div><span id="led-enabled" class="led bad"></span> Enabled</div>
             <div><span id="led-mqtt" class="led bad"></span> MQTT</div>
@@ -779,14 +815,14 @@ _last_metering_sample: dict[str, Any] | None = None
 # toggled on/off. For now, metered total power is split among enabled circuits
 # in proportion to their rated_kw to provide a plausible per-circuit breakdown.
 _circuits: list[dict[str, Any]] = [
-    {"id": "hvac1",    "name": "HVAC",        "type": "hvac",    "enabled": True,  "rated_kw": 3.5, "current_kw": 0.0, "critical": True},
-    {"id": "heater1",  "name": "Heater",      "type": "heater",  "enabled": True,  "rated_kw": 1.5, "current_kw": 0.0, "critical": False},
-    {"id": "ev1",      "name": "EV Charger",  "type": "ev",      "enabled": False, "rated_kw": 7.2, "current_kw": 0.0, "critical": False},
-    {"id": "batt1",    "name": "Battery",     "type": "battery", "enabled": False, "rated_kw": 5.0, "current_kw": 0.0, "critical": False},
-    {"id": "pv1",      "name": "Solar PV",    "type": "pv",      "enabled": False, "rated_kw": 6.0, "current_kw": 0.0, "critical": False},
-    {"id": "lights1",  "name": "Lights",      "type": "lights",  "enabled": True,  "rated_kw": 0.4, "current_kw": 0.0, "critical": False},
-    {"id": "fridge1",  "name": "Fridge",      "type": "fridge",  "enabled": True,  "rated_kw": 0.2, "current_kw": 0.0, "critical": True},
-    {"id": "misc1",    "name": "House",       "type": "misc",    "enabled": True,  "rated_kw": 1.0, "current_kw": 0.0, "critical": False},
+    {"id": "hvac1",    "name": "HVAC",       "type": "hvac",    "enabled": True,  "connected": True, "rated_kw": 3.5, "current_kw": 0.0, "critical": True,  "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "heater1",  "name": "Heater",     "type": "heater",  "enabled": True,  "connected": True, "rated_kw": 1.5, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "ev1",      "name": "EV Charger", "type": "ev",      "enabled": False, "connected": True, "rated_kw": 7.2, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "batt1",    "name": "Battery",    "type": "battery", "enabled": False, "connected": True, "rated_kw": 5.0, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "pv1",      "name": "Solar PV",   "type": "pv",      "enabled": False, "connected": True, "rated_kw": 6.0, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "lights1",  "name": "Lights",     "type": "lights",  "enabled": True,  "connected": True, "rated_kw": 0.4, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "fridge1",  "name": "Fridge",     "type": "fridge",  "enabled": True,  "connected": True, "rated_kw": 0.2, "current_kw": 0.0, "critical": True,  "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "misc1",    "name": "House",      "type": "misc",    "enabled": True,  "connected": True, "rated_kw": 1.0, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
 ]
 
 # Per-load priority (lower number = more critical, shed later). Defaults:
@@ -831,6 +867,9 @@ def _circuits_snapshot() -> list[dict[str, Any]]:
                 "shedCapabilityKw": _shed_capability_for(c),
                 "priority": int(c.get("priority", _circuit_priority.get(c.get("type", "misc"), 5))),
                 "critical": bool(c.get("critical", False)),
+                "connected": bool(c.get("connected", True)),
+                "mode": c.get("mode", "dynamic"),
+                "fixedKw": float(c.get("fixed_kw", 0.0)),
             }
             for c in _circuits
         ]
@@ -940,49 +979,62 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
             return default
         return min(default, float(entry.get("limit_kw", default)))
 
-    # House load (misc): between base min/max with jitter
+    # Helper for fixed/dynamic per-load
     import random as _r
+    def _apply_mode(c: dict[str, Any], dyn_kw: float) -> float:
+        if not c or not c.get("connected", True) or not c.get("enabled", True):
+            return 0.0
+        mode = str(c.get("mode") or "dynamic").lower()
+        if mode == "fixed":
+            try:
+                return max(0.0, min(float(c.get("rated_kw", 0.0)), float(c.get("fixed_kw", 0.0))))
+            except Exception:
+                return 0.0
+        return max(0.0, dyn_kw)
+
+    # House load (misc): between base min/max with jitter
     base_low, base_high = _meter_base_min_kw, max(_meter_base_min_kw, _meter_base_max_kw)
     house_kw = 0.0
-    if house and house.get("enabled", True):
-        house_kw = round(_r.uniform(base_low, base_high), 2)
+    if house and house.get("connected", True):
+        dyn = round(_r.uniform(base_low, base_high), 2)
+        house_kw = _apply_mode(house, dyn)
         house_kw = min(house_kw, effective_limit(house["id"], house_kw))
         house["current_kw"] = house_kw
 
     # HVAC: duty between 0.2..0.8 of rated
     hvac_kw = 0.0
-    if hvac and hvac.get("enabled", True):
+    if hvac and hvac.get("connected", True):
         duty = max(0.0, min(1.0, 0.5 + _r.uniform(-0.3, 0.3)))
-        hvac_kw = round(hvac.get("rated_kw", 0.0) * duty, 2)
+        hvac_kw = _apply_mode(hvac, round(hvac.get("rated_kw", 0.0) * duty, 2))
         hvac_kw = min(hvac_kw, effective_limit(hvac["id"], hvac_kw))
         hvac["current_kw"] = hvac_kw
 
     # Heater: bursty low duty 0..0.5
     heater_kw = 0.0
-    if heater and heater.get("enabled", True):
+    if heater and heater.get("connected", True):
         duty = max(0.0, min(0.5, _r.uniform(0.0, 0.5)))
-        heater_kw = round(heater.get("rated_kw", 0.0) * duty, 2)
+        heater_kw = _apply_mode(heater, round(heater.get("rated_kw", 0.0) * duty, 2))
         heater_kw = min(heater_kw, effective_limit(heater["id"], heater_kw))
         heater["current_kw"] = heater_kw
 
     # EV: simple on/off at rated when enabled
     ev_kw = 0.0
-    if ev and ev.get("enabled", False):
-        ev_kw = round(ev.get("rated_kw", 0.0), 2)
+    if ev and ev.get("connected", True):
+        ev_kw = _apply_mode(ev, round(ev.get("rated_kw", 0.0), 2))
         ev_kw = min(ev_kw, effective_limit(ev["id"], ev_kw))
         ev["current_kw"] = ev_kw
 
     # Lights: modest variable draw up to rated
-    if lights and lights.get("enabled", True):
-        lk = round(max(0.0, min(lights.get("rated_kw", 0.0), _r.uniform(0.05, lights.get("rated_kw", 0.0)))), 2)
+    if lights and lights.get("connected", True):
+        lk = _apply_mode(lights, round(max(0.0, min(lights.get("rated_kw", 0.0), _r.uniform(0.05, lights.get("rated_kw", 0.0)))), 2))
         lk = min(lk, effective_limit(lights["id"], lk))
         lights["current_kw"] = lk
     else:
         lk = 0.0
 
     # Fridge: quasi-constant duty with small jitter
-    if fridge and fridge.get("enabled", True):
-        fk = round(max(0.0, min(fridge.get("rated_kw", 0.0), 0.5 * fridge.get("rated_kw", 0.0) + _r.uniform(-0.02, 0.02))), 2)
+    if fridge and fridge.get("connected", True):
+        fk = _apply_mode(fridge, round(max(0.0, min(fridge.get("rated_kw", 0.0), 0.5 * fridge.get("rated_kw", 0.0) + _r.uniform(-0.02, 0.02))), 2))
         fk = min(fk, effective_limit(fridge["id"], fk))
         fridge["current_kw"] = fk
     else:
@@ -990,7 +1042,7 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
 
     # PV generation: rated * curve factor
     pv_gen = 0.0
-    if pv and pv.get("enabled", False):
+    if pv and pv.get("connected", True) and pv.get("enabled", False):
         pv_gen = round(pv.get("rated_kw", 0.0) * _pv_curve_factor(now_ts), 2)
         pv["current_kw"] = -pv_gen  # represent as negative load (generation)
 
@@ -2213,6 +2265,23 @@ class HealthHandler(BaseHTTPRequestHandler):
                                 c["priority"] = int(body["priority"])
                             except Exception:
                                 pass
+                        if isinstance(body, dict) and "connected" in body:
+                            try:
+                                c["connected"] = bool(body["connected"])
+                            except Exception:
+                                pass
+                        if isinstance(body, dict) and "mode" in body:
+                            try:
+                                m = str(body["mode"]).lower()
+                                if m in ("dynamic","fixed"):
+                                    c["mode"] = m
+                            except Exception:
+                                pass
+                        if isinstance(body, dict) and "fixed_kw" in body:
+                            try:
+                                c["fixed_kw"] = max(0.0, float(body["fixed_kw"]))
+                            except Exception:
+                                pass
                         updated = {
                             "id": c["id"],
                             "name": c["name"],
@@ -2222,6 +2291,9 @@ class HealthHandler(BaseHTTPRequestHandler):
                             "current_kw": float(c.get("current_kw", 0.0)),
                             "critical": bool(c.get("critical", False)),
                             "priority": int(c.get("priority", _circuit_priority.get(c.get("type", "misc"), 5))),
+                            "connected": bool(c.get("connected", True)),
+                            "mode": c.get("mode", "dynamic"),
+                            "fixedKw": float(c.get("fixed_kw", 0.0)),
                         }
                         break
             if updated is None:
