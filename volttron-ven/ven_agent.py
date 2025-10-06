@@ -703,7 +703,10 @@ _last_disconnect_time: float | None = None
 _last_publish_time: float | None = None
 _reconnect_lock = threading.Lock()
 _reconnect_in_progress = False
-_shadow_state_lock = threading.Lock()
+# Use an RLock to avoid deadlocks when helper functions that also acquire the
+# same lock are called from within a locked section (e.g., /live assembling a
+# snapshot while holding the state lock).
+_shadow_state_lock = threading.RLock()
 _shadow_reported_state: dict[str, Any] = {
     "status": {"ven": "starting", "mqtt_connected": False},
     "report_interval_seconds": REPORT_INTERVAL_SECONDS,
@@ -1951,6 +1954,9 @@ class HealthHandler(BaseHTTPRequestHandler):
 
         if path == "/live":
             code, status = health_snapshot()
+            # Read basic config and shadow-derived bits under the lock, but
+            # take the (potentially slower) circuits snapshot outside to avoid
+            # holding the lock during nested calls.
             with _shadow_state_lock:
                 cfg = {
                     "report_interval_seconds": REPORT_INTERVAL_SECONDS,
@@ -1965,7 +1971,6 @@ class HealthHandler(BaseHTTPRequestHandler):
                         events = evs.get("last_backend") or evs.get("last")
                 except Exception:
                     events = None
-                loads_live = _circuits_snapshot()
                 # Active event info for UI banner
                 active_event = None
                 if _active_event:
@@ -1988,6 +1993,8 @@ class HealthHandler(BaseHTTPRequestHandler):
                         last_event_summary = mets.get("lastEventSummary")
                 except Exception:
                     last_event_summary = None
+            # Take circuits snapshot outside the lock to avoid re-entrancy.
+            loads_live = _circuits_snapshot()
             live = {
                 "status": status,
                 "config": cfg,
