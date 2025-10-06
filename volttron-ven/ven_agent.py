@@ -551,6 +551,15 @@ except ValueError:
     REPORT_INTERVAL_SECONDS = 60
 REPORT_INTERVAL_SECONDS = max(1, REPORT_INTERVAL_SECONDS)
 
+# Compute client identity early so it is available for VEN_ID
+CLIENT_ID             = (
+    os.getenv("IOT_CLIENT_ID")
+    or os.getenv("CLIENT_ID")
+    or os.getenv("AWS_IOT_THING_NAME")
+    or os.getenv("THING_NAME")
+    or "volttron_thing"
+)
+
 SCHEMA_VERSION = "1.0"
 VEN_ID = IOT_THING_NAME or CLIENT_ID
 
@@ -571,14 +580,6 @@ else:
     SHADOW_TOPIC_GET_REJECTED = None
     BACKEND_CMD_TOPIC = os.getenv("BACKEND_CMD_TOPIC")
     BACKEND_ACK_TOPIC = os.getenv("BACKEND_ACK_TOPIC")
-    
-CLIENT_ID             = (
-    os.getenv("IOT_CLIENT_ID")
-    or os.getenv("CLIENT_ID")
-    or os.getenv("AWS_IOT_THING_NAME")
-    or os.getenv("THING_NAME")
-    or "volttron_thing"
-)
 
 # ── TLS setup ──────────────────────────────────────────────────────────
 CA_CERT = CLIENT_CERT = PRIVATE_KEY = None
@@ -654,9 +655,47 @@ elif ".vpce." in MQTT_CONNECT_HOST:
         file=sys.stderr,
     )
 
-_tls_ctx = _build_tls_context(CA_CERT, CLIENT_CERT, PRIVATE_KEY, TLS_SERVER_HOSTNAME, MQTT_CONNECT_HOST)
-client.tls_set_context(_tls_ctx)
+_tls_ctx = None
+try:
+    _tls_ctx = _build_tls_context(CA_CERT, CLIENT_CERT, PRIVATE_KEY, TLS_SERVER_HOSTNAME, MQTT_CONNECT_HOST)
+    client.tls_set_context(_tls_ctx)
+except Exception as tls_err:
+    print(f"⚠️ Falling back to insecure TLS due to context error: {tls_err}", file=sys.stderr)
+    if hasattr(client, "tls_insecure_set"):
+        try:
+            client.tls_insecure_set(True)
+        except Exception:
+            pass
+# When overriding SNI/hostname, disable Paho's built-in hostname verification and
+# perform our own check post-connect. This aligns with existing tests and allows
+# connecting to IoT PrivateLink endpoints while validating against the public ATS name.
+if manual_hostname_override and hasattr(client, "tls_insecure_set"):
+    try:
+        client.tls_insecure_set(True)
+    except Exception:
+        pass
 client.reconnect_delay_set(min_delay=1, max_delay=60)
+# Keep publish queue bounded to avoid unbounded memory use if the broker is unreachable.
+try:
+    client.max_inflight_messages_set(20)
+    client.max_queued_messages_set(200)
+except Exception:
+    pass
+try:
+    client.enable_logger()
+except Exception:
+    pass
+
+# Last Will: mark the VEN as offline if the client disconnects unexpectedly.
+try:
+    client.will_set(
+        MQTT_TOPIC_STATUS,
+        json.dumps({"ven": "offline", "venId": VEN_ID, "ts": int(time.time())}),
+        qos=1,
+        retain=False,
+    )
+except Exception:
+    pass
 
 connected = False
 _last_connect_time: float | None = None
@@ -1763,6 +1802,10 @@ def _shutdown(signo, _frame):
     sys.exit(0)
 
 signal.signal(signal.SIGTERM, _shutdown)
+try:
+    signal.signal(signal.SIGINT, _shutdown)
+except Exception:
+    pass
 
 client.loop_start()
 
@@ -2184,15 +2227,15 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(resp).encode())
 
 def _start_health_server():
-_srv_cls = _ThreadingHTTPServer or HTTPServer
-server = _srv_cls(("0.0.0.0", HEALTH_PORT), HealthHandler)
-try:
-    # For ThreadingMixIn-based servers, make threads daemonic so they don't block shutdown
-    if hasattr(server, "daemon_threads"):
-        setattr(server, "daemon_threads", True)
-except Exception:
-    pass
-server.serve_forever()
+    _srv_cls = _ThreadingHTTPServer or HTTPServer
+    server = _srv_cls(("0.0.0.0", HEALTH_PORT), HealthHandler)
+    try:
+        # For ThreadingMixIn-based servers, make threads daemonic so they don't block shutdown
+        if hasattr(server, "daemon_threads"):
+            setattr(server, "daemon_threads", True)
+    except Exception:
+        pass
+    server.serve_forever()
 
 threading.Thread(target=_start_health_server, daemon=True).start()
 print(f"🩺 Health server running on port {HEALTH_PORT}")
@@ -2267,167 +2310,179 @@ def main(iterations: int | None = None) -> None:
         if not _ven_enabled:
             time.sleep(1)
             continue
-
-        now = int(time.time())
-        status_payload = {"ven": "ready"}
-        # Build metering payload with optional fields
-        # Compute panel step via circuit model
-        step = _compute_panel_step(now)
-        power_kw = step["power_kw"]
-        metering_payload = {"timestamp": now, "power_kw": power_kw}
-        with _shadow_state_lock:
-            include_v = _voltage_enabled
-            include_i = _current_enabled
-            v_nom = _voltage_nominal
-            pf = _power_factor
-
-        if include_v:
-            metering_payload["voltage_v"] = _next_voltage_reading()
-            v_for_current = metering_payload["voltage_v"]
-        else:
-            v_for_current = v_nom
-
-        if include_i and v_for_current > 0 and pf > 0:
-            # P(kW) = V(V) * I(A) * PF / 1000  => I = P*1000/(V*PF)
-            amps = (power_kw * 1000.0) / (v_for_current * pf)
-            metering_payload["current_a"] = round(max(0.0, amps), 2)
-
-        # Attach per-circuit snapshot and battery SOC
-        metering_payload["circuits"] = step.get("circuits")
-        metering_payload["battery_soc"] = step.get("battery_soc")
-
-        # Update history and event-derived metrics
         try:
-            _power_history.append((now, float(power_kw)))
+            now = int(time.time())
+            status_payload = {"ven": "ready"}
+            # Build metering payload with optional fields
+            # Compute panel step via circuit model
+            step = _compute_panel_step(now)
+            power_kw = step["power_kw"]
+            metering_payload = {"timestamp": now, "power_kw": power_kw}
+            with _shadow_state_lock:
+                include_v = _voltage_enabled
+                include_i = _current_enabled
+                v_nom = _voltage_nominal
+                pf = _power_factor
+
+            if include_v:
+                metering_payload["voltage_v"] = _next_voltage_reading()
+                v_for_current = metering_payload["voltage_v"]
+            else:
+                v_for_current = v_nom
+
+            if include_i and v_for_current > 0 and pf > 0:
+                # P(kW) = V(V) * I(A) * PF / 1000  => I = P*1000/(V*PF)
+                amps = (power_kw * 1000.0) / (v_for_current * pf)
+                metering_payload["current_a"] = round(max(0.0, amps), 2)
+
+            # Attach per-circuit snapshot and battery SOC
+            metering_payload["circuits"] = step.get("circuits")
+            metering_payload["battery_soc"] = step.get("battery_soc")
+
+            # Update history and event-derived metrics
+            try:
+                _power_history.append((now, float(power_kw)))
+            except Exception:
+                pass
+
+            # Determine if within active event window
+            shed_power_kw = 0.0
+            requested_kw = None
+            event_id = None
+            if _active_event:
+                event_id = _active_event.get("event_id")
+                st = int(_active_event.get("start_ts", 0))
+                et = int(_active_event.get("end_ts", 0))
+                if now >= et:
+                    # Event ended
+                    _active_event["ended_at"] = now
+                if st <= now <= et:
+                    requested_kw = _active_event.get("requested_kw")
+                    # Compute baseline if missing: avg of last 5 samples before start
+                    if _active_event.get("baseline_kw") is None:
+                        prev = [v for (ts, v) in list(_power_history) if ts < st][-5:]
+                        if prev:
+                            _active_event["baseline_kw"] = sum(prev) / len(prev)
+                    base = _active_event.get("baseline_kw")
+                    if isinstance(base, (int, float)):
+                        shed_power_kw = max(0.0, float(base) - float(power_kw))
+                        # accumulate delivered kWh
+                        step_h = max(1.0, REPORT_INTERVAL_SECONDS) / 3600.0
+                        _active_event["delivered_kwh"] = float(_active_event.get("delivered_kwh") or 0.0) + shed_power_kw * step_h
+
+            # Enrich telemetry
+            telem = {
+                "schemaVersion": SCHEMA_VERSION,
+                "venId": VEN_ID,
+                "timestamp": now,
+                "usedPowerKw": power_kw,
+                "shedPowerKw": round(shed_power_kw, 3),
+            }
+            if requested_kw is not None:
+                telem["requestedReductionKw"] = float(requested_kw)
+            if event_id is not None:
+                telem["eventId"] = str(event_id)
+            telem["loads"] = [
+                {"id": c["id"], "currentPowerKw": float(c.get("current_kw", 0.0))}
+                for c in (step.get("circuits") or [])
+            ]
+            if "battery_soc" in step:
+                telem["batterySoc"] = step["battery_soc"]
+            # Back-compat: keep previous topic payload plus enriched telem keys
+            metering_payload.update(telem)
+
+            try:
+                client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
+                client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
+            except Exception as pub_err:
+                print(f"Publish error: {pub_err}", file=sys.stderr)
+
+            # Publish richer loads snapshot occasionally (optional)
+            try:
+                global _loads_pub_counter
+                _loads_pub_counter = (_loads_pub_counter + 1) % max(1, LOADS_PUBLISH_EVERY)
+                if BACKEND_LOADS_TOPIC and _loads_pub_counter == 0:
+                    loads_msg = {
+                        "schemaVersion": SCHEMA_VERSION,
+                        "venId": VEN_ID,
+                        "timestamp": now,
+                        "loads": loads_snap,
+                    }
+                    client.publish(BACKEND_LOADS_TOPIC, json.dumps(loads_msg), qos=1)
+            except Exception:
+                pass
+            print("Published VEN status and metering data to MQTT")
+            _last_publish_time = time.time()
+            # store last metering for /live UI endpoint
+            try:
+                global _last_metering_sample
+                _last_metering_sample = dict(metering_payload)
+            except Exception:
+                pass
+            with _shadow_state_lock:
+                target_power_kw = _shadow_target_power_kw
+
+            # Compute loads and metrics snapshot for shadow
+            loads_snap = _circuits_snapshot()
+            metrics = {
+                "currentPowerKw": power_kw,
+                "shedAvailabilityKw": _compute_shed_availability(),
+            }
+            if step.get("battery_soc") is not None:
+                metrics["batterySoc"] = step.get("battery_soc")
+            if event_id is not None:
+                metrics["activeEventId"] = event_id
+            # Event summary handling
+            event_summary = _maybe_finalize_event(now)
+
+            shadow_update = {
+                "status": {
+                    "ven": "ready",
+                    "last_publish_ts": now,
+                    "mqtt_connected": connected
+                },
+                "metering": metering_payload,
+                "report_interval_seconds": REPORT_INTERVAL_SECONDS,
+                "ven": {"venId": VEN_ID, "enabled": _ven_enabled, "status": "connected" if connected else "disconnected", "lastPublishTs": now},
+                "loads": loads_snap,
+                "metrics": metrics,
+                "schemaVersion": SCHEMA_VERSION,
+            }
+            if event_summary:
+                shadow_update.setdefault("metrics", {}).update({"lastEventSummary": event_summary})
+
+            if target_power_kw is not None:
+                shadow_update["target_power_kw"] = target_power_kw
+
+            # Include current knob configuration in reported state for visibility.
+            with _shadow_state_lock:
+                shadow_update.update({
+                    "enabled": _ven_enabled,
+                    "meter_base_min_kw": _meter_base_min_kw,
+                    "meter_base_max_kw": _meter_base_max_kw,
+                    "meter_jitter_pct": _meter_jitter_pct,
+                    "voltage_enabled": _voltage_enabled,
+                    "voltage_nominal": _voltage_nominal,
+                    "voltage_jitter_pct": _voltage_jitter_pct,
+                    "current_enabled": _current_enabled,
+                    "power_factor": _power_factor,
+                })
+
+            _shadow_merge_report(shadow_update)
+
+            count += 1
+            if iterations is not None and count >= iterations:
+                break
+        except Exception as loop_err:
+            print(f"Loop error (continuing): {loop_err}", file=sys.stderr)
+        # Add slight jitter to reduce thundering herd across instances
+        sleep_s = REPORT_INTERVAL_SECONDS
+        try:
+            jitter = max(0.0, min(0.25 * REPORT_INTERVAL_SECONDS, random.uniform(0, 0.1 * REPORT_INTERVAL_SECONDS)))
+            sleep_s = REPORT_INTERVAL_SECONDS + jitter
         except Exception:
             pass
-
-        # Determine if within active event window
-        shed_power_kw = 0.0
-        requested_kw = None
-        event_id = None
-        if _active_event:
-            event_id = _active_event.get("event_id")
-            st = int(_active_event.get("start_ts", 0))
-            et = int(_active_event.get("end_ts", 0))
-            if now >= et:
-                # Event ended
-                _active_event["ended_at"] = now
-            if st <= now <= et:
-                requested_kw = _active_event.get("requested_kw")
-                # Compute baseline if missing: avg of last 5 samples before start
-                if _active_event.get("baseline_kw") is None:
-                    prev = [v for (ts, v) in list(_power_history) if ts < st][-5:]
-                    if prev:
-                        _active_event["baseline_kw"] = sum(prev) / len(prev)
-                base = _active_event.get("baseline_kw")
-                if isinstance(base, (int, float)):
-                    shed_power_kw = max(0.0, float(base) - float(power_kw))
-                    # accumulate delivered kWh
-                    step_h = max(1.0, REPORT_INTERVAL_SECONDS) / 3600.0
-                    _active_event["delivered_kwh"] = float(_active_event.get("delivered_kwh") or 0.0) + shed_power_kw * step_h
-
-        # Enrich telemetry
-        telem = {
-            "schemaVersion": SCHEMA_VERSION,
-            "venId": VEN_ID,
-            "timestamp": now,
-            "usedPowerKw": power_kw,
-            "shedPowerKw": round(shed_power_kw, 3),
-        }
-        if requested_kw is not None:
-            telem["requestedReductionKw"] = float(requested_kw)
-        if event_id is not None:
-            telem["eventId"] = str(event_id)
-        telem["loads"] = [
-            {"id": c["id"], "currentPowerKw": float(c.get("current_kw", 0.0))}
-            for c in (step.get("circuits") or [])
-        ]
-        if "battery_soc" in step:
-            telem["batterySoc"] = step["battery_soc"]
-        # Back-compat: keep previous topic payload plus enriched telem keys
-        metering_payload.update(telem)
-
-        client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
-        client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
-
-        # Publish richer loads snapshot occasionally (optional)
-        try:
-            global _loads_pub_counter
-            _loads_pub_counter = (_loads_pub_counter + 1) % max(1, LOADS_PUBLISH_EVERY)
-            if BACKEND_LOADS_TOPIC and _loads_pub_counter == 0:
-                loads_msg = {
-                    "schemaVersion": SCHEMA_VERSION,
-                    "venId": VEN_ID,
-                    "timestamp": now,
-                    "loads": loads_snap,
-                }
-                client.publish(BACKEND_LOADS_TOPIC, json.dumps(loads_msg), qos=1)
-        except Exception:
-            pass
-        print("Published VEN status and metering data to MQTT")
-        _last_publish_time = time.time()
-        # store last metering for /live UI endpoint
-        try:
-            global _last_metering_sample
-            _last_metering_sample = dict(metering_payload)
-        except Exception:
-            pass
-        with _shadow_state_lock:
-            target_power_kw = _shadow_target_power_kw
-
-        # Compute loads and metrics snapshot for shadow
-        loads_snap = _circuits_snapshot()
-        metrics = {
-            "currentPowerKw": power_kw,
-            "shedAvailabilityKw": _compute_shed_availability(),
-        }
-        if step.get("battery_soc") is not None:
-            metrics["batterySoc"] = step.get("battery_soc")
-        if event_id is not None:
-            metrics["activeEventId"] = event_id
-        # Event summary handling
-        event_summary = _maybe_finalize_event(now)
-
-        shadow_update = {
-            "status": {
-                "ven": "ready",
-                "last_publish_ts": now,
-                "mqtt_connected": connected
-            },
-            "metering": metering_payload,
-            "report_interval_seconds": REPORT_INTERVAL_SECONDS,
-            "ven": {"venId": VEN_ID, "enabled": _ven_enabled, "status": "connected" if connected else "disconnected", "lastPublishTs": now},
-            "loads": loads_snap,
-            "metrics": metrics,
-            "schemaVersion": SCHEMA_VERSION,
-        }
-        if event_summary:
-            shadow_update.setdefault("metrics", {}).update({"lastEventSummary": event_summary})
-
-        if target_power_kw is not None:
-            shadow_update["target_power_kw"] = target_power_kw
-
-        # Include current knob configuration in reported state for visibility.
-        with _shadow_state_lock:
-            shadow_update.update({
-                "enabled": _ven_enabled,
-                "meter_base_min_kw": _meter_base_min_kw,
-                "meter_base_max_kw": _meter_base_max_kw,
-                "meter_jitter_pct": _meter_jitter_pct,
-                "voltage_enabled": _voltage_enabled,
-                "voltage_nominal": _voltage_nominal,
-                "voltage_jitter_pct": _voltage_jitter_pct,
-                "current_enabled": _current_enabled,
-                "power_factor": _power_factor,
-            })
-
-        _shadow_merge_report(shadow_update)
-
-        count += 1
-        if iterations is not None and count >= iterations:
-            break
-        time.sleep(REPORT_INTERVAL_SECONDS)
+        time.sleep(sleep_s)
 
 if __name__ == "__main__":
     main()
