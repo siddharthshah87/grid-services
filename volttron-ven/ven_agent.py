@@ -279,7 +279,22 @@ CONFIG_UI_HTML = """
           document.getElementById('live-batt-soc').textContent = soc + '%';
         }
         window.__sheddingIds = j.sheddingLoadIds || [];
-        renderCircuits(j.metering && j.metering.circuits);
+        // Prefer circuits from /live.metering, but fall back to /circuits so
+        // the panel always renders even before the first publish.
+        const liveCircuits = (j.metering && j.metering.circuits) || [];
+        if(Array.isArray(liveCircuits) && liveCircuits.length > 0){
+          renderCircuits(liveCircuits);
+        } else {
+          try {
+            const rc = await fetch('/circuits');
+            if (rc.ok) {
+              const list = await rc.json();
+              renderCircuits(list);
+            } else {
+              renderCircuits([]);
+            }
+          } catch(e){ renderCircuits([]); }
+        }
         // Update event banners
         const eb = document.getElementById('eventbar');
         if(eb){
