@@ -133,7 +133,7 @@ CONFIG_UI_HTML = """
     header { background: var(--bg); color:#fff; padding:12px 16px; position:sticky; top:0; display:flex; align-items:center; gap:12px; }
     header a { color:#fff; margin-left: 12px; text-decoration: underline; }
     main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
-    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
     .card { background: var(--card); border-radius: 10px; padding:16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
     .card h2 { margin:0 0 8px; font-size:1.1rem; }
     .field { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:8px 0; }
@@ -160,6 +160,12 @@ CONFIG_UI_HTML = """
     .build { margin-left:auto; font-size:.8rem; opacity:.9; }
     .gauge { margin-top:10px; width:100%; height:14px; background:#333; border-radius:7px; overflow:hidden; box-shadow: inset 0 0 4px rgba(0,0,0,.5); }
     .bar { height:100%; background: linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c); width:0%; transition: width .4s ease; }
+    table { width:100%; border-collapse: collapse; }
+    thead th { text-align:left; font-weight:600; color:#666; padding:8px 10px; border-bottom:1px solid #eee; }
+    tbody td { padding:8px 10px; border-bottom:1px solid #f2f2f2; vertical-align: middle; }
+    tbody tr:hover { background:#fafafa; }
+    td.nowrap { white-space: nowrap; }
+    td.actions input[type="number"] { width:100px; }
   </style>
   <script>
     async function loadCurrent(){
@@ -253,33 +259,30 @@ CONFIG_UI_HTML = """
       fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({fixed_kw}) })
         .then(()=>refreshLive()).catch(()=>{});
     }
-    function renderCircuits(list){
-      const box = document.getElementById('circuits');
-      if(!box) return;
-      box.innerHTML = '';
+    function renderLoads(list){
+      const body = document.getElementById('loads-body');
+      if(!body) return;
+      body.innerHTML = '';
       const shedding = new Set((window.__sheddingIds||[]));
       (list||[]).forEach(c => {
-        const el = document.createElement('div');
-        el.className = 'card';
+        const tr = document.createElement('tr');
         const shed = shedding.has(c.id) ? '<span class="badge">Shed</span>' : '';
-        el.innerHTML = `
-          <h2>${c.name} <span class="muted" style="font-weight:400">(${c.type||''})</span> ${shed}</h2>
-          <div class="field"><label>Connected</label><input type="checkbox" ${c.connected!==false? 'checked':''} onchange="toggleConnected('${c.id}', this.checked)"></div>
-          <div class="field"><label>Mode</label>
-            <div>
-              <select onchange="setMode('${c.id}', this.value)">
-                <option value="dynamic" ${c.mode==='dynamic'?'selected':''}>Dynamic</option>
-                <option value="fixed" ${c.mode==='fixed'?'selected':''}>Fixed</option>
-              </select>
-              <input type="number" step="0.01" min="0" value="${(c.fixedKw??0)}" onblur="setFixedKw('${c.id}', this.value)" style="width:100px; margin-left:8px;" />
-            </div>
-          </div>
-          <div class="field"><label>Status</label><input type="checkbox" ${c.enabled? 'checked':''} onchange="toggleCircuit('${c.id}', this.checked)"></div>
-          <div class="field"><label>Critical</label><input type="checkbox" ${c.critical? 'checked':''} onchange="toggleCritical('${c.id}', this.checked)"></div>
-          <div class="field"><label>Rated</label><div>${(c.rated_kw??0).toFixed ? c.rated_kw.toFixed(2) : c.rated_kw} kW</div></div>
-          <div class="field"><label>Now</label><div><strong>${(c.current_kw??0).toFixed ? c.current_kw.toFixed(2) : c.current_kw}</strong> kW</div></div>
+        tr.innerHTML = `
+          <td class="nowrap"><strong>${c.name}</strong> <span class="muted">(${c.type||''})</span> ${shed}</td>
+          <td><input type="checkbox" ${c.connected!==false? 'checked':''} onchange="toggleConnected('${c.id}', this.checked)"></td>
+          <td><input type="checkbox" ${c.enabled? 'checked':''} onchange="toggleCircuit('${c.id}', this.checked)"></td>
+          <td>
+            <select onchange="setMode('${c.id}', this.value)">
+              <option value="dynamic" ${c.mode==='dynamic'?'selected':''}>Dynamic</option>
+              <option value="fixed" ${c.mode==='fixed'?'selected':''}>Fixed</option>
+            </select>
+          </td>
+          <td class="actions"><input type="number" step="0.01" min="0" value="${(c.fixedKw??0)}" onblur="setFixedKw('${c.id}', this.value)"></td>
+          <td><input type="checkbox" ${c.critical? 'checked':''} onchange="toggleCritical('${c.id}', this.checked)"></td>
+          <td class="nowrap">${(c.rated_kw??0).toFixed ? c.rated_kw.toFixed(2) : c.rated_kw} kW</td>
+          <td class="nowrap"><strong>${(c.current_kw??0).toFixed ? c.current_kw.toFixed(2) : c.current_kw}</strong> kW</td>
         `;
-        box.appendChild(el);
+        body.appendChild(tr);
       });
     }
     async function refreshLive(){
@@ -309,18 +312,18 @@ CONFIG_UI_HTML = """
         const liveCircuits = (j.metering && j.metering.circuits) || [];
         if(Array.isArray(liveCircuits) && liveCircuits.length > 0){
           window.__lastCircuits = liveCircuits;
-          renderCircuits(liveCircuits);
+          renderLoads(liveCircuits);
         } else {
           try {
             const rc = await fetch('/circuits');
             if (rc.ok) {
               const list = await rc.json();
               window.__lastCircuits = list;
-              renderCircuits(list);
+              renderLoads(list);
             } else {
-              renderCircuits([]);
+              renderLoads([]);
             }
-          } catch(e){ renderCircuits([]); }
+          } catch(e){ renderLoads([]); }
         }
         // Update overall draw gauge
         try{
@@ -413,8 +416,24 @@ CONFIG_UI_HTML = """
         </section>
 
         <section class="card">
-          <h2>Circuits</h2>
-          <div id="circuits" class="grid"></div>
+          <h2>Loads</h2>
+          <div style="overflow:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Load</th>
+                  <th>Connected</th>
+                  <th>Enabled</th>
+                  <th>Mode</th>
+                  <th>Fixed kW</th>
+                  <th>Critical</th>
+                  <th>Rated</th>
+                  <th>Now</th>
+                </tr>
+              </thead>
+              <tbody id="loads-body"></tbody>
+            </table>
+          </div>
         </section>
 
         <section class="card">
