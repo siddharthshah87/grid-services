@@ -11,11 +11,21 @@ import threading
 from copy import deepcopy
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
+try:
+    # Python 3.7+
+    from http.server import ThreadingHTTPServer as _ThreadingHTTPServer  # type: ignore
+except Exception:  # pragma: no cover - fallback for older runtimes
+    _ThreadingHTTPServer = None  # type: ignore
 from urllib.parse import urlparse
-from typing import Any
+from typing import Any, Deque
+from collections import deque
 import paho.mqtt.client as mqtt
 import boto3
 from botocore.exceptions import ClientError
+
+# Build metadata injected at image build time via Dockerfile args
+APP_BUILD = os.getenv("APP_BUILD", "dev")
+APP_BUILD_DATE = os.getenv("APP_BUILD_DATE", "")
 
 # ── OpenAPI spec --------------------------------------------------------
 OPENAPI_SPEC = {
@@ -120,7 +130,7 @@ CONFIG_UI_HTML = """
   <style>
     :root { --bg:#0b5; --card:#fff; --muted:#666; --accent:#0b5; }
     body { font-family: system-ui, sans-serif; margin: 0; line-height: 1.4; background:#f6f8fa; }
-    header { background: var(--bg); color:#fff; padding:12px 16px; position:sticky; top:0; }
+    header { background: var(--bg); color:#fff; padding:12px 16px; position:sticky; top:0; display:flex; align-items:center; gap:12px; }
     header a { color:#fff; margin-left: 12px; text-decoration: underline; }
     main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
     .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
@@ -144,6 +154,12 @@ CONFIG_UI_HTML = """
     .muted { color:#bbb; }
     .kv { display:flex; gap:12px; flex-wrap:wrap; }
     .kv div { background:rgba(255,255,255,.05); padding:8px 10px; border-radius:8px; min-width: 120px; text-align:center; }
+    .eventbar { background:#222; color:#eee; border-radius:8px; padding:10px 12px; display:flex; gap:16px; align-items:center; margin-top:10px; }
+    .pill { background:#0b5; color:#fff; padding:4px 8px; border-radius:999px; font-size:.8rem; }
+    .badge { background:#e67e22; color:#fff; padding:2px 6px; border-radius:6px; font-size:.75rem; margin-left:8px; }
+    .build { margin-left:auto; font-size:.8rem; opacity:.9; }
+    .gauge { margin-top:10px; width:100%; height:14px; background:#333; border-radius:7px; overflow:hidden; box-shadow: inset 0 0 4px rgba(0,0,0,.5); }
+    .bar { height:100%; background: linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c); width:0%; transition: width .4s ease; }
   </style>
   <script>
     async function loadCurrent(){
@@ -220,16 +236,46 @@ CONFIG_UI_HTML = """
       fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({enabled}) })
         .then(()=>refreshLive()).catch(()=>{});
     }
+    function toggleCritical(id, critical){
+      fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({critical}) })
+        .then(()=>refreshLive()).catch(()=>{});
+    }
+    function toggleConnected(id, connected){
+      fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({connected}) })
+        .then(()=>refreshLive()).catch(()=>{});
+    }
+    function setMode(id, mode){
+      fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mode}) })
+        .then(()=>refreshLive()).catch(()=>{});
+    }
+    function setFixedKw(id, v){
+      const fixed_kw = Number(v||0);
+      fetch('/circuits/'+encodeURIComponent(id), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({fixed_kw}) })
+        .then(()=>refreshLive()).catch(()=>{});
+    }
     function renderCircuits(list){
       const box = document.getElementById('circuits');
       if(!box) return;
       box.innerHTML = '';
+      const shedding = new Set((window.__sheddingIds||[]));
       (list||[]).forEach(c => {
         const el = document.createElement('div');
         el.className = 'card';
+        const shed = shedding.has(c.id) ? '<span class="badge">Shed</span>' : '';
         el.innerHTML = `
-          <h2>${c.name} <span class="muted" style="font-weight:400">(${c.type||''})</span></h2>
+          <h2>${c.name} <span class="muted" style="font-weight:400">(${c.type||''})</span> ${shed}</h2>
+          <div class="field"><label>Connected</label><input type="checkbox" ${c.connected!==false? 'checked':''} onchange="toggleConnected('${c.id}', this.checked)"></div>
+          <div class="field"><label>Mode</label>
+            <div>
+              <select onchange="setMode('${c.id}', this.value)">
+                <option value="dynamic" ${c.mode==='dynamic'?'selected':''}>Dynamic</option>
+                <option value="fixed" ${c.mode==='fixed'?'selected':''}>Fixed</option>
+              </select>
+              <input type="number" step="0.01" min="0" value="${(c.fixedKw??0)}" onblur="setFixedKw('${c.id}', this.value)" style="width:100px; margin-left:8px;" />
+            </div>
+          </div>
           <div class="field"><label>Status</label><input type="checkbox" ${c.enabled? 'checked':''} onchange="toggleCircuit('${c.id}', this.checked)"></div>
+          <div class="field"><label>Critical</label><input type="checkbox" ${c.critical? 'checked':''} onchange="toggleCritical('${c.id}', this.checked)"></div>
           <div class="field"><label>Rated</label><div>${(c.rated_kw??0).toFixed ? c.rated_kw.toFixed(2) : c.rated_kw} kW</div></div>
           <div class="field"><label>Now</label><div><strong>${(c.current_kw??0).toFixed ? c.current_kw.toFixed(2) : c.current_kw}</strong> kW</div></div>
         `;
@@ -257,10 +303,79 @@ CONFIG_UI_HTML = """
           const soc = j.metering && j.metering.battery_soc != null ? (j.metering.battery_soc*100).toFixed(0) : '--';
           document.getElementById('live-batt-soc').textContent = soc + '%';
         }
-        renderCircuits(j.metering && j.metering.circuits);
+        window.__sheddingIds = j.sheddingLoadIds || [];
+        // Prefer circuits from /live.metering, but fall back to /circuits so
+        // the panel always renders even before the first publish.
+        const liveCircuits = (j.metering && j.metering.circuits) || [];
+        if(Array.isArray(liveCircuits) && liveCircuits.length > 0){
+          window.__lastCircuits = liveCircuits;
+          renderCircuits(liveCircuits);
+        } else {
+          try {
+            const rc = await fetch('/circuits');
+            if (rc.ok) {
+              const list = await rc.json();
+              window.__lastCircuits = list;
+              renderCircuits(list);
+            } else {
+              renderCircuits([]);
+            }
+          } catch(e){ renderCircuits([]); }
+        }
+        // Update overall draw gauge
+        try{
+          const list = window.__lastCircuits || [];
+          const cap = list.filter(x=>x.connected!==false).reduce((s,c)=> s + (Number(c.rated_kw||0) || 0), 0) || 1;
+          const p = (j.metering && j.metering.power_kw!=null) ? Number(j.metering.power_kw) : 0;
+          const pct = Math.min(100, Math.max(0, (p/cap)*100));
+          const bar = document.getElementById('gauge-bar'); if(bar) bar.style.width = pct.toFixed(0)+'%';
+        }catch(e){}
+        // Update event banners
+        const eb = document.getElementById('eventbar');
+        if(eb){
+          const ae = j.activeEvent;
+          if(ae && ae.eventId){
+            const mins = Math.floor((ae.remainingS||0)/60), secs = (ae.remainingS||0)%60;
+            const req = ae.requestedReductionKw != null ? ae.requestedReductionKw : '--';
+            const shed = j.metering && j.metering.shedPowerKw != null ? j.metering.shedPowerKw.toFixed(2) : '--';
+            eb.innerHTML = `<span class="pill">Event ${ae.eventId}</span>
+                            <span>Time left: <strong>${mins}:${secs.toString().padStart(2,'0')}</strong></span>
+                            <span>Requested: <strong>${req} kW</strong></span>
+                            <span>Current shed: <strong>${shed} kW</strong></span>`;
+          } else {
+            eb.innerHTML = '<span class="muted">No active event</span>';
+          }
+        }
+        const ed = document.getElementById('eventdone');
+        if(ed){
+          const s = j.lastEventSummary;
+          if(s && s.eventId){
+            ed.innerHTML = `<span class="pill">Event ${s.eventId} complete</span>
+                            <span>Actual reduction: <strong>${s.actualReductionKw ?? '--'} kW</strong></span>
+                            <span>Delivered: <strong>${s.deliveredKwh ?? '--'} kWh</strong></span>`;
+          } else {
+            ed.innerHTML = '<span class="muted">No recent event summary</span>';
+          }
+        }
       } catch(e){ /* ignore */ }
     }
-    window.addEventListener('DOMContentLoaded', ()=>{ loadCurrent(); refreshLive(); setInterval(refreshLive, 2000); });
+    async function showBuild(){
+      try{
+        const r = await fetch('/openapi.json');
+        const j = await r.json();
+        const v = (j && j.info && (j.info["x-build"] || j.info.version)) || '';
+        const el = document.getElementById('build-id'); if(el) el.textContent = v;
+      }catch(e){ const el = document.getElementById('build-id'); if(el) el.textContent = 'n/a'; }
+    }
+    window.addEventListener('DOMContentLoaded', ()=>{
+      showBuild();
+      loadCurrent();
+      // Eagerly render circuits once from /circuits so the panel shows loads
+      // immediately, then let /live keep it fresh.
+      fetch('/circuits').then(r=>r.ok?r.json():[]).then(list=>{ try{ renderCircuits(list||[]); }catch(e){} });
+      refreshLive();
+      setInterval(refreshLive, 2000);
+    });
   </script>
   </head>
   <body>
@@ -268,6 +383,7 @@ CONFIG_UI_HTML = """
       <strong>VOLTTRON VEN Control</strong>
       <a href="/docs">API Docs</a>
       <a href="/config">Current Config</a>
+      <span class="build">Build: <span id="build-id">(loading)</span></span>
     </header>
     <main>
       <div class="grid">
@@ -286,6 +402,7 @@ CONFIG_UI_HTML = """
               <div><span class="muted">Battery SOC</span><br/><strong><span id="live-batt-soc">--</span></strong></div>
             </div>
           </div>
+          <div class="gauge"><div id="gauge-bar" class="bar"></div></div>
           <div style="margin-top:10px; color:#ccc; display:flex; align-items:center; gap:16px;">
             <div><span id="led-enabled" class="led bad"></span> Enabled</div>
             <div><span id="led-mqtt" class="led bad"></span> MQTT</div>
@@ -298,6 +415,11 @@ CONFIG_UI_HTML = """
         <section class="card">
           <h2>Circuits</h2>
           <div id="circuits" class="grid"></div>
+        </section>
+
+        <section class="card">
+          <h2>Event</h2>
+          <div id="eventbar" class="eventbar"><span class="muted">No active event</span></div>
         </section>
         <section class="card">
           <h2>General</h2>
@@ -345,6 +467,31 @@ CONFIG_UI_HTML = """
   </body>
   </html>
 """
+
+# ── Static assets loader ------------------------------------------------------
+def _load_static_html(filename: str, default_html: str) -> str:
+    """Load an HTML asset from a static directory if present.
+
+    Search order:
+      1) Directory pointed by env VEN_STATIC_DIR
+      2) ./static relative to this file
+    Falls back to the provided default_html if no file is found.
+    """
+    try:
+        base = os.getenv("VEN_STATIC_DIR")
+        paths: list[pathlib.Path] = []
+        if base:
+            paths.append(pathlib.Path(base) / filename)
+        paths.append(pathlib.Path(__file__).resolve().parent / "static" / filename)
+        for p in paths:
+            if p.exists() and p.is_file():
+                try:
+                    return p.read_text(encoding="utf-8")
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return default_html
 
 # ── helpers ────────────────────────────────────────────────────────────
 def fetch_tls_creds_from_secrets(secret_name: str, region_name="us-west-2") -> dict | None:
@@ -468,6 +615,18 @@ except ValueError:
     REPORT_INTERVAL_SECONDS = 60
 REPORT_INTERVAL_SECONDS = max(1, REPORT_INTERVAL_SECONDS)
 
+# Compute client identity early so it is available for VEN_ID
+CLIENT_ID             = (
+    os.getenv("IOT_CLIENT_ID")
+    or os.getenv("CLIENT_ID")
+    or os.getenv("AWS_IOT_THING_NAME")
+    or os.getenv("THING_NAME")
+    or "volttron_thing"
+)
+
+SCHEMA_VERSION = "1.0"
+VEN_ID = IOT_THING_NAME or CLIENT_ID
+
 if IOT_THING_NAME:
     SHADOW_TOPIC_UPDATE = f"$aws/things/{IOT_THING_NAME}/shadow/update"
     SHADOW_TOPIC_DELTA = f"{SHADOW_TOPIC_UPDATE}/delta"
@@ -485,14 +644,6 @@ else:
     SHADOW_TOPIC_GET_REJECTED = None
     BACKEND_CMD_TOPIC = os.getenv("BACKEND_CMD_TOPIC")
     BACKEND_ACK_TOPIC = os.getenv("BACKEND_ACK_TOPIC")
-    
-CLIENT_ID             = (
-    os.getenv("IOT_CLIENT_ID")
-    or os.getenv("CLIENT_ID")
-    or os.getenv("AWS_IOT_THING_NAME")
-    or os.getenv("THING_NAME")
-    or "volttron_thing"
-)
 
 # ── TLS setup ──────────────────────────────────────────────────────────
 CA_CERT = CLIENT_CERT = PRIVATE_KEY = None
@@ -568,9 +719,47 @@ elif ".vpce." in MQTT_CONNECT_HOST:
         file=sys.stderr,
     )
 
-_tls_ctx = _build_tls_context(CA_CERT, CLIENT_CERT, PRIVATE_KEY, TLS_SERVER_HOSTNAME, MQTT_CONNECT_HOST)
-client.tls_set_context(_tls_ctx)
+_tls_ctx = None
+try:
+    _tls_ctx = _build_tls_context(CA_CERT, CLIENT_CERT, PRIVATE_KEY, TLS_SERVER_HOSTNAME, MQTT_CONNECT_HOST)
+    client.tls_set_context(_tls_ctx)
+except Exception as tls_err:
+    print(f"⚠️ Falling back to insecure TLS due to context error: {tls_err}", file=sys.stderr)
+    if hasattr(client, "tls_insecure_set"):
+        try:
+            client.tls_insecure_set(True)
+        except Exception:
+            pass
+# When overriding SNI/hostname, disable Paho's built-in hostname verification and
+# perform our own check post-connect. This aligns with existing tests and allows
+# connecting to IoT PrivateLink endpoints while validating against the public ATS name.
+if manual_hostname_override and hasattr(client, "tls_insecure_set"):
+    try:
+        client.tls_insecure_set(True)
+    except Exception:
+        pass
 client.reconnect_delay_set(min_delay=1, max_delay=60)
+# Keep publish queue bounded to avoid unbounded memory use if the broker is unreachable.
+try:
+    client.max_inflight_messages_set(20)
+    client.max_queued_messages_set(200)
+except Exception:
+    pass
+try:
+    client.enable_logger()
+except Exception:
+    pass
+
+# Last Will: mark the VEN as offline if the client disconnects unexpectedly.
+try:
+    client.will_set(
+        MQTT_TOPIC_STATUS,
+        json.dumps({"ven": "offline", "venId": VEN_ID, "ts": int(time.time())}),
+        qos=1,
+        retain=False,
+    )
+except Exception:
+    pass
 
 connected = False
 _last_connect_time: float | None = None
@@ -578,7 +767,10 @@ _last_disconnect_time: float | None = None
 _last_publish_time: float | None = None
 _reconnect_lock = threading.Lock()
 _reconnect_in_progress = False
-_shadow_state_lock = threading.Lock()
+# Use an RLock to avoid deadlocks when helper functions that also acquire the
+# same lock are called from within a locked section (e.g., /live assembling a
+# snapshot while holding the state lock).
+_shadow_state_lock = threading.RLock()
 _shadow_reported_state: dict[str, Any] = {
     "status": {"ven": "starting", "mqtt_connected": False},
     "report_interval_seconds": REPORT_INTERVAL_SECONDS,
@@ -586,6 +778,22 @@ _shadow_reported_state: dict[str, Any] = {
 }
 _shadow_target_power_kw: float | None = None
 _ven_enabled: bool = True
+_last_enable_change: dict[str, Any] | None = None  # {ts, to, source}
+ENABLE_DEBOUNCE_SECONDS = 5
+
+# Update context (tracks source of config/shadow changes for logging)
+_UPDATE_SOURCE: str | None = None
+
+def _with_update_source(source: str):
+    class _Ctx:
+        def __enter__(self_inner):
+            global _UPDATE_SOURCE
+            self_inner.prev = _UPDATE_SOURCE
+            _UPDATE_SOURCE = source
+        def __exit__(self_inner, exc_type, exc, tb):
+            global _UPDATE_SOURCE
+            _UPDATE_SOURCE = self_inner.prev
+    return _Ctx()
 
 # ── Metering configuration knobs (tunable at runtime) -----------------------
 _meter_base_min_kw: float = 0.5
@@ -607,17 +815,41 @@ _last_metering_sample: dict[str, Any] | None = None
 # toggled on/off. For now, metered total power is split among enabled circuits
 # in proportion to their rated_kw to provide a plausible per-circuit breakdown.
 _circuits: list[dict[str, Any]] = [
-    {"id": "hvac1",   "name": "HVAC",       "type": "hvac",   "enabled": True,  "rated_kw": 3.5, "current_kw": 0.0},
-    {"id": "heater1", "name": "Heater",     "type": "heater", "enabled": True,  "rated_kw": 1.5, "current_kw": 0.0},
-    {"id": "ev1",     "name": "EV Charger", "type": "ev",     "enabled": False, "rated_kw": 7.2, "current_kw": 0.0},
-    {"id": "batt1",   "name": "Battery",    "type": "battery","enabled": False, "rated_kw": 5.0, "current_kw": 0.0},
-    {"id": "pv1",     "name": "Solar PV",   "type": "pv",     "enabled": False, "rated_kw": 6.0, "current_kw": 0.0},
-    {"id": "misc1",   "name": "House",      "type": "misc",   "enabled": True,  "rated_kw": 1.0, "current_kw": 0.0},
+    {"id": "hvac1",    "name": "HVAC",       "type": "hvac",    "enabled": True,  "connected": True, "rated_kw": 3.5, "current_kw": 0.0, "critical": True,  "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "heater1",  "name": "Heater",     "type": "heater",  "enabled": True,  "connected": True, "rated_kw": 1.5, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "ev1",      "name": "EV Charger", "type": "ev",      "enabled": False, "connected": True, "rated_kw": 7.2, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "batt1",    "name": "Battery",    "type": "battery", "enabled": False, "connected": True, "rated_kw": 5.0, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "pv1",      "name": "Solar PV",   "type": "pv",      "enabled": False, "connected": True, "rated_kw": 6.0, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "lights1",  "name": "Lights",     "type": "lights",  "enabled": True,  "connected": True, "rated_kw": 0.4, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "fridge1",  "name": "Fridge",     "type": "fridge",  "enabled": True,  "connected": True, "rated_kw": 0.2, "current_kw": 0.0, "critical": True,  "mode": "dynamic", "fixed_kw": 0.0},
+    {"id": "misc1",    "name": "House",      "type": "misc",    "enabled": True,  "connected": True, "rated_kw": 1.0, "current_kw": 0.0, "critical": False, "mode": "dynamic", "fixed_kw": 0.0},
 ]
+
+# Per-load priority (lower number = more critical, shed later). Defaults:
+_circuit_priority: dict[str, int] = {"hvac": 1, "misc": 1, "heater": 2, "ev": 3, "battery": 2, "pv": 0}
+
+# Optional per-load limit (kW) until timestamp for shed commands
+_load_limits: dict[str, dict[str, float]] = {}  # {id: {"limit_kw": float, "until": ts}}
+
+# Optional panel temp target during shedPanel (kW) with expiry
+_panel_temp_target_kw: float | None = None
+_panel_temp_until_ts: int | None = None
 
 _circuit_model_enabled: bool = True
 _battery_capacity_kwh: float = 13.5
 _battery_soc: float = 0.5  # 0..1
+
+# Event tracking and baseline history
+_power_history: Deque[tuple[int, float]] = deque(maxlen=360)
+_active_event: dict[str, Any] | None = None  # {event_id,start_ts,end_ts,requested_kw,baseline_kw,delivered_kwh,summary_done}
+
+# Optional richer loads publish channel for backend (less frequent than metering)
+BACKEND_LOADS_TOPIC = os.getenv("BACKEND_LOADS_TOPIC") or (f"ven/loads/{IOT_THING_NAME}" if IOT_THING_NAME else None)
+try:
+    LOADS_PUBLISH_EVERY = int(os.getenv("LOADS_PUBLISH_EVERY", "6"))
+except ValueError:
+    LOADS_PUBLISH_EVERY = 6
+_loads_pub_counter = 0
 
 
 def _circuits_snapshot() -> list[dict[str, Any]]:
@@ -629,10 +861,49 @@ def _circuits_snapshot() -> list[dict[str, Any]]:
                 "type": c.get("type"),
                 "enabled": bool(c.get("enabled", True)),
                 "rated_kw": float(c.get("rated_kw", 0.0)),
+                "capacityKw": float(c.get("rated_kw", 0.0)),
                 "current_kw": float(c.get("current_kw", 0.0)),
+                "currentPowerKw": float(c.get("current_kw", 0.0)),
+                "shedCapabilityKw": _shed_capability_for(c),
+                "priority": int(c.get("priority", _circuit_priority.get(c.get("type", "misc"), 5))),
+                "critical": bool(c.get("critical", False)),
+                "connected": bool(c.get("connected", True)),
+                "mode": c.get("mode", "dynamic"),
+                "fixedKw": float(c.get("fixed_kw", 0.0)),
             }
             for c in _circuits
         ]
+
+def _shed_capability_for(c: dict[str, Any]) -> float:
+    try:
+        typ = c.get("type")
+        kw = float(c.get("current_kw", 0.0))
+        rated = float(c.get("rated_kw", 0.0))
+        crit = bool(c.get("critical", False))
+        if not c.get("enabled", True):
+            return 0.0
+        # Critical loads have a higher non-shed floor
+        crit_floor_factor = 0.8 if crit else None
+        if typ == "hvac":
+            floor = (crit_floor_factor or 0.2) * rated
+            return round(max(0.0, kw - floor), 2)
+        if typ == "heater":
+            return round(kw, 2)
+        if typ == "ev":
+            return round(kw, 2)
+        if typ == "misc":
+            floor = (crit_floor_factor or 0.3) * rated
+            return round(max(0.0, kw - floor), 2)
+        if typ == "pv":
+            return 0.0
+        if typ == "battery":
+            return round(rated, 2)
+        if typ in ("lights", "fridge"):
+            floor = (crit_floor_factor or 0.5) * rated
+            return round(max(0.0, kw - floor), 2)
+    except Exception:
+        return 0.0
+    return 0.0
 
 def _distribute_power_to_circuits(total_kw: float) -> list[dict[str, Any]]:
     """Proportionally split total_kw across enabled circuits by rated_kw.
@@ -674,6 +945,7 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
 
     Returns a dict with keys: power_kw, circuits, battery_soc.
     """
+    global _battery_soc
     if not _circuit_model_enabled:
         # Fallback: keep previous behavior
         total = _next_power_reading()
@@ -689,56 +961,112 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
         hvac = next((c for c in _circuits if c["type"] == "hvac"), None)
         heater = next((c for c in _circuits if c["type"] == "heater"), None)
         house = next((c for c in _circuits if c["type"] == "misc"), None)
+        lights = next((c for c in _circuits if c["type"] == "lights"), None)
+        fridge = next((c for c in _circuits if c["type"] == "fridge"), None)
 
     # Base: zero out current_kw
     for c in _circuits:
         c["current_kw"] = 0.0
 
-    # House load (misc): between base min/max with jitter
+    # Determine active per-load limit
+    def effective_limit(load_id: str, default: float) -> float:
+        entry = _load_limits.get(load_id)
+        if not entry:
+            return default
+        if now_ts >= int(entry.get("until", 0)):
+            # expired
+            _load_limits.pop(load_id, None)
+            return default
+        return min(default, float(entry.get("limit_kw", default)))
+
+    # Helper for fixed/dynamic per-load
     import random as _r
+    def _apply_mode(c: dict[str, Any], dyn_kw: float) -> float:
+        if not c or not c.get("connected", True) or not c.get("enabled", True):
+            return 0.0
+        mode = str(c.get("mode") or "dynamic").lower()
+        if mode == "fixed":
+            try:
+                return max(0.0, min(float(c.get("rated_kw", 0.0)), float(c.get("fixed_kw", 0.0))))
+            except Exception:
+                return 0.0
+        return max(0.0, dyn_kw)
+
+    # House load (misc): between base min/max with jitter
     base_low, base_high = _meter_base_min_kw, max(_meter_base_min_kw, _meter_base_max_kw)
     house_kw = 0.0
-    if house and house.get("enabled", True):
-        house_kw = round(_r.uniform(base_low, base_high), 2)
+    if house and house.get("connected", True):
+        dyn = round(_r.uniform(base_low, base_high), 2)
+        house_kw = _apply_mode(house, dyn)
+        house_kw = min(house_kw, effective_limit(house["id"], house_kw))
         house["current_kw"] = house_kw
 
     # HVAC: duty between 0.2..0.8 of rated
     hvac_kw = 0.0
-    if hvac and hvac.get("enabled", True):
+    if hvac and hvac.get("connected", True):
         duty = max(0.0, min(1.0, 0.5 + _r.uniform(-0.3, 0.3)))
-        hvac_kw = round(hvac.get("rated_kw", 0.0) * duty, 2)
+        hvac_kw = _apply_mode(hvac, round(hvac.get("rated_kw", 0.0) * duty, 2))
+        hvac_kw = min(hvac_kw, effective_limit(hvac["id"], hvac_kw))
         hvac["current_kw"] = hvac_kw
 
     # Heater: bursty low duty 0..0.5
     heater_kw = 0.0
-    if heater and heater.get("enabled", True):
+    if heater and heater.get("connected", True):
         duty = max(0.0, min(0.5, _r.uniform(0.0, 0.5)))
-        heater_kw = round(heater.get("rated_kw", 0.0) * duty, 2)
+        heater_kw = _apply_mode(heater, round(heater.get("rated_kw", 0.0) * duty, 2))
+        heater_kw = min(heater_kw, effective_limit(heater["id"], heater_kw))
         heater["current_kw"] = heater_kw
 
     # EV: simple on/off at rated when enabled
     ev_kw = 0.0
-    if ev and ev.get("enabled", False):
-        ev_kw = round(ev.get("rated_kw", 0.0), 2)
+    if ev and ev.get("connected", True):
+        ev_kw = _apply_mode(ev, round(ev.get("rated_kw", 0.0), 2))
+        ev_kw = min(ev_kw, effective_limit(ev["id"], ev_kw))
         ev["current_kw"] = ev_kw
+
+    # Lights: modest variable draw up to rated
+    if lights and lights.get("connected", True):
+        lk = _apply_mode(lights, round(max(0.0, min(lights.get("rated_kw", 0.0), _r.uniform(0.05, lights.get("rated_kw", 0.0)))), 2))
+        lk = min(lk, effective_limit(lights["id"], lk))
+        lights["current_kw"] = lk
+    else:
+        lk = 0.0
+
+    # Fridge: quasi-constant duty with small jitter
+    if fridge and fridge.get("connected", True):
+        fk = _apply_mode(fridge, round(max(0.0, min(fridge.get("rated_kw", 0.0), 0.5 * fridge.get("rated_kw", 0.0) + _r.uniform(-0.02, 0.02))), 2))
+        fk = min(fk, effective_limit(fridge["id"], fk))
+        fridge["current_kw"] = fk
+    else:
+        fk = 0.0
 
     # PV generation: rated * curve factor
     pv_gen = 0.0
-    if pv and pv.get("enabled", False):
+    if pv and pv.get("connected", True) and pv.get("enabled", False):
         pv_gen = round(pv.get("rated_kw", 0.0) * _pv_curve_factor(now_ts), 2)
         pv["current_kw"] = -pv_gen  # represent as negative load (generation)
 
     # Pre-battery net load
-    load_kw = house_kw + hvac_kw + heater_kw + ev_kw
+    load_kw = house_kw + hvac_kw + heater_kw + ev_kw + lk + fk
     net_kw_before_batt = max(0.0, load_kw - pv_gen)
 
-    # Battery action: attempt to move net toward target
+    # Battery action: attempt to move net toward effective target
     batt_flow = 0.0  # positive=discharge (reduce grid draw), negative=charge
     if batt and batt.get("enabled", False):
         batt_max = float(batt.get("rated_kw", 0.0))
-        if target is not None:
+        # Temporary target during panel shed may override configured target
+        eff_target = target
+        if _panel_temp_target_kw is not None and _panel_temp_until_ts and now_ts < _panel_temp_until_ts:
+            eff_target = _panel_temp_target_kw
+        else:
+            # clear expired
+            if _panel_temp_until_ts and now_ts >= _panel_temp_until_ts:
+                globals()["_panel_temp_target_kw"] = None
+                globals()["_panel_temp_until_ts"] = None
+
+        if eff_target is not None:
             # If above target, discharge; if below target, (optionally) charge
-            diff = net_kw_before_batt - float(target)
+            diff = net_kw_before_batt - float(eff_target)
             if diff > 0.05:  # above target: discharge up to diff
                 batt_flow = min(batt_max, diff)
             elif diff < -0.5:  # well below target: charge up to -diff/2
@@ -748,7 +1076,6 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
             batt_flow = 0.0
 
         # Update SOC (simple integrator)
-        global _battery_soc
         step_h = max(1.0, REPORT_INTERVAL_SECONDS) / 3600.0
         energy_delta_kwh = batt_flow * step_h
         _battery_soc = max(0.0, min(1.0, _battery_soc + (energy_delta_kwh / max(0.1, _battery_capacity_kwh))))
@@ -765,6 +1092,65 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
     power_kw = round(max(0.0, net_kw_before_batt - max(0.0, batt_flow)), 2)
 
     return {"power_kw": power_kw, "circuits": _circuits_snapshot(), "battery_soc": _battery_soc}
+
+
+def _compute_shed_availability() -> float:
+    """Estimate instantaneous shed availability across loads and storage."""
+    avail = 0.0
+    for c in _circuits:
+        if not c.get("enabled", True):
+            continue
+        typ = c.get("type")
+        kw = float(c.get("current_kw", 0.0))
+        rated = float(c.get("rated_kw", 0.0))
+        if typ == "hvac":
+            floor = 0.2 * rated
+            avail += max(0.0, kw - floor)
+        elif typ == "heater":
+            avail += kw
+        elif typ == "ev":
+            avail += kw
+        elif typ == "misc":
+            floor = 0.3 * rated
+            avail += max(0.0, kw - floor)
+        elif typ == "pv":
+            # cannot shed generation here
+            continue
+        elif typ == "battery":
+            # battery can contribute up to discharge headroom (rated)
+            avail += rated
+    return round(avail, 2)
+
+
+def _maybe_finalize_event(now_ts: int) -> dict[str, Any] | None:
+    """If an active event has ended and no summary yet, compute and return a summary.
+
+    Returns a dict with summary fields or None if not applicable.
+    """
+    global _active_event
+    ev = _active_event
+    if not ev:
+        return None
+    et = int(ev.get("end_ts", 0))
+    if now_ts < et:
+        return None
+    if ev.get("summary_done"):
+        return None
+    st = int(ev.get("start_ts", et))
+    duration_h = max(1e-6, (et - st) / 3600.0)
+    delivered_kwh = float(ev.get("delivered_kwh") or 0.0)
+    actual_reduction_kw = delivered_kwh / duration_h
+    summary = {
+        "eventId": ev.get("event_id"),
+        "requestedReductionKw": ev.get("requested_kw"),
+        "actualReductionKw": round(actual_reduction_kw, 3),
+        "deliveredKwh": round(delivered_kwh, 3),
+        "baselineKw": ev.get("baseline_kw"),
+        "startTs": st,
+        "endTs": et,
+    }
+    ev["summary_done"] = True
+    return summary
 
 
 def _merge_dict(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
@@ -1030,10 +1416,23 @@ def _apply_shadow_delta(delta: dict[str, Any]) -> dict[str, Any]:
         elif key == "enabled":
             try:
                 desired_enabled = bool(value)
-                if desired_enabled and not _ven_enabled:
-                    _ven_enable()
-                elif not desired_enabled and _ven_enabled:
-                    _ven_disable()
+                # Debounce rapid flaps
+                now_ts = int(time.time())
+                if desired_enabled != _ven_enabled:
+                    allow = True
+                    if _last_enable_change and isinstance(_last_enable_change.get("ts"), (int, float)):
+                        if (now_ts - int(_last_enable_change["ts"])) < ENABLE_DEBOUNCE_SECONDS:
+                            allow = False
+                    if allow:
+                        source = _UPDATE_SOURCE or "unknown"
+                        print(f"VEN enable -> {desired_enabled} (source={source})")
+                        if desired_enabled:
+                            _ven_enable()
+                        else:
+                            _ven_disable()
+                        _last_enable_change = {"ts": now_ts, "to": desired_enabled, "source": source}
+                    else:
+                        print("Debounced rapid enable/disable toggle; ignoring")
                 updates[key] = desired_enabled
             except Exception:
                 errors[key] = f"invalid enabled: {value}"
@@ -1120,7 +1519,8 @@ def on_shadow_delta(_client, _userdata, msg):
         return
 
     print(f"Received desired shadow state delta: {delta}")
-    updates = _apply_shadow_delta(delta)
+    with _with_update_source("shadow_delta"):
+        updates = _apply_shadow_delta(delta)
     if updates:
         _shadow_merge_report(updates)
 
@@ -1144,7 +1544,8 @@ def on_shadow_get_accepted(_client, _userdata, msg):
     updates: dict[str, Any] = {"status": {"shadow_version": payload.get("version")}}
 
     if isinstance(desired, dict) and desired:
-        desired_updates = _apply_shadow_delta(desired)
+        with _with_update_source("shadow_get"):
+            desired_updates = _apply_shadow_delta(desired)
         _merge_dict(updates, desired_updates)
     elif isinstance(reported, dict) and reported:
         _sync_reported_state(reported)
@@ -1174,14 +1575,17 @@ def _log_unhandled_message(_client, _userdata, msg):
     print(f"Unhandled MQTT message on {msg.topic}: {payload}")
 
 
-def _publish_ack(op: str, ok: bool, data: dict | None = None, error: str | None = None) -> None:
+def _publish_ack(op: str, ok: bool, data: dict | None = None, error: str | None = None, correlation_id: str | None = None) -> None:
     if not BACKEND_ACK_TOPIC:
         return
     ack = {
         "op": op,
         "ok": ok,
         "ts": int(time.time()),
+        "venId": VEN_ID,
     }
+    if correlation_id:
+        ack["correlationId"] = correlation_id
     if data is not None:
         ack["data"] = data
     if error is not None:
@@ -1216,7 +1620,8 @@ def _apply_config_payload(obj: dict[str, Any]) -> dict[str, Any]:
         if fld in obj:
             desired[fld] = obj[fld]
 
-    updates = _apply_shadow_delta(desired)
+    with _with_update_source(_UPDATE_SOURCE or "config"):
+        updates = _apply_shadow_delta(desired)
     if updates:
         _shadow_merge_report(updates)
         _shadow_publish_desired(desired)
@@ -1301,23 +1706,29 @@ def on_backend_cmd(_client, _userdata, msg):
       - { "op": "ping" }
       - { "op": "event", "data": { "event_id": "...", "shed_kw": 1.2, "start_ts": 123, "duration_s": 900 } }
     """
+    global _shadow_target_power_kw
     op = "unknown"
+    corr = None
     try:
         payload = json.loads(msg.payload.decode())
         op = str(payload.get("op") or "set").lower()
+        corr = payload.get("correlationId")
         data = payload.get("data")
 
-        if op == "set":
-            updates = _apply_config_payload(data if isinstance(data, dict) else payload)
-            _publish_ack(op, True, {"applied": updates})
+        if op in ("set", "setconfig"):
+            with _with_update_source("backend_cmd"):
+                updates = _apply_config_payload(data if isinstance(data, dict) else payload)
+            _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
             return
         if op == "enable":
-            updates = _apply_config_payload({"enabled": True})
-            _publish_ack(op, True, {"applied": updates})
+            with _with_update_source("backend_cmd"):
+                updates = _apply_config_payload({"enabled": True})
+            _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
             return
         if op == "disable":
-            updates = _apply_config_payload({"enabled": False})
-            _publish_ack(op, True, {"applied": updates})
+            with _with_update_source("backend_cmd"):
+                updates = _apply_config_payload({"enabled": False})
+            _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
             return
         if op == "get":
             what = str(payload.get("what") or "status").lower()
@@ -1336,19 +1747,23 @@ def on_backend_cmd(_client, _userdata, msg):
                         "current_enabled": _current_enabled,
                         "power_factor": _power_factor,
                     }
-                _publish_ack(op, True, {"config": cfg})
+                _publish_ack(op, True, {"config": cfg}, correlation_id=corr)
             else:
                 _code, status = health_snapshot()
-                _publish_ack(op, True, {"status": status})
+                _publish_ack(op, True, {"status": status}, correlation_id=corr)
             return
         if op == "ping":
-            _publish_ack(op, True, {"pong": True, "ts": int(time.time())})
+            _publish_ack(op, True, {"pong": True, "ts": int(time.time())}, correlation_id=corr)
             return
         if op == "event":
             ev = data if isinstance(data, dict) else {}
             # Record event in shadow and optionally adjust target
             ev_id = ev.get("event_id") or f"backend_{int(time.time())}"
             shed_kw = ev.get("shed_kw")
+            start_ts = int(ev.get("start_ts") or int(time.time()))
+            duration_s = int(ev.get("duration_s") or 0)
+            end_ts = int(ev.get("end_ts") or (start_ts + duration_s if duration_s > 0 else start_ts))
+            req_kw = ev.get("requestedReductionKw") or ev.get("requested_kw")
             updates: dict[str, Any] = {
                 "status": {"last_backend_event_ts": int(time.time())},
                 "events": {"last_backend": {"event_id": ev_id, **ev}},
@@ -1358,17 +1773,113 @@ def on_backend_cmd(_client, _userdata, msg):
                 updates["target_power_kw"] = max(0.0, float(shed_kw))
                 with _shadow_state_lock:
                     try:
-                        global _shadow_target_power_kw
                         _shadow_target_power_kw = float(updates["target_power_kw"])
                     except Exception:
                         pass
+            # Track active event window
+            globals()["_active_event"] = {
+                "event_id": ev_id,
+                "start_ts": start_ts,
+                "end_ts": end_ts,
+                "requested_kw": float(req_kw) if isinstance(req_kw, (int, float)) else None,
+                "baseline_kw": None,
+                "delivered_kwh": 0.0,
+            }
             _shadow_merge_report(updates)
-            _publish_ack(op, True, {"event_id": ev_id})
+            _publish_ack(op, True, {"event_id": ev_id}, correlation_id=corr)
+            return
+        if op == "setload":
+            d = data if isinstance(data, dict) else {}
+            load_id = str(d.get("loadId") or "")
+            if not load_id:
+                _publish_ack(op, False, error="missing loadId", correlation_id=corr)
+                return
+            updated = None
+            with _shadow_state_lock:
+                for c in _circuits:
+                    if c["id"] == load_id:
+                        if "enabled" in d:
+                            c["enabled"] = bool(d.get("enabled"))
+                        if "capacityKw" in d or "rated_kw" in d:
+                            cap = d.get("capacityKw", d.get("rated_kw"))
+                            try:
+                                c["rated_kw"] = max(0.0, float(cap))
+                            except Exception:
+                                pass
+                        if "priority" in d:
+                            try:
+                                _circuit_priority[c.get("type", "misc")] = int(d.get("priority"))
+                            except Exception:
+                                pass
+                        updated = {k: c[k] for k in ("id","name","type","enabled","rated_kw")}
+                        break
+            if updated is None:
+                _publish_ack(op, False, error=f"unknown loadId: {load_id}", correlation_id=corr)
+                return
+            _publish_ack(op, True, {"updated": updated}, correlation_id=corr)
+            return
+        if op == "shedload":
+            d = data if isinstance(data, dict) else {}
+            load_id = str(d.get("loadId") or "")
+            reduce_kw = float(d.get("reduceKw") or 0.0)
+            duration_s = int(d.get("durationS") or 0)
+            if not load_id or reduce_kw <= 0 or duration_s <= 0:
+                _publish_ack(op, False, error="require loadId, reduceKw>0, durationS>0", correlation_id=corr)
+                return
+            now = int(time.time())
+            with _shadow_state_lock:
+                # Determine current expected power and set a limit
+                base_limit = None
+                for c in _circuits:
+                    if c["id"] == load_id and c.get("enabled", True):
+                        cur = float(c.get("current_kw", 0.0))
+                        base_limit = max(0.0, cur - reduce_kw)
+                        _load_limits[load_id] = {"limit_kw": base_limit, "until": now + duration_s}
+                        break
+            if base_limit is None:
+                _publish_ack(op, False, error="load not found or disabled", correlation_id=corr)
+                return
+            _publish_ack(op, True, {"limitKw": base_limit, "until": now + duration_s}, correlation_id=corr)
+            return
+        if op == "shedpanel":
+            d = data if isinstance(data, dict) else {}
+            req = float(d.get("requestedReductionKw") or 0.0)
+            duration_s = int(d.get("durationS") or 0)
+            if req <= 0 or duration_s <= 0:
+                _publish_ack(op, False, error="require requestedReductionKw>0 and durationS>0", correlation_id=corr)
+                return
+            now = int(time.time())
+            # Set temporary panel target based on last metered power
+            eff_target = None
+            if _last_metering_sample and isinstance(_last_metering_sample.get("power_kw"), (int, float)):
+                eff_target = max(0.0, float(_last_metering_sample["power_kw"]) - req)
+            else:
+                eff_target = max(0.0, req)  # fallback
+            globals()["_panel_temp_target_kw"] = eff_target
+            globals()["_panel_temp_until_ts"] = now + duration_s
+            # Simple allocation: impose per-load limits starting with lowest priority (highest number)
+            remaining = req
+            with _shadow_state_lock:
+                loads_sorted = sorted(
+                    [c for c in _circuits if c.get("enabled", True) and c.get("type") not in ("pv",)],
+                    key=lambda c: _circuit_priority.get(c.get("type", "misc"), 5),
+                    reverse=True,
+                )
+                for c in loads_sorted:
+                    if remaining <= 0:
+                        break
+                    cur = float(c.get("current_kw", 0.0))
+                    shed = min(cur, remaining)
+                    new_limit = max(0.0, cur - shed)
+                    _load_limits[c["id"]] = {"limit_kw": new_limit, "until": now + duration_s}
+                    remaining -= shed
+            accepted = req - max(0.0, remaining)
+            _publish_ack(op, True, {"targetKw": eff_target, "acceptedReduceKw": round(accepted,2), "until": now + duration_s}, correlation_id=corr)
             return
 
-        _publish_ack(op, False, error=f"unknown op: {op}")
+        _publish_ack(op, False, error=f"unknown op: {op}", correlation_id=corr)
     except Exception as e:
-        _publish_ack(op, False, error=str(e))
+        _publish_ack(op, False, error=str(e), correlation_id=corr)
 
 client.on_connect = _on_connect
 client.on_disconnect = _on_disconnect
@@ -1401,6 +1912,10 @@ def _shutdown(signo, _frame):
     sys.exit(0)
 
 signal.signal(signal.SIGTERM, _shutdown)
+try:
+    signal.signal(signal.SIGINT, _shutdown)
+except Exception:
+    pass
 
 client.loop_start()
 
@@ -1423,6 +1938,9 @@ def health_snapshot() -> tuple[int, dict]:
         "enabled": _ven_enabled,
     }
 
+    if _last_enable_change:
+        payload["last_enable_change"] = _last_enable_change
+
     if _last_connect_time is not None:
         payload["last_connected_at"] = _format_timestamp(_last_connect_time)
     if _last_disconnect_time is not None:
@@ -1434,6 +1952,47 @@ def health_snapshot() -> tuple[int, dict]:
 
 
 class HealthHandler(BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        path = urlparse(self.path).path
+        while "//" in path:
+            path = path.replace("//", "/")
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
+
+        # Minimal HEAD handling for common endpoints.
+        if path == "/openapi.json":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            return
+        if path == "/docs":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            return
+        if path in ("/", "/ui"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            return
+        if path == "/health":
+            code, _ = health_snapshot()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            return
+        if path == "/circuits":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            return
+        # Default: 404 for unknown paths
+        self.send_response(404)
+        self.end_headers()
+
     def do_GET(self):
         path = urlparse(self.path).path
         # Normalize duplicate slashes and trailing slashes (except root)
@@ -1445,25 +2004,38 @@ class HealthHandler(BaseHTTPRequestHandler):
         if path == "/openapi.json":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
+            self.send_header("X-App-Build", APP_BUILD)
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            self.wfile.write(json.dumps(OPENAPI_SPEC).encode())
+            spec = deepcopy(OPENAPI_SPEC)
+            try:
+                spec.setdefault("info", {})
+                spec["info"]["x-build"] = APP_BUILD
+                if spec["info"].get("version") and APP_BUILD:
+                    spec["info"]["version"] = f"{spec['info']['version']}+{APP_BUILD}"
+            except Exception:
+                pass
+            self.wfile.write(json.dumps(spec).encode())
             return
 
         if path == "/docs":
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
+            self.send_header("X-App-Build", APP_BUILD)
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            self.wfile.write(SWAGGER_HTML.encode())
+            html = _load_static_html("docs.html", SWAGGER_HTML)
+            self.wfile.write(html.encode("utf-8"))
             return
 
         if path in ("/", "/ui"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
+            self.send_header("X-App-Build", APP_BUILD)
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            self.wfile.write(CONFIG_UI_HTML.encode())
+            html = _load_static_html("ui.html", CONFIG_UI_HTML)
+            self.wfile.write(html.encode("utf-8"))
             return
 
         if path == "/config":
@@ -1489,6 +2061,9 @@ class HealthHandler(BaseHTTPRequestHandler):
 
         if path == "/live":
             code, status = health_snapshot()
+            # Read basic config and shadow-derived bits under the lock, but
+            # take the (potentially slower) circuits snapshot outside to avoid
+            # holding the lock during nested calls.
             with _shadow_state_lock:
                 cfg = {
                     "report_interval_seconds": REPORT_INTERVAL_SECONDS,
@@ -1503,11 +2078,50 @@ class HealthHandler(BaseHTTPRequestHandler):
                         events = evs.get("last_backend") or evs.get("last")
                 except Exception:
                     events = None
+                # Active event info for UI banner
+                active_event = None
+                if _active_event:
+                    ae = _active_event
+                    rem = max(0, int(ae.get("end_ts", 0)) - int(time.time()))
+                    active_event = {
+                        "eventId": ae.get("event_id"),
+                        "requestedReductionKw": ae.get("requested_kw"),
+                        "baselineKw": ae.get("baseline_kw"),
+                        "deliveredKwh": ae.get("delivered_kwh"),
+                        "startTs": ae.get("start_ts"),
+                        "endTs": ae.get("end_ts"),
+                        "remainingS": rem,
+                    }
+                # Last event summary for end-of-event banner
+                last_event_summary = None
+                try:
+                    mets = _shadow_reported_state.get("metrics") if isinstance(_shadow_reported_state, dict) else None
+                    if isinstance(mets, dict):
+                        last_event_summary = mets.get("lastEventSummary")
+                except Exception:
+                    last_event_summary = None
+            # Take circuits snapshot outside the lock to avoid re-entrancy.
+            loads_live = _circuits_snapshot()
+            # Ensure the UI can render circuits even before the first publish.
+            metering_for_ui = _last_metering_sample if _last_metering_sample else {}
+            try:
+                if not isinstance(metering_for_ui, dict):
+                    metering_for_ui = {}
+                if "circuits" not in metering_for_ui:
+                    metering_for_ui = dict(metering_for_ui)
+                    metering_for_ui["circuits"] = loads_live
+            except Exception:
+                metering_for_ui = {"circuits": loads_live}
+
             live = {
                 "status": status,
                 "config": cfg,
-                "metering": _last_metering_sample,
+                "metering": metering_for_ui,
                 "events": events,
+                "loads": loads_live,
+                "activeEvent": active_event,
+                "sheddingLoadIds": [lid for lid, lim in _load_limits.items() if int(lim.get("until", 0)) > int(time.time())],
+                "lastEventSummary": last_event_summary,
             }
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
@@ -1641,6 +2255,33 @@ class HealthHandler(BaseHTTPRequestHandler):
                                 c["rated_kw"] = max(0.0, float(body["rated_kw"]))
                             except Exception:
                                 pass
+                        if isinstance(body, dict) and "critical" in body:
+                            try:
+                                c["critical"] = bool(body["critical"])
+                            except Exception:
+                                pass
+                        if isinstance(body, dict) and "priority" in body:
+                            try:
+                                c["priority"] = int(body["priority"])
+                            except Exception:
+                                pass
+                        if isinstance(body, dict) and "connected" in body:
+                            try:
+                                c["connected"] = bool(body["connected"])
+                            except Exception:
+                                pass
+                        if isinstance(body, dict) and "mode" in body:
+                            try:
+                                m = str(body["mode"]).lower()
+                                if m in ("dynamic","fixed"):
+                                    c["mode"] = m
+                            except Exception:
+                                pass
+                        if isinstance(body, dict) and "fixed_kw" in body:
+                            try:
+                                c["fixed_kw"] = max(0.0, float(body["fixed_kw"]))
+                            except Exception:
+                                pass
                         updated = {
                             "id": c["id"],
                             "name": c["name"],
@@ -1648,6 +2289,11 @@ class HealthHandler(BaseHTTPRequestHandler):
                             "enabled": bool(c.get("enabled", True)),
                             "rated_kw": float(c.get("rated_kw", 0.0)),
                             "current_kw": float(c.get("current_kw", 0.0)),
+                            "critical": bool(c.get("critical", False)),
+                            "priority": int(c.get("priority", _circuit_priority.get(c.get("type", "misc"), 5))),
+                            "connected": bool(c.get("connected", True)),
+                            "mode": c.get("mode", "dynamic"),
+                            "fixedKw": float(c.get("fixed_kw", 0.0)),
                         }
                         break
             if updated is None:
@@ -1738,7 +2384,15 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(resp).encode())
 
 def _start_health_server():
-    HTTPServer(("0.0.0.0", HEALTH_PORT), HealthHandler).serve_forever()
+    _srv_cls = _ThreadingHTTPServer or HTTPServer
+    server = _srv_cls(("0.0.0.0", HEALTH_PORT), HealthHandler)
+    try:
+        # For ThreadingMixIn-based servers, make threads daemonic so they don't block shutdown
+        if hasattr(server, "daemon_threads"):
+            setattr(server, "daemon_threads", True)
+    except Exception:
+        pass
+    server.serve_forever()
 
 threading.Thread(target=_start_health_server, daemon=True).start()
 print(f"🩺 Health server running on port {HEALTH_PORT}")
@@ -1783,7 +2437,7 @@ def main(iterations: int | None = None) -> None:
     global _last_publish_time
     client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
     client.subscribe(MQTT_TOPIC_EVENTS)
-
+    print("✅ MQTT setup complete, starting VEN agent loop")
     # Subscribe to backend control plane topic if configured
     if BACKEND_CMD_TOPIC:
         client.message_callback_add(BACKEND_CMD_TOPIC, on_backend_cmd)
@@ -1813,81 +2467,179 @@ def main(iterations: int | None = None) -> None:
         if not _ven_enabled:
             time.sleep(1)
             continue
-
-        now = int(time.time())
-        status_payload = {"ven": "ready"}
-        # Build metering payload with optional fields
-        # Compute panel step via circuit model
-        step = _compute_panel_step(now)
-        power_kw = step["power_kw"]
-        metering_payload = {"timestamp": now, "power_kw": power_kw}
-        with _shadow_state_lock:
-            include_v = _voltage_enabled
-            include_i = _current_enabled
-            v_nom = _voltage_nominal
-            pf = _power_factor
-
-        if include_v:
-            metering_payload["voltage_v"] = _next_voltage_reading()
-            v_for_current = metering_payload["voltage_v"]
-        else:
-            v_for_current = v_nom
-
-        if include_i and v_for_current > 0 and pf > 0:
-            # P(kW) = V(V) * I(A) * PF / 1000  => I = P*1000/(V*PF)
-            amps = (power_kw * 1000.0) / (v_for_current * pf)
-            metering_payload["current_a"] = round(max(0.0, amps), 2)
-
-        # Attach per-circuit snapshot and battery SOC
-        metering_payload["circuits"] = step.get("circuits")
-        metering_payload["battery_soc"] = step.get("battery_soc")
-
-    client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
-        client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
-        print("Published VEN status and metering data to MQTT")
-        _last_publish_time = time.time()
-        # store last metering for /live UI endpoint
         try:
-            global _last_metering_sample
-            _last_metering_sample = dict(metering_payload)
+            now = int(time.time())
+            status_payload = {"ven": "ready"}
+            # Build metering payload with optional fields
+            # Compute panel step via circuit model
+            step = _compute_panel_step(now)
+            power_kw = step["power_kw"]
+            metering_payload = {"timestamp": now, "power_kw": power_kw}
+            with _shadow_state_lock:
+                include_v = _voltage_enabled
+                include_i = _current_enabled
+                v_nom = _voltage_nominal
+                pf = _power_factor
+
+            if include_v:
+                metering_payload["voltage_v"] = _next_voltage_reading()
+                v_for_current = metering_payload["voltage_v"]
+            else:
+                v_for_current = v_nom
+
+            if include_i and v_for_current > 0 and pf > 0:
+                # P(kW) = V(V) * I(A) * PF / 1000  => I = P*1000/(V*PF)
+                amps = (power_kw * 1000.0) / (v_for_current * pf)
+                metering_payload["current_a"] = round(max(0.0, amps), 2)
+
+            # Attach per-circuit snapshot and battery SOC
+            metering_payload["circuits"] = step.get("circuits")
+            metering_payload["battery_soc"] = step.get("battery_soc")
+
+            # Update history and event-derived metrics
+            try:
+                _power_history.append((now, float(power_kw)))
+            except Exception:
+                pass
+
+            # Determine if within active event window
+            shed_power_kw = 0.0
+            requested_kw = None
+            event_id = None
+            if _active_event:
+                event_id = _active_event.get("event_id")
+                st = int(_active_event.get("start_ts", 0))
+                et = int(_active_event.get("end_ts", 0))
+                if now >= et:
+                    # Event ended
+                    _active_event["ended_at"] = now
+                if st <= now <= et:
+                    requested_kw = _active_event.get("requested_kw")
+                    # Compute baseline if missing: avg of last 5 samples before start
+                    if _active_event.get("baseline_kw") is None:
+                        prev = [v for (ts, v) in list(_power_history) if ts < st][-5:]
+                        if prev:
+                            _active_event["baseline_kw"] = sum(prev) / len(prev)
+                    base = _active_event.get("baseline_kw")
+                    if isinstance(base, (int, float)):
+                        shed_power_kw = max(0.0, float(base) - float(power_kw))
+                        # accumulate delivered kWh
+                        step_h = max(1.0, REPORT_INTERVAL_SECONDS) / 3600.0
+                        _active_event["delivered_kwh"] = float(_active_event.get("delivered_kwh") or 0.0) + shed_power_kw * step_h
+
+            # Enrich telemetry
+            telem = {
+                "schemaVersion": SCHEMA_VERSION,
+                "venId": VEN_ID,
+                "timestamp": now,
+                "usedPowerKw": power_kw,
+                "shedPowerKw": round(shed_power_kw, 3),
+            }
+            if requested_kw is not None:
+                telem["requestedReductionKw"] = float(requested_kw)
+            if event_id is not None:
+                telem["eventId"] = str(event_id)
+            telem["loads"] = [
+                {"id": c["id"], "currentPowerKw": float(c.get("current_kw", 0.0))}
+                for c in (step.get("circuits") or [])
+            ]
+            if "battery_soc" in step:
+                telem["batterySoc"] = step["battery_soc"]
+            # Back-compat: keep previous topic payload plus enriched telem keys
+            metering_payload.update(telem)
+
+            try:
+                client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
+                client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
+            except Exception as pub_err:
+                print(f"Publish error: {pub_err}", file=sys.stderr)
+
+            # Publish richer loads snapshot occasionally (optional)
+            try:
+                global _loads_pub_counter
+                _loads_pub_counter = (_loads_pub_counter + 1) % max(1, LOADS_PUBLISH_EVERY)
+                if BACKEND_LOADS_TOPIC and _loads_pub_counter == 0:
+                    loads_msg = {
+                        "schemaVersion": SCHEMA_VERSION,
+                        "venId": VEN_ID,
+                        "timestamp": now,
+                        "loads": loads_snap,
+                    }
+                    client.publish(BACKEND_LOADS_TOPIC, json.dumps(loads_msg), qos=1)
+            except Exception:
+                pass
+            print("Published VEN status and metering data to MQTT")
+            _last_publish_time = time.time()
+            # store last metering for /live UI endpoint
+            try:
+                global _last_metering_sample
+                _last_metering_sample = dict(metering_payload)
+            except Exception:
+                pass
+            with _shadow_state_lock:
+                target_power_kw = _shadow_target_power_kw
+
+            # Compute loads and metrics snapshot for shadow
+            loads_snap = _circuits_snapshot()
+            metrics = {
+                "currentPowerKw": power_kw,
+                "shedAvailabilityKw": _compute_shed_availability(),
+            }
+            if step.get("battery_soc") is not None:
+                metrics["batterySoc"] = step.get("battery_soc")
+            if event_id is not None:
+                metrics["activeEventId"] = event_id
+            # Event summary handling
+            event_summary = _maybe_finalize_event(now)
+
+            shadow_update = {
+                "status": {
+                    "ven": "ready",
+                    "last_publish_ts": now,
+                    "mqtt_connected": connected
+                },
+                "metering": metering_payload,
+                "report_interval_seconds": REPORT_INTERVAL_SECONDS,
+                "ven": {"venId": VEN_ID, "enabled": _ven_enabled, "status": "connected" if connected else "disconnected", "lastPublishTs": now},
+                "loads": loads_snap,
+                "metrics": metrics,
+                "schemaVersion": SCHEMA_VERSION,
+            }
+            if event_summary:
+                shadow_update.setdefault("metrics", {}).update({"lastEventSummary": event_summary})
+
+            if target_power_kw is not None:
+                shadow_update["target_power_kw"] = target_power_kw
+
+            # Include current knob configuration in reported state for visibility.
+            with _shadow_state_lock:
+                shadow_update.update({
+                    "enabled": _ven_enabled,
+                    "meter_base_min_kw": _meter_base_min_kw,
+                    "meter_base_max_kw": _meter_base_max_kw,
+                    "meter_jitter_pct": _meter_jitter_pct,
+                    "voltage_enabled": _voltage_enabled,
+                    "voltage_nominal": _voltage_nominal,
+                    "voltage_jitter_pct": _voltage_jitter_pct,
+                    "current_enabled": _current_enabled,
+                    "power_factor": _power_factor,
+                })
+
+            _shadow_merge_report(shadow_update)
+
+            count += 1
+            if iterations is not None and count >= iterations:
+                break
+        except Exception as loop_err:
+            print(f"Loop error (continuing): {loop_err}", file=sys.stderr)
+        # Add slight jitter to reduce thundering herd across instances
+        sleep_s = REPORT_INTERVAL_SECONDS
+        try:
+            jitter = max(0.0, min(0.25 * REPORT_INTERVAL_SECONDS, random.uniform(0, 0.1 * REPORT_INTERVAL_SECONDS)))
+            sleep_s = REPORT_INTERVAL_SECONDS + jitter
         except Exception:
             pass
-        with _shadow_state_lock:
-            target_power_kw = _shadow_target_power_kw
-
-        shadow_update = {
-            "status": {
-                "ven": "ready",
-                "last_publish_ts": now,
-                "mqtt_connected": connected
-            },
-            "metering": metering_payload,
-            "report_interval_seconds": REPORT_INTERVAL_SECONDS,
-        }
-
-        if target_power_kw is not None:
-            shadow_update["target_power_kw"] = target_power_kw
-
-        # Include current knob configuration in reported state for visibility.
-        with _shadow_state_lock:
-            shadow_update.update({
-                "enabled": _ven_enabled,
-                "meter_base_min_kw": _meter_base_min_kw,
-                "meter_base_max_kw": _meter_base_max_kw,
-                "meter_jitter_pct": _meter_jitter_pct,
-                "voltage_enabled": _voltage_enabled,
-                "voltage_nominal": _voltage_nominal,
-                "voltage_jitter_pct": _voltage_jitter_pct,
-                "current_enabled": _current_enabled,
-                "power_factor": _power_factor,
-            })
-
-        _shadow_merge_report(shadow_update)
-
-        count += 1
-        if iterations is not None and count >= iterations:
-            break
-        time.sleep(REPORT_INTERVAL_SECONDS)
+        time.sleep(sleep_s)
 
 if __name__ == "__main__":
     main()

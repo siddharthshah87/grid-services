@@ -17,8 +17,31 @@ eval "$LOGIN_CMD" | docker login --username AWS --password-stdin "$REPO_URI"
 
 cd "$(dirname "$0")"
 
-echo "Building and pushing to $REPO_URI..."
-docker build -t volttron-ven .
-docker tag volttron-ven:latest "$REPO_URI:latest"
-docker push "$REPO_URI:latest"
+# Derive an immutable image tag from the current git commit.
+GIT_SHA=$(git rev-parse --short HEAD)
+BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+LOCAL_IMAGE="volttron-ven"
+TAG_SHA="$REPO_URI:$GIT_SHA"
+TAG_LATEST="$REPO_URI:latest"
+
+echo "Building image with tags: $TAG_SHA and latest..."
+docker build \
+  --build-arg GIT_SHA="$GIT_SHA" \
+  --build-arg BUILD_DATE="$BUILD_DATE" \
+  -t "$LOCAL_IMAGE:latest" \
+  -t "$LOCAL_IMAGE:$GIT_SHA" \
+  .
+
+docker tag "$LOCAL_IMAGE:$GIT_SHA" "$TAG_SHA"
+docker tag "$LOCAL_IMAGE:latest" "$TAG_LATEST"
+
+echo "Pushing $TAG_SHA"
+docker push "$TAG_SHA"
+echo "Pushing $TAG_LATEST"
+docker push "$TAG_LATEST"
+
+echo "✅ Pushed images:"
+echo " - $TAG_SHA"
+echo " - $TAG_LATEST"
+echo "You can update your task definition to use: $TAG_SHA"

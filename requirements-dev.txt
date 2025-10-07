@@ -1,0 +1,17 @@
+boto3
+requests
+awscrt
+awsiotsdk
+aiohttp
+paho-mqtt
+openleadr
+pytest
+pytest-asyncio
+httpx
+fastapi
+sqlalchemy[asyncio]
+aiosqlite
+alembic
+pydantic
+pydantic-settings
+asyncpg
