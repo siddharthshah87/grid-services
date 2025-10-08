@@ -77,60 +77,53 @@ async def test_health(async_client):
 
 @pytest.mark.asyncio
 async def test_ven_endpoints(async_client):
-    ven_payload = {"ven_id": "ven123", "registration_id": "reg123"}
+    ven_payload = {"name": "Test VEN", "location": {"lat": 1.23, "lon": 4.56}}
     resp = await async_client.post("/vens/", json=ven_payload)
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     data = resp.json()
-    assert data["ven_id"] == ven_payload["ven_id"]
+    assert data["name"] == ven_payload["name"]
+    new_id = data["id"]
 
     resp = await async_client.get("/vens/")
     assert resp.status_code == 200
-    assert any(v["ven_id"] == ven_payload["ven_id"] for v in resp.json())
+    assert any(v["id"] == new_id for v in resp.json())
 
 @pytest.mark.asyncio
 async def test_event_endpoints(async_client):
     event_payload = {
-        "event_id": "evt1",
-        "ven_id": "ven123",
-        "signal_name": "simple",
-        "signal_type": "level",
-        "signal_payload": "1",
-        "start_time": "2024-01-01T00:00:00Z",
-        "response_required": "always",
-        "raw": {"a": "b"},
+        "startTime": "2024-01-01T00:00:00Z",
+        "endTime": "2024-01-01T01:00:00Z",
+        "requestedReductionKw": 1.5,
     }
     resp = await async_client.post("/events/", json=event_payload)
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     event = resp.json()
-    assert event["event_id"] == event_payload["event_id"]
+    event_id = event["id"]
 
     resp = await async_client.get("/events/")
     assert resp.status_code == 200
-    assert any(e["event_id"] == event_payload["event_id"] for e in resp.json())
+    assert any(e["id"] == event_id for e in resp.json())
 
-    resp = await async_client.get(f"/events/{event_payload['event_id']}")
+    resp = await async_client.get(f"/events/{event_id}")
     assert resp.status_code == 200
 
-    resp = await async_client.get(f"/events/ven/{event_payload['ven_id']}")
-    assert resp.status_code == 200
-    assert any(e["event_id"] == event_payload["event_id"] for e in resp.json())
-
-    resp = await async_client.delete(f"/events/{event_payload['event_id']}")
+    resp = await async_client.delete(f"/events/{event_id}")
     assert resp.status_code == 204
 
-    resp = await async_client.get(f"/events/{event_payload['event_id']}")
+    resp = await async_client.get(f"/events/{event_id}")
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_delete_ven(async_client):
-    ven_payload = {"ven_id": "ven_del", "registration_id": "reg_del"}
+    ven_payload = {"name": "Delete VEN", "location": {"lat": 0.0, "lon": 0.0}}
     resp = await async_client.post("/vens/", json=ven_payload)
-    assert resp.status_code == 200
+    assert resp.status_code == 201
+    ven_id = resp.json()["id"]
 
-    resp = await async_client.delete(f"/vens/{ven_payload['ven_id']}")
+    resp = await async_client.delete(f"/vens/{ven_id}")
     assert resp.status_code == 204
 
     resp = await async_client.get("/vens/")
-    assert all(v["ven_id"] != ven_payload["ven_id"] for v in resp.json())
+    assert all(v["id"] != ven_id for v in resp.json())
 

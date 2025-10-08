@@ -24,6 +24,29 @@ The service loads its database settings from environment variables with the `DB_
 
 `DB_PORT` defaults to `5432` if unset.
 
+### MQTT telemetry ingestion
+
+When `MQTT_ENABLED=true` the FastAPI process starts an MQTT/AWS IoT Core consumer alongside the API server. The consumer subscribes to the VEN agent topics (`MQTT_TOPIC_METERING`, `MQTT_TOPIC_STATUS`, `BACKEND_LOADS_TOPIC`, plus any extra topics listed in `MQTT_TOPICS`) and persists telemetry and load snapshots using the application database session factory. Messages are parsed using the canonical VEN payload schema and stored in the `telemetry_readings`, `telemetry_loads`, and `load_snapshots` tables.
+
+#### MQTT configuration variables
+
+- `MQTT_ENABLED` – enable the consumer (`false` by default).
+- `MQTT_HOST`/`MQTT_PORT` – broker endpoint and port (required when enabled).
+- `MQTT_USE_TLS` – set to `false` for unsecured local brokers; defaults to `true`.
+- `MQTT_CA_CERT`, `MQTT_CLIENT_CERT`, `MQTT_CLIENT_KEY` – filesystem paths to AWS IoT Core certificates. Mount the certificate directory into the container and reference the absolute paths here.
+- `MQTT_USERNAME`/`MQTT_PASSWORD` – optional username/password for brokers that use basic auth.
+- `MQTT_KEEPALIVE` – keepalive interval in seconds (default `60`).
+- `MQTT_CLIENT_ID` – optional custom MQTT client identifier.
+- `MQTT_TOPIC_METERING`, `MQTT_TOPIC_STATUS`, `MQTT_TOPIC_EVENTS`, `MQTT_TOPIC_RESPONSES` – topic overrides aligning with the VEN agent defaults.
+- `BACKEND_LOADS_TOPIC` – topic carrying periodic load snapshots (disabled when unset).
+- `MQTT_TOPICS` – comma-separated list of any additional topics that should be subscribed to alongside the defaults.
+
+Operational notes:
+
+- The consumer logs and skips invalid JSON payloads, but raises startup errors if a broker host/port is missing while enabled.
+- AWS IoT Core deployments typically require TLS; mount certificates and set the path variables accordingly.
+- Data persistence occurs on the same async SQLAlchemy session factory used by the API; commits happen per-message and will roll back automatically on failure.
+
 ## Running locally
 
 Launch the API using Poetry:
@@ -50,6 +73,14 @@ docker run -p 8000:8000 \
 The container's entrypoint runs database migrations via Alembic before starting
 the server. It now retries the upgrade a few times to handle cases where the
 database is still coming online.
+
+## Testing
+
+Run the automated test suite (including MQTT consumer unit tests) with:
+
+```bash
+poetry run pytest
+```
 
 ## API Overview
 
