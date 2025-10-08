@@ -14,7 +14,7 @@ paths:
       tags: [Stats]
       responses:
         '200':
-          description: Current network metrics aggregated from the latest VEN telemetry
+          description: Current network metrics aggregated from the latest VEN telemetry (with optional status-derived fields when available)
           content:
             application/json:
               schema:
@@ -56,11 +56,11 @@ paths:
           required: false
           schema:
             type: string
-            description: Aggregation step (e.g., 5m, 1h)
+            description: Aggregation step (supports suffixes s, m, or h; default 5m)
             default: 5m
       responses:
         '200':
-          description: Time series of network metrics
+          description: Time series of aggregated network metrics (summed per bucket across all VEN telemetry)
           content:
             application/json:
               schema:
@@ -111,6 +111,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ven'
+        '404':
+          description: VEN not found
     patch:
       summary: Update configuration for a VEN (fixture-backed)
       tags: [VENs]
@@ -127,12 +129,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ven'
+        '404':
+          description: VEN not found
     delete:
       summary: Remove a VEN (fixture-backed)
       tags: [VENs]
       responses:
         '204':
           description: VEN deleted
+        '404':
+          description: VEN not found
   /vens/{venId}/loads:
     parameters:
       - in: path
@@ -152,6 +158,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Load'
+        '404':
+          description: VEN not found
   /vens/{venId}/loads/{loadId}:
     parameters:
       - in: path
@@ -174,6 +182,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Load'
+        '404':
+          description: VEN or load not found
     patch:
       summary: Update load configuration (fixture-backed)
       tags: [Loads]
@@ -190,6 +200,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Load'
+        '404':
+          description: VEN or load not found
   /vens/{venId}/loads/{loadId}/commands/shed:
     post:
       summary: Issue a load shed command for a specific load (fixture-backed)
@@ -203,6 +215,8 @@ paths:
       responses:
         '202':
           description: Shed command accepted
+        '404':
+          description: VEN not found
   /vens/{venId}/history:
     parameters:
       - in: path
@@ -231,7 +245,7 @@ paths:
           required: false
           schema:
             type: string
-            description: Aggregation step (e.g., 5m, 1h)
+            description: Aggregation step (supports suffixes s, m, or h; default 5m)
             default: 5m
       responses:
         '200':
@@ -240,6 +254,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HistoryResponse'
+        '404':
+          description: VEN not found
   /vens/{venId}/loads/{loadId}/history:
     parameters:
       - in: path
@@ -273,7 +289,7 @@ paths:
           required: false
           schema:
             type: string
-            description: Aggregation step (e.g., 5m, 1h)
+            description: Aggregation step (supports suffixes s, m, or h; default 5m)
             default: 5m
       responses:
         '200':
@@ -282,6 +298,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HistoryResponse'
+        '404':
+          description: VEN or load not found
   /events:
     get:
       summary: List ADR events (fixture-backed)
@@ -410,7 +428,7 @@ components:
         onlineVens:
           type: integer
           nullable: true
-          description: Count of VENs reporting an "online" status
+          description: Count of VENs with a latest status row marked "online" (falls back to 0 when none are recorded)
         currentLoadReductionKw:
           type: number
           nullable: true
@@ -431,7 +449,7 @@ components:
       properties:
         type:
           type: string
-          description: Load category (e.g., ev, solar, hvac)
+          description: Load category (e.g., ev, solar, hvac); defaults to "unknown" when not supplied
         totalCapacityKw:
           type: number
           description: Total capacity in kW
@@ -511,10 +529,10 @@ components:
         capacityKw:
           type: number
           nullable: true
-          description: Maximum power in kW (if reported)
+          description: Maximum power in kW (reported by the VEN or estimated when missing)
         shedCapabilityKw:
           type: number
-          description: Shed capability in kW
+          description: Shed capability in kW (falls back to shedPowerKw when no explicit value is provided)
         currentPowerKw:
           type: number
           description: Current power usage in kW
@@ -567,10 +585,13 @@ components:
         timestamp:
           type: string
           format: date-time
+          description: ISO-8601 timestamp in UTC (truncated to the bucket boundary)
         usedPowerKw:
           type: number
+          description: Aggregated used power for the bucket
         shedPowerKw:
           type: number
+          description: Aggregated shed power for the bucket
         eventId:
           type: string
           nullable: true
@@ -580,6 +601,7 @@ components:
       required: [timestamp, usedPowerKw, shedPowerKw]
     HistoryResponse:
       type: object
+      description: Aggregated telemetry buckets ordered oldest to newest
       properties:
         points:
           type: array

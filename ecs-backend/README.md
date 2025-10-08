@@ -39,7 +39,9 @@ Telemetry from VEN MQTT payloads is stored in three Alembic-managed tables:
   load type, instantaneous usage, shed capability, and optional capacity
   estimates.
 - `ven_statuses` – status transitions reported by VENs (e.g. `online`,
-  `offline`) with optional structured details.
+  `offline`) with optional structured details. The table is provisioned but the
+  automated ingestion pipeline has not been wired up yet, so rows must be
+  inserted manually for now when testing `onlineVens` calculations.
 
 Run migrations locally after installing dependencies:
 

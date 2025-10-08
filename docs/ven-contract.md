@@ -144,9 +144,10 @@ Published occasionally (every `LOADS_PUBLISH_EVERY` intervals; default 6).
 Each publish on `oadr/meter/{venId}` is stored in the backend database. The
 panel-level fields populate the `ven_telemetry` table while the entries in the
 `loads` array are expanded into `ven_load_samples` records. The full JSON payload
-is retained for troubleshooting in both tables. Status transitions reported via
-the shadow or acknowledgements are captured in the `ven_statuses` table so the
-dashboard can surface the latest heartbeat and status for each VEN.
+is retained for troubleshooting in both tables. A companion `ven_statuses` table
+exists for heartbeat/state changes, but the automated ingestion path is still
+pending; until it is wired up, status rows must be inserted manually if the UI
+needs to reflect online/offline transitions.
 
 ## Ambiguities and Decisions
 
