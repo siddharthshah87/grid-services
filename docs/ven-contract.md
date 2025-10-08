@@ -139,6 +139,15 @@ Published occasionally (every `LOADS_PUBLISH_EVERY` intervals; default 6).
 
 `state.desired` accepts updates for config/knobs and load fields (enabled, capacityKw, priority).
 
+## Backend persistence
+
+Each publish on `oadr/meter/{venId}` is stored in the backend database. The
+panel-level fields populate the `ven_telemetry` table while the entries in the
+`loads` array are expanded into `ven_load_samples` records. The full JSON payload
+is retained for troubleshooting in both tables. Status transitions reported via
+the shadow or acknowledgements are captured in the `ven_statuses` table so the
+dashboard can surface the latest heartbeat and status for each VEN.
+
 ## Ambiguities and Decisions
 
 - `currentPowerKw` for PV is negative (generation). Backend may separate generation in its models.

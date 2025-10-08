@@ -1,10 +1,10 @@
-openapi: 3.1.0
 info:
   title: Grid Services Backend API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     API for the Smart Grid Control Center dashboard.
-    Endpoints are aligned with the Data Model defined in docs/backend-api.md.
+    Endpoints aggregate persisted VEN telemetry and expose fixture-backed
+    administration flows used by the current UI.
 servers:
   - url: /api
 paths:
@@ -14,7 +14,7 @@ paths:
       tags: [Stats]
       responses:
         '200':
-          description: Current network metrics
+          description: Current network metrics aggregated from the latest VEN telemetry
           content:
             application/json:
               schema:
@@ -39,24 +39,25 @@ paths:
       parameters:
         - in: query
           name: start
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
-          description: Start of the interval
+          description: Start of the interval (defaults to earliest stored sample)
         - in: query
           name: end
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
-          description: End of the interval
+          description: End of the interval (defaults to latest stored sample)
         - in: query
           name: granularity
           required: false
           schema:
             type: string
             description: Aggregation step (e.g., 5m, 1h)
+            default: 5m
       responses:
         '200':
           description: Time series of network metrics
@@ -66,7 +67,7 @@ paths:
                 $ref: '#/components/schemas/HistoryResponse'
   /vens:
     get:
-      summary: List all VENs
+      summary: List all VENs (fixture-backed)
       tags: [VENs]
       responses:
         '200':
@@ -78,7 +79,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Ven'
     post:
-      summary: Register a new VEN
+      summary: Register a new VEN (fixture-backed)
       tags: [VENs]
       requestBody:
         required: true
@@ -101,7 +102,7 @@ paths:
         schema:
           type: string
     get:
-      summary: Get details for a specific VEN
+      summary: Get details for a specific VEN (fixture-backed)
       tags: [VENs]
       responses:
         '200':
@@ -111,7 +112,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Ven'
     patch:
-      summary: Update configuration for a VEN
+      summary: Update configuration for a VEN (fixture-backed)
       tags: [VENs]
       requestBody:
         required: true
@@ -127,7 +128,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Ven'
     delete:
-      summary: Remove a VEN
+      summary: Remove a VEN (fixture-backed)
       tags: [VENs]
       responses:
         '204':
@@ -144,7 +145,7 @@ paths:
       tags: [Loads]
       responses:
         '200':
-          description: Array of loads
+          description: Array of loads with the latest telemetry sample
           content:
             application/json:
               schema:
@@ -168,13 +169,13 @@ paths:
       tags: [Loads]
       responses:
         '200':
-          description: Load information
+          description: Load information from the latest telemetry sample
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Load'
     patch:
-      summary: Update load configuration
+      summary: Update load configuration (fixture-backed)
       tags: [Loads]
       requestBody:
         required: true
@@ -184,14 +185,14 @@ paths:
               $ref: '#/components/schemas/LoadUpdate'
       responses:
         '200':
-          description: Updated load
+          description: Updated load (fixture-backed)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Load'
   /vens/{venId}/loads/{loadId}/commands/shed:
     post:
-      summary: Issue a load shed command for a specific load
+      summary: Issue a load shed command for a specific load (fixture-backed)
       tags: [Loads]
       requestBody:
         required: true
@@ -215,13 +216,13 @@ paths:
       parameters:
         - in: query
           name: start
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
         - in: query
           name: end
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
@@ -231,6 +232,7 @@ paths:
           schema:
             type: string
             description: Aggregation step (e.g., 5m, 1h)
+            default: 5m
       responses:
         '200':
           description: Time series of VEN metrics
@@ -256,13 +258,13 @@ paths:
       parameters:
         - in: query
           name: start
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
         - in: query
           name: end
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
@@ -272,6 +274,7 @@ paths:
           schema:
             type: string
             description: Aggregation step (e.g., 5m, 1h)
+            default: 5m
       responses:
         '200':
           description: Time series of load metrics
@@ -281,7 +284,7 @@ paths:
                 $ref: '#/components/schemas/HistoryResponse'
   /events:
     get:
-      summary: List ADR events
+      summary: List ADR events (fixture-backed)
       tags: [Events]
       responses:
         '200':
@@ -293,7 +296,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Event'
     post:
-      summary: Start a new ADR event
+      summary: Start a new ADR event (fixture-backed)
       tags: [Events]
       requestBody:
         required: true
@@ -326,7 +329,7 @@ paths:
         schema:
           type: string
     get:
-      summary: Get ADR event details
+      summary: Get ADR event details (fixture-backed)
       tags: [Events]
       responses:
         '200':
@@ -336,43 +339,45 @@ paths:
               schema:
                 $ref: '#/components/schemas/Event'
     delete:
-      summary: Cancel an event
+      summary: Cancel an event (fixture-backed)
       tags: [Events]
       responses:
         '204':
           description: Event cancelled
   /events/{eventId}/stop:
     post:
-      summary: Stop an active event
+      summary: Stop an active event (fixture-backed)
       tags: [Events]
       responses:
         '202':
           description: Event stop command accepted
   /events/current:
     get:
-      summary: Get the currently active ADR event if any
+      summary: Get the currently active ADR event if any (fixture-backed)
       tags: [Events]
       responses:
         '200':
-          description: Active event
+          description: Active event (or null when none)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Event'
+                oneOf:
+                  - $ref: '#/components/schemas/Event'
+                  - type: 'null'
   /events/history:
     get:
-      summary: Query historical ADR events
+      summary: Query historical ADR events (fixture-backed)
       tags: [Events, History]
       parameters:
         - in: query
           name: start
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
         - in: query
           name: end
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
@@ -401,7 +406,25 @@ components:
           description: Potential kW reduction if fully shed
         householdUsageKw:
           type: number
-          description: Current household usage in kW
+          description: Current aggregated usage in kW
+        onlineVens:
+          type: integer
+          nullable: true
+          description: Count of VENs reporting an "online" status
+        currentLoadReductionKw:
+          type: number
+          nullable: true
+          description: Currently delivered shed amount
+        networkEfficiency:
+          type: number
+          nullable: true
+        averageHousePower:
+          type: number
+          nullable: true
+          description: Average per-VEN usage when telemetry is available
+        totalHousePowerToday:
+          type: number
+          nullable: true
       required: [venCount, controllablePowerKw, potentialLoadReductionKw, householdUsageKw]
     LoadTypeStats:
       type: object
@@ -470,7 +493,7 @@ components:
       required: [name, location]
     VenUpdate:
       type: object
-      description: Partial VEN update
+      description: Partial VEN update (fixture-backed)
       properties:
         name:
           type: string
@@ -487,7 +510,8 @@ components:
           type: string
         capacityKw:
           type: number
-          description: Maximum power in kW
+          nullable: true
+          description: Maximum power in kW (if reported)
         shedCapabilityKw:
           type: number
           description: Shed capability in kW
@@ -496,10 +520,11 @@ components:
           description: Current power usage in kW
         name:
           type: string
-      required: [id, type, capacityKw, shedCapabilityKw, currentPowerKw]
+          nullable: true
+      required: [id, type, shedCapabilityKw, currentPowerKw]
     LoadUpdate:
       type: object
-      description: Partial Load update
+      description: Partial load update (fixture-backed)
       properties:
         name:
           type: string
@@ -551,6 +576,7 @@ components:
           nullable: true
         requestedReductionKw:
           type: number
+          nullable: true
       required: [timestamp, usedPowerKw, shedPowerKw]
     HistoryResponse:
       type: object
