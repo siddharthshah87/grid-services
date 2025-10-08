@@ -3,10 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 import sys
 
+from app.routers import event
 from app.routers import health
 from app.routers import stats as api_stats
 from app.routers import ven
-from app.routers import event
+from app.services import MQTTConsumer
+from app.core.config import settings
+from app.dependencies import get_session
 
 app = FastAPI(
     title="OpenADR VTN Admin API",
@@ -38,3 +41,16 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger("uvicorn")
+
+
+mqtt_consumer = MQTTConsumer(config=settings, session_factory=get_session)
+
+
+@app.on_event("startup")
+async def start_services() -> None:
+    await mqtt_consumer.start()
+
+
+@app.on_event("shutdown")
+async def stop_services() -> None:
+    await mqtt_consumer.stop()
