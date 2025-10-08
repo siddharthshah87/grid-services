@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -118,3 +120,36 @@ class EventWithMetrics(Event):
     currentReductionKw: Optional[float] = None
     vensResponding: Optional[int] = None
     avgResponseMs: Optional[int] = None
+
+
+class VenTelemetryRecord(BaseModel):
+    venId: str = Field(alias="ven_id")
+    timestamp: datetime
+    usedPowerKw: float = Field(alias="used_power_kw")
+    shedPowerKw: float = Field(alias="shed_power_kw")
+    payload: Optional[dict] = None
+
+    model_config = {"populate_by_name": True}
+
+
+class VenLoadSampleRecord(BaseModel):
+    venId: str = Field(alias="ven_id")
+    loadId: str = Field(alias="load_id")
+    timestamp: datetime
+    loadType: Optional[str] = Field(default=None, alias="load_type")
+    usedPowerKw: float = Field(alias="used_power_kw")
+    shedPowerKw: float = Field(alias="shed_power_kw")
+    capacityKw: Optional[float] = Field(default=None, alias="capacity_kw")
+    shedCapabilityKw: Optional[float] = Field(default=None, alias="shed_capability_kw")
+    payload: Optional[dict] = None
+
+    model_config = {"populate_by_name": True}
+
+
+class VenStatusRecord(BaseModel):
+    venId: str = Field(alias="ven_id")
+    status: str
+    recordedAt: datetime = Field(alias="recorded_at")
+    details: Optional[dict] = None
+
+    model_config = {"populate_by_name": True}

@@ -1,14 +1,29 @@
-from fastapi import APIRouter, HTTPException
 from typing import List
 
-from app.schemas.api_models import Ven, VenCreate, VenUpdate, Load, HistoryResponse, ShedCommand, VenSummary
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app import crud
+from app.dependencies import get_session
+from app.models import VenLoadSample
+from app.schemas.api_models import (
+    HistoryResponse,
+    Load,
+    ShedCommand,
+    TimeseriesPoint,
+    Ven,
+    VenCreate,
+    VenSummary,
+    VenUpdate,
+)
 from app.data.dummy import (
     list_vens,
     get_ven as get_dummy_ven,
     upsert_ven as upsert_dummy_ven,
-    sample_history_points,
     ven_summaries,
 )
+
+from .utils import format_timestamp, parse_granularity, parse_timestamp
 
 
 router = APIRouter()
@@ -66,22 +81,21 @@ async def delete_ven_v2(ven_id: str):
 
 
 @router.get("/{ven_id}/loads", response_model=List[Load])
-async def list_ven_loads(ven_id: str):
-    ven = get_dummy_ven(ven_id)
-    if not ven:
+async def list_ven_loads(ven_id: str, session: AsyncSession = Depends(get_session)):
+    if not await crud.ven_exists(session, ven_id):
         raise HTTPException(status_code=404, detail="VEN not found")
-    return ven.loads
+    samples = await crud.latest_load_samples_for_ven(session, ven_id)
+    return [_to_load_model(sample) for sample in samples]
 
 
 @router.get("/{ven_id}/loads/{load_id}", response_model=Load)
-async def get_ven_load(ven_id: str, load_id: str):
-    ven = get_dummy_ven(ven_id)
-    if not ven:
+async def get_ven_load(ven_id: str, load_id: str, session: AsyncSession = Depends(get_session)):
+    if not await crud.ven_exists(session, ven_id):
         raise HTTPException(status_code=404, detail="VEN not found")
-    for l in ven.loads:
-        if l.id == load_id:
-            return l
-    raise HTTPException(status_code=404, detail="Load not found")
+    sample = await crud.latest_load_sample(session, ven_id, load_id)
+    if not sample:
+        raise HTTPException(status_code=404, detail="Load not found")
+    return _to_load_model(sample)
 
 
 @router.patch("/{ven_id}/loads/{load_id}", response_model=Load)
@@ -114,15 +128,90 @@ async def shed_ven_load(ven_id: str, load_id: str, cmd: ShedCommand):
 
 
 @router.get("/{ven_id}/history", response_model=HistoryResponse)
-async def ven_history(ven_id: str):
-    if not get_dummy_ven(ven_id):
+async def ven_history(
+    ven_id: str,
+    start: str | None = Query(default=None),
+    end: str | None = Query(default=None),
+    granularity: str | None = Query(default="5m"),
+    session: AsyncSession = Depends(get_session),
+):
+    if not await crud.ven_exists(session, ven_id):
         raise HTTPException(status_code=404, detail="VEN not found")
-    return sample_history_points()
+
+    start_dt = parse_timestamp(start) if start else None
+    end_dt = parse_timestamp(end) if end else None
+    interval = parse_granularity(granularity)
+
+    rows = await crud.telemetry_history(session, ven_id=ven_id, start=start_dt, end=end_dt)
+    bucketed = crud.bucketize_telemetry(rows, interval=interval) if rows else []
+
+    points = [
+        TimeseriesPoint(
+            timestamp=format_timestamp(entry["timestamp"]),
+            usedPowerKw=round(float(entry["used_power_kw"]), 3),
+            shedPowerKw=round(float(entry["shed_power_kw"]), 3),
+        )
+        for entry in bucketed
+    ]
+
+    return HistoryResponse(points=points)
 
 
 @router.get("/{ven_id}/loads/{load_id}/history", response_model=HistoryResponse)
-async def ven_load_history(ven_id: str, load_id: str):
-    ven = get_dummy_ven(ven_id)
-    if not ven or not any(l.id == load_id for l in ven.loads):
-        raise HTTPException(status_code=404, detail="Not found")
-    return sample_history_points()
+async def ven_load_history(
+    ven_id: str,
+    load_id: str,
+    start: str | None = Query(default=None),
+    end: str | None = Query(default=None),
+    granularity: str | None = Query(default="5m"),
+    session: AsyncSession = Depends(get_session),
+):
+    if not await crud.ven_exists(session, ven_id):
+        raise HTTPException(status_code=404, detail="VEN not found")
+
+    sample = await crud.latest_load_sample(session, ven_id, load_id)
+    if not sample:
+        raise HTTPException(status_code=404, detail="Load not found")
+
+    start_dt = parse_timestamp(start) if start else None
+    end_dt = parse_timestamp(end) if end else None
+    interval = parse_granularity(granularity)
+
+    rows = await crud.telemetry_history(
+        session,
+        ven_id=ven_id,
+        load_id=load_id,
+        start=start_dt,
+        end=end_dt,
+    )
+    bucketed = crud.bucketize_telemetry(rows, interval=interval) if rows else []
+
+    points = [
+        TimeseriesPoint(
+            timestamp=format_timestamp(entry["timestamp"]),
+            usedPowerKw=round(float(entry["used_power_kw"]), 3),
+            shedPowerKw=round(float(entry["shed_power_kw"]), 3),
+        )
+        for entry in bucketed
+    ]
+
+    return HistoryResponse(points=points)
+
+
+def _to_load_model(sample: VenLoadSample) -> Load:
+    payload = sample.payload if isinstance(sample.payload, dict) else {}
+    shed_capability = (
+        sample.shed_capability_kw if sample.shed_capability_kw is not None else sample.shed_power_kw or 0.0
+    )
+    capacity = sample.capacity_kw
+    if capacity is None:
+        capacity = (sample.used_power_kw or 0.0) + (shed_capability or 0.0)
+
+    return Load(
+        id=sample.load_id,
+        type=sample.load_type or payload.get("type", "unknown"),
+        capacityKw=float(capacity or 0.0),
+        shedCapabilityKw=float(shed_capability or 0.0),
+        currentPowerKw=float(sample.used_power_kw or 0.0),
+        name=payload.get("name"),
+    )

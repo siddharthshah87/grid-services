@@ -4,5 +4,13 @@ Base = declarative_base()
 
 from .ven import VEN  # noqa: E402
 from .event import Event  # noqa: E402
+from .telemetry import VenTelemetry, VenLoadSample, VenStatus  # noqa: E402
 
-__all__ = ["Base", "VEN", "Event"]
+__all__ = [
+    "Base",
+    "VEN",
+    "Event",
+    "VenTelemetry",
+    "VenLoadSample",
+    "VenStatus",
+]
