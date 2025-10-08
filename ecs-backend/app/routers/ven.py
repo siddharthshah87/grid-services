@@ -1,128 +1,104 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 
-from app.schemas.api_models import Ven, VenCreate, VenUpdate, Load, HistoryResponse, ShedCommand, VenSummary
-from app.data.dummy import (
-    list_vens,
-    get_ven as get_dummy_ven,
-    upsert_ven as upsert_dummy_ven,
-    sample_history_points,
-    ven_summaries,
-)
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app import crud
+from app.dependencies import get_session
+from app.schemas.api_models import Load, HistoryResponse, ShedCommand, VenSummary
+from app.schemas.ven import VENCreate, VENRead, VENUpdate
 
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[Ven])
-async def list_vens_v2():
-    return list_vens()
+@router.get("/", response_model=List[VENRead])
+async def list_vens_v2(session: AsyncSession = Depends(get_session)):
+    return await crud.list_vens(session)
 
 
-@router.post("/", response_model=Ven, status_code=201)
-async def create_ven_v2(payload: VenCreate):
-    new_id = f"ven-{100 + len(list_vens()) + 1}"
-    ven = Ven(
-        id=new_id,
-        name=payload.name,
-        status="online",
-        location=payload.location,
-        loads=[],
-        metrics={"currentPowerKw": 0.0, "shedAvailabilityKw": 0.0, "activeEventId": None, "shedLoadIds": []},
-    )
-    return upsert_dummy_ven(ven)
-
-
-@router.get("/summary", response_model=List[VenSummary])
-async def list_vens_summary():
-    """Summarized VEN data tailored for the current UI list view."""
-    return ven_summaries()
-
-
-@router.get("/{ven_id}", response_model=Ven)
-async def get_ven_v2(ven_id: str):
-    ven = get_dummy_ven(ven_id)
-    if not ven:
-        raise HTTPException(status_code=404, detail="VEN not found")
+@router.post("/", response_model=VENRead, status_code=status.HTTP_201_CREATED)
+async def create_ven_v2(payload: VENCreate, session: AsyncSession = Depends(get_session)):
+    ven = await crud.create_ven(session, payload.model_dump())
     return ven
 
 
-@router.patch("/{ven_id}", response_model=Ven)
-async def patch_ven_v2(ven_id: str, update: VenUpdate):
-    ven = get_dummy_ven(ven_id)
+@router.get("/summary", response_model=List[VenSummary])
+async def list_vens_summary(session: AsyncSession = Depends(get_session)):
+    """Summarized VEN data tailored for the current UI list view."""
+
+    # Summary information is not yet stored in the database, so return an empty list
+    # until the backing data model is expanded.
+    await crud.list_vens(session)
+    return []
+
+
+@router.get("/{ven_id}", response_model=VENRead)
+async def get_ven_v2(ven_id: str, session: AsyncSession = Depends(get_session)):
+    ven = await crud.get_ven(session, ven_id)
     if not ven:
-        raise HTTPException(status_code=404, detail="VEN not found")
-    data = ven.model_copy(update={k: v for k, v in update.model_dump(exclude_unset=True).items()})
-    return upsert_dummy_ven(data)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VEN not found")
+    return ven
 
 
-@router.delete("/{ven_id}", status_code=204)
-async def delete_ven_v2(ven_id: str):
-    from app.data.dummy import VENS
-    if ven_id not in VENS:
-        raise HTTPException(status_code=404, detail="VEN not found")
-    del VENS[ven_id]
-    return {"status": "deleted"}
+@router.patch("/{ven_id}", response_model=VENRead)
+async def patch_ven_v2(ven_id: str, update: VENUpdate, session: AsyncSession = Depends(get_session)):
+    ven = await crud.update_ven(session, ven_id, update.model_dump(exclude_unset=True, exclude_none=True))
+    if not ven:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VEN not found")
+    return ven
+
+
+@router.delete("/{ven_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_ven_v2(ven_id: str, session: AsyncSession = Depends(get_session)):
+    deleted = await crud.delete_ven(session, ven_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VEN not found")
 
 
 @router.get("/{ven_id}/loads", response_model=List[Load])
-async def list_ven_loads(ven_id: str):
-    ven = get_dummy_ven(ven_id)
+async def list_ven_loads(ven_id: str, session: AsyncSession = Depends(get_session)):
+    ven = await crud.get_ven(session, ven_id)
     if not ven:
-        raise HTTPException(status_code=404, detail="VEN not found")
-    return ven.loads
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VEN not found")
+    return []
 
 
 @router.get("/{ven_id}/loads/{load_id}", response_model=Load)
-async def get_ven_load(ven_id: str, load_id: str):
-    ven = get_dummy_ven(ven_id)
+async def get_ven_load(ven_id: str, load_id: str, session: AsyncSession = Depends(get_session)):
+    ven = await crud.get_ven(session, ven_id)
     if not ven:
-        raise HTTPException(status_code=404, detail="VEN not found")
-    for l in ven.loads:
-        if l.id == load_id:
-            return l
-    raise HTTPException(status_code=404, detail="Load not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VEN not found")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Load not found")
 
 
 @router.patch("/{ven_id}/loads/{load_id}", response_model=Load)
-async def update_ven_load(ven_id: str, load_id: str, update: dict):
-    ven = get_dummy_ven(ven_id)
+async def update_ven_load(ven_id: str, load_id: str, update: dict, session: AsyncSession = Depends(get_session)):
+    ven = await crud.get_ven(session, ven_id)
     if not ven:
-        raise HTTPException(status_code=404, detail="VEN not found")
-    updated = None
-    new_loads: List[Load] = []
-    for l in ven.loads:
-        if l.id == load_id:
-            data = l.model_dump()
-            data.update({k: v for k, v in update.items() if k in data})
-            updated = Load(**data)
-            new_loads.append(updated)
-        else:
-            new_loads.append(l)
-    if not updated:
-        raise HTTPException(status_code=404, detail="Load not found")
-    upsert_dummy_ven(ven.model_copy(update={"loads": new_loads}))
-    return updated
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VEN not found")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Load not found")
 
 
-@router.post("/{ven_id}/loads/{load_id}/commands/shed", status_code=202)
-async def shed_ven_load(ven_id: str, load_id: str, cmd: ShedCommand):
-    ven = get_dummy_ven(ven_id)
+@router.post("/{ven_id}/loads/{load_id}/commands/shed", status_code=status.HTTP_202_ACCEPTED)
+async def shed_ven_load(ven_id: str, load_id: str, cmd: ShedCommand, session: AsyncSession = Depends(get_session)):
+    ven = await crud.get_ven(session, ven_id)
     if not ven:
-        raise HTTPException(status_code=404, detail="VEN not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VEN not found")
     return {"status": "accepted", "venId": ven_id, "loadId": load_id, "amountKw": cmd.amountKw}
 
 
 @router.get("/{ven_id}/history", response_model=HistoryResponse)
-async def ven_history(ven_id: str):
-    if not get_dummy_ven(ven_id):
-        raise HTTPException(status_code=404, detail="VEN not found")
-    return sample_history_points()
+async def ven_history(ven_id: str, session: AsyncSession = Depends(get_session)):
+    ven = await crud.get_ven(session, ven_id)
+    if not ven:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VEN not found")
+    return HistoryResponse(points=[])
 
 
 @router.get("/{ven_id}/loads/{load_id}/history", response_model=HistoryResponse)
-async def ven_load_history(ven_id: str, load_id: str):
-    ven = get_dummy_ven(ven_id)
-    if not ven or not any(l.id == load_id for l in ven.loads):
-        raise HTTPException(status_code=404, detail="Not found")
-    return sample_history_points()
+async def ven_load_history(ven_id: str, load_id: str, session: AsyncSession = Depends(get_session)):
+    ven = await crud.get_ven(session, ven_id)
+    if not ven:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VEN not found")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Load not found")

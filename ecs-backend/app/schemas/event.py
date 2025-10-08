@@ -1,5 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from typing import Optional
 from datetime import datetime
+
 
 class EventBase(BaseModel):
     event_id: str
@@ -9,13 +11,40 @@ class EventBase(BaseModel):
     signal_payload: str
     start_time: datetime
     response_required: str
-    raw: dict
+    raw: Optional[dict] = None
+
 
 class EventCreate(EventBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
+
+
+class EventUpdate(BaseModel):
+    ven_id: Optional[str] = None
+    signal_name: Optional[str] = None
+    signal_type: Optional[str] = None
+    signal_payload: Optional[str] = None
+    start_time: Optional[datetime] = None
+    response_required: Optional[str] = None
+    raw: Optional[dict] = None
+
+    model_config = ConfigDict(extra="forbid")
+
 
 class EventRead(EventBase):
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EventMetrics(BaseModel):
+    current_reduction_kw: float
+    vens_responding: int
+    avg_response_ms: int
+
+
+class EventWithMetrics(EventRead):
+    current_reduction_kw: Optional[float] = None
+    vens_responding: Optional[int] = None
+    avg_response_ms: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
