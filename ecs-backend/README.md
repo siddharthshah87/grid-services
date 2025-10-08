@@ -3,7 +3,10 @@
 This directory contains a FastAPI application that powers the Grid-Event
 Gateway administration API. The backend persists VEN telemetry, exposes
 time-series statistics, and still serves a small set of in-memory fixtures used
-by the UI while device provisioning flows are finalized.
+by the UI while device provisioning flows are finalized. Legacy fixture-backed
+VEN and event management endpoints remain available so the UI can continue to
+create, list, and delete records during the transition to a fully persisted
+workflow.
 
 ## Setup
 
@@ -88,8 +91,10 @@ The service currently supports three classes of endpoints:
    historical samples for each VEN and load.
 3. **Fixture-backed VEN and event management** – high-level VEN CRUD and ADR
    event endpoints still return the in-memory fixtures defined in
-   `app/data/dummy.py`. These endpoints provide deterministic responses for the
-   UI until full provisioning flows are wired up.
+   `app/data/dummy.py`. These fixture routes continue to support creation,
+   listing, and deletion operations (e.g. `POST /vens/`, `DELETE /vens/{venId}`,
+   `POST /events/`, `DELETE /events/{eventId}`) until the provisioning flows are
+   replaced with persistent storage.
 
 Refer to `docs/backend-api.md` and `docs/backend-api.yaml` for request/response
 examples that align with the current implementation.
