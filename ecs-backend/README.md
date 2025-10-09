@@ -84,6 +84,56 @@ poetry run pytest
 
 ## API Overview
 
-The service exposes REST endpoints to manage VENs and events. In addition to
-creating and listing records, the latest version adds the ability to remove
-entries using `DELETE /vens/{ven_id}` and `DELETE /events/{event_id}`.
+The service exposes REST endpoints to manage VENs and events. See `docs/backend-api.md` and `docs/backend-api.yaml` for full API details and models. Key endpoints include:
+
+- `GET /api/stats/network` – network metrics
+- `GET /api/vens` – list VENs
+- `POST /api/vens` – create VEN
+- `GET /api/events` – list events
+- `POST /api/events` – create event
+- `DELETE /api/vens/{ven_id}` – remove VEN
+- `DELETE /api/events/{event_id}` – remove event
+
+Refer to the API documentation for all supported endpoints, request/response formats, and data models.
+
+## Database Migrations
+
+Alembic is used for database migrations. Migrations run automatically on container startup. To manually run migrations:
+
+```bash
+poetry run alembic upgrade head
+```
+
+## Architecture & Dependencies
+
+- FastAPI for REST API
+- SQLAlchemy (async) for database access
+- Alembic for migrations
+- MQTT consumer for telemetry ingestion (optional)
+- See `pyproject.toml` for all dependencies
+
+## Environment Variables
+
+See above for required DB and MQTT variables. Additional variables may be required for cloud deployment, logging, or secrets. Document any new variables in this README.
+
+## Test Coverage
+
+### Test Coverage
+Automated tests are provided in `tests/test_api.py` and `tests/test_mqtt_consumer.py`:
+- `test_api.py`: Covers REST API endpoints for VENs, events, and health, including database integration and deletion logic.
+- `test_mqtt_consumer.py`: Covers MQTT consumer logic, telemetry ingestion, and load snapshot persistence.
+
+To run all tests:
+```bash
+poetry run pytest
+```
+
+Tests use `pytest` and `pytest-asyncio` for async FastAPI and database logic. Add new tests for new endpoints, features, or bug fixes.
+
+## Contributing
+
+- Add docstrings and comments to new code.
+- Update this README and API docs for new features.
+
+## License
+Specify license here.
