@@ -3,6 +3,7 @@ import sys
 import asyncio
 import pytest
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 import pytest_asyncio
@@ -23,6 +24,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from fastapi import FastAPI
 from app.routers import health, ven, event
 from app.db.database import get_session
+from app.models.event import Event as EventModel
+from app.models.ven import VEN
 
 
 def create_app() -> FastAPI:
@@ -40,7 +43,7 @@ DATABASE_URL = f"sqlite+aiosqlite:///{db_file}"
 
 
 @pytest_asyncio.fixture(scope="module")
-async def async_client():
+async def api_context():
     if os.path.exists(db_file):
         os.remove(db_file)
     engine = create_async_engine(DATABASE_URL, future=True)
@@ -62,7 +65,7 @@ async def async_client():
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
+        yield client, async_session
 
     app.dependency_overrides.clear()
     await engine.dispose()
@@ -70,60 +73,84 @@ async def async_client():
         os.remove(db_file)
 
 @pytest.mark.asyncio
-async def test_health(async_client):
-    resp = await async_client.get("/health")
+async def test_health(api_context):
+    client, _ = api_context
+    resp = await client.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
 @pytest.mark.asyncio
-async def test_ven_endpoints(async_client):
+async def test_ven_endpoints(api_context):
+    client, session_factory = api_context
     ven_payload = {"name": "Test VEN", "location": {"lat": 1.23, "lon": 4.56}}
-    resp = await async_client.post("/vens/", json=ven_payload)
+    resp = await client.post("/vens/", json=ven_payload)
     assert resp.status_code == 201
     data = resp.json()
     assert data["name"] == ven_payload["name"]
     new_id = data["id"]
 
-    resp = await async_client.get("/vens/")
+    async with session_factory() as session:
+        db_row = await session.execute(select(VEN).where(VEN.ven_id == new_id))
+        ven_row = db_row.scalar_one()
+        assert ven_row.name == ven_payload["name"]
+        assert pytest.approx(ven_row.latitude, rel=1e-3) == ven_payload["location"]["lat"]
+        assert pytest.approx(ven_row.longitude, rel=1e-3) == ven_payload["location"]["lon"]
+
+    resp = await client.get("/vens/")
     assert resp.status_code == 200
     assert any(v["id"] == new_id for v in resp.json())
 
 @pytest.mark.asyncio
-async def test_event_endpoints(async_client):
+async def test_event_endpoints(api_context):
+    client, session_factory = api_context
     event_payload = {
         "startTime": "2024-01-01T00:00:00Z",
         "endTime": "2024-01-01T01:00:00Z",
         "requestedReductionKw": 1.5,
     }
-    resp = await async_client.post("/events/", json=event_payload)
+    resp = await client.post("/events/", json=event_payload)
     assert resp.status_code == 201
     event = resp.json()
     event_id = event["id"]
 
-    resp = await async_client.get("/events/")
+    async with session_factory() as session:
+        db_row = await session.execute(select(EventModel).where(EventModel.event_id == event_id))
+        event_row = db_row.scalar_one()
+        assert event_row.requested_reduction_kw == pytest.approx(event_payload["requestedReductionKw"])
+
+    resp = await client.get("/events/")
     assert resp.status_code == 200
     assert any(e["id"] == event_id for e in resp.json())
 
-    resp = await async_client.get(f"/events/{event_id}")
+    resp = await client.get(f"/events/{event_id}")
     assert resp.status_code == 200
 
-    resp = await async_client.delete(f"/events/{event_id}")
+    resp = await client.delete(f"/events/{event_id}")
     assert resp.status_code == 204
 
-    resp = await async_client.get(f"/events/{event_id}")
+    async with session_factory() as session:
+        result = await session.execute(select(EventModel).where(EventModel.event_id == event_id))
+        assert result.scalar_one_or_none() is None
+
+    resp = await client.get(f"/events/{event_id}")
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_delete_ven(async_client):
+async def test_delete_ven(api_context):
+    client, session_factory = api_context
     ven_payload = {"name": "Delete VEN", "location": {"lat": 0.0, "lon": 0.0}}
-    resp = await async_client.post("/vens/", json=ven_payload)
+    resp = await client.post("/vens/", json=ven_payload)
     assert resp.status_code == 201
     ven_id = resp.json()["id"]
 
-    resp = await async_client.delete(f"/vens/{ven_id}")
+    resp = await client.delete(f"/vens/{ven_id}")
     assert resp.status_code == 204
 
-    resp = await async_client.get("/vens/")
+    async with session_factory() as session:
+        result = await session.execute(select(VEN).where(VEN.ven_id == ven_id))
+        assert result.scalar_one_or_none() is None
+
+    resp = await client.get("/vens/")
     assert all(v["id"] != ven_id for v in resp.json())
 

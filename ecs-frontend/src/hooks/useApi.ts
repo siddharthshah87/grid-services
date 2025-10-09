@@ -55,6 +55,7 @@ export interface Ven {
   status: string;
   location: VenLocation;
   metrics: VenMetrics;
+  createdAt: string;
   loads?: Load[];
 }
 

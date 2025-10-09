@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Location(BaseModel):
@@ -19,10 +21,10 @@ class Load(BaseModel):
 
 
 class VenMetrics(BaseModel):
-    currentPowerKw: float
-    shedAvailabilityKw: float
+    currentPowerKw: float = 0.0
+    shedAvailabilityKw: float = 0.0
     activeEventId: Optional[str] = None
-    shedLoadIds: List[str] = []
+    shedLoadIds: list[str] = Field(default_factory=list)
 
 
 class Ven(BaseModel):
@@ -30,19 +32,23 @@ class Ven(BaseModel):
     name: str
     status: str
     location: Location
-    loads: List[Load]
     metrics: VenMetrics
+    createdAt: datetime
+    loads: list[Load] | None = None
 
 
 class VenCreate(BaseModel):
     name: str
     location: Location
+    status: Optional[str] = "active"
+    registrationId: Optional[str] = None
 
 
 class VenUpdate(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
     location: Optional[Location] = None
+    registrationId: Optional[str] = None
 
 
 class NetworkStats(BaseModel):
@@ -50,9 +56,8 @@ class NetworkStats(BaseModel):
     controllablePowerKw: float
     potentialLoadReductionKw: float
     householdUsageKw: float
-    # Extended fields to support current UI without frontend refactors
-    onlineVens: int | None = None
-    currentLoadReductionKw: float | None = None
+    onlineVens: int = 0
+    currentLoadReductionKw: float = 0.0
     networkEfficiency: float | None = None
     averageHousePower: float | None = None
     totalHousePowerToday: float | None = None
@@ -66,7 +71,7 @@ class LoadTypeStats(BaseModel):
 
 
 class TimeseriesPoint(BaseModel):
-    timestamp: str
+    timestamp: datetime
     usedPowerKw: float
     shedPowerKw: float
     eventId: Optional[str] = None
@@ -74,22 +79,23 @@ class TimeseriesPoint(BaseModel):
 
 
 class HistoryResponse(BaseModel):
-    points: List[TimeseriesPoint]
+    points: list[TimeseriesPoint]
 
 
 class Event(BaseModel):
     id: str
     status: str
-    startTime: str
-    endTime: str
-    requestedReductionKw: float
-    actualReductionKw: float = 0
+    startTime: Optional[datetime]
+    endTime: Optional[datetime]
+    requestedReductionKw: Optional[float]
+    actualReductionKw: float = 0.0
 
 
 class EventCreate(BaseModel):
-    startTime: str
-    endTime: str
+    startTime: datetime
+    endTime: datetime
     requestedReductionKw: float
+    status: Optional[str] = "scheduled"
 
 
 class ShedCommand(BaseModel):
@@ -99,13 +105,13 @@ class ShedCommand(BaseModel):
 class VenSummary(BaseModel):
     id: str
     name: str
-    location: str  # label for UI
-    status: str  # online | offline | maintenance
-    controllablePower: float  # kW
-    currentPower: float  # kW
+    location: str
+    status: str
+    controllablePower: float
+    currentPower: float
     address: str
     lastSeen: str
-    responseTime: int  # ms
+    responseTime: int
 
 
 class EventMetrics(BaseModel):
