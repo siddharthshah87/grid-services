@@ -4,23 +4,14 @@ import json
 import random
 import time
 import sys
-import signal
+"""
 import tempfile
-import pathlib
 import threading
 from copy import deepcopy
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
-try:
-    # Python 3.7+
-    from http.server import ThreadingHTTPServer as _ThreadingHTTPServer  # type: ignore
-except Exception:  # pragma: no cover - fallback for older runtimes
-    _ThreadingHTTPServer = None  # type: ignore
 from urllib.parse import urlparse
 from typing import Any, Deque
-from collections import deque
-import paho.mqtt.client as mqtt
-import boto3
 from botocore.exceptions import ClientError
 
 # Build metadata injected at image build time via Dockerfile args
@@ -495,6 +486,9 @@ def _load_static_html(filename: str, default_html: str) -> str:
 
 # ── helpers ────────────────────────────────────────────────────────────
 def fetch_tls_creds_from_secrets(secret_name: str, region_name="us-west-2") -> dict | None:
+    """Fetch TLS PEM contents from AWS Secrets Manager and write them to temp files.
+    Returns a dict of file paths for ca_cert, client_cert, and private_key.
+    """
     """Fetch TLS PEM contents from AWS Secrets Manager and write them to temp files."""
     try:
         client = boto3.client("secretsmanager", region_name=region_name)
@@ -519,6 +513,7 @@ def fetch_tls_creds_from_secrets(secret_name: str, region_name="us-west-2") -> d
         return None
 
 def _materialise_pem(*var_names: str) -> str | None:
+    """Materialize PEM string from env var to a temp file, return its path."""
     """Return a file-path ready for paho.tls_set()."""
     for var_name in var_names:
         val = os.getenv(var_name)
@@ -534,6 +529,7 @@ def _materialise_pem(*var_names: str) -> str | None:
 
 
 def _format_timestamp(timestamp: float | None) -> str | None:
+    """Format a UNIX timestamp as ISO8601 string in UTC."""
     if timestamp is None:
         return None
 
@@ -545,6 +541,7 @@ def _format_timestamp(timestamp: float | None) -> str | None:
 
 
 def _dnsname_matches(pattern: str, hostname: str) -> bool:
+    """Check if a DNS pattern matches a hostname (supports wildcard)."""
     pattern = pattern.lower()
     hostname = hostname.lower()
 
@@ -559,6 +556,7 @@ def _dnsname_matches(pattern: str, hostname: str) -> bool:
 
 
 def _ensure_expected_server_hostname(mqtt_client: mqtt.Client, expected: str) -> None:
+    """Verify MQTT TLS peer certificate matches expected hostname."""
     """Perform hostname verification manually when connect and TLS hosts differ."""
     hostname = expected.strip()
     if not hostname:
@@ -668,6 +666,7 @@ if not all([CA_CERT, CLIENT_CERT, PRIVATE_KEY]):
     sys.exit(1)
 
 def _build_tls_context(
+    """Create an SSLContext for MQTT with SNI and hostname verification."""
     ca_path: str, cert_path: str, key_path: str, expected_sni: str | None, connect_host: str
 ) -> ssl.SSLContext:
     """Create an SSLContext that always sends SNI=expected_sni when set.
@@ -853,6 +852,7 @@ _loads_pub_counter = 0
 
 
 def _circuits_snapshot() -> list[dict[str, Any]]:
+    """Return a snapshot of all circuits with current state and shed capability."""
     with _shadow_state_lock:
         return [
             {
@@ -875,6 +875,7 @@ def _circuits_snapshot() -> list[dict[str, Any]]:
         ]
 
 def _shed_capability_for(c: dict[str, Any]) -> float:
+    """Estimate shed capability for a circuit based on type and state."""
     try:
         typ = c.get("type")
         kw = float(c.get("current_kw", 0.0))
@@ -906,6 +907,7 @@ def _shed_capability_for(c: dict[str, Any]) -> float:
     return 0.0
 
 def _distribute_power_to_circuits(total_kw: float) -> list[dict[str, Any]]:
+    """Distribute total power among enabled circuits by rated_kw proportion."""
     """Proportionally split total_kw across enabled circuits by rated_kw.
 
     Updates _circuits current_kw and returns a snapshot for reporting.
@@ -928,6 +930,7 @@ def _distribute_power_to_circuits(total_kw: float) -> list[dict[str, Any]]:
 
 
 def _pv_curve_factor(ts_utc: int) -> float:
+    """Simulate a diurnal PV output curve (bell-shaped, peaks at midday)."""
     """Simple diurnal PV factor based on UTC time; peaks at 12:00 local-ish.
     This is a placeholder bell-shaped curve in [0,1]."""
     # Use hour of day in UTC; approximate local midday by shifting -8h (Pacific)
@@ -941,6 +944,9 @@ def _pv_curve_factor(ts_utc: int) -> float:
 
 
 def _compute_panel_step(now_ts: int) -> dict[str, Any]:
+    """Compute per-circuit kW and aggregate net power for this step.
+    Returns dict with power_kw, circuits, battery_soc.
+    """
     """Compute per-circuit kW and aggregate net power for this step.
 
     Returns a dict with keys: power_kw, circuits, battery_soc.
@@ -1096,6 +1102,7 @@ def _compute_panel_step(now_ts: int) -> dict[str, Any]:
 
 def _compute_shed_availability() -> float:
     """Estimate instantaneous shed availability across loads and storage."""
+    """Estimate instantaneous shed availability across loads and storage."""
     avail = 0.0
     for c in _circuits:
         if not c.get("enabled", True):
@@ -1123,6 +1130,7 @@ def _compute_shed_availability() -> float:
 
 
 def _maybe_finalize_event(now_ts: int) -> dict[str, Any] | None:
+    """If an active event has ended, compute and return a summary."""
     """If an active event has ended and no summary yet, compute and return a summary.
 
     Returns a dict with summary fields or None if not applicable.
@@ -1154,6 +1162,7 @@ def _maybe_finalize_event(now_ts: int) -> dict[str, Any] | None:
 
 
 def _merge_dict(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge updates into target dict."""
     for key, value in updates.items():
         if isinstance(value, dict) and isinstance(target.get(key), dict):
             _merge_dict(target[key], value)
@@ -1163,6 +1172,7 @@ def _merge_dict(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, An
 
 
 def _shadow_merge_report(updates: dict[str, Any]) -> None:
+    """Merge updates into reported shadow state and publish to MQTT."""
     if not SHADOW_TOPIC_UPDATE or not updates:
         return
 
@@ -1176,6 +1186,7 @@ def _shadow_merge_report(updates: dict[str, Any]) -> None:
 
 
 def _shadow_publish_desired(desired: dict[str, Any]) -> None:
+    """Publish desired state to device shadow via MQTT."""
     if not SHADOW_TOPIC_UPDATE or not desired:
         return
     payload = json.dumps({"state": {"desired": desired}})
@@ -1184,6 +1195,7 @@ def _shadow_publish_desired(desired: dict[str, Any]) -> None:
 
 
 def _manual_hostname_verification(mqtt_client: mqtt.Client) -> None:
+    """Perform manual TLS hostname verification if SNI override is used."""
     # With the SNI-forcing TLS context, Python already validated the
     # certificate against TLS_SERVER_HOSTNAME. Keep this as a belt‑and‑braces
     # check, but it should never fail unless the broker rotates certs mid‑session.
@@ -1196,6 +1208,7 @@ def _manual_hostname_verification(mqtt_client: mqtt.Client) -> None:
 
 
 def _on_connect(_client, _userdata, _flags, rc, *_args):
+    """MQTT on_connect callback: handle TLS verification and state update."""
     global connected, _last_connect_time
     if rc == 0:
         try:
@@ -1223,6 +1236,7 @@ def _on_connect(_client, _userdata, _flags, rc, *_args):
 
 
 def _on_disconnect(_client, _userdata, rc):
+    """MQTT on_disconnect callback: handle reconnect logic."""
     global connected, _reconnect_in_progress, _last_disconnect_time
     connected = False
     _last_disconnect_time = time.time()
@@ -1264,6 +1278,7 @@ def _on_disconnect(_client, _userdata, rc):
 
 
 def _subscribe_topics() -> None:
+    """Subscribe to required MQTT topics for events and shadow sync."""
     client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
     client.subscribe(MQTT_TOPIC_EVENTS)
 
@@ -1286,6 +1301,7 @@ def _subscribe_topics() -> None:
 
 
 def _ven_disable() -> None:
+    """Disable VEN agent and disconnect MQTT client."""
     global _ven_enabled, connected
     _ven_enabled = False
     try:
@@ -1300,6 +1316,7 @@ def _ven_disable() -> None:
 
 
 def _ven_enable() -> None:
+    """Enable VEN agent and connect MQTT client."""
     global _ven_enabled
     if _ven_enabled:
         return
@@ -1320,6 +1337,7 @@ def _ven_enable() -> None:
 
 
 def _shadow_request_sync() -> None:
+    """Request device shadow sync from AWS IoT Core."""
     if not SHADOW_TOPIC_GET:
         return
     print(f"Requesting device shadow state for thing '{IOT_THING_NAME}'")
@@ -1327,6 +1345,7 @@ def _shadow_request_sync() -> None:
 
 
 def _sync_reported_state(reported: dict[str, Any]) -> None:
+    """Apply reported shadow state to local config and runtime knobs."""
     global REPORT_INTERVAL_SECONDS, _shadow_target_power_kw, _ven_enabled
     global _meter_base_min_kw, _meter_base_max_kw, _meter_jitter_pct
     global _voltage_enabled, _voltage_nominal, _voltage_jitter_pct
@@ -1390,6 +1409,7 @@ def _sync_reported_state(reported: dict[str, Any]) -> None:
 
 
 def _apply_shadow_delta(delta: dict[str, Any]) -> dict[str, Any]:
+    """Apply shadow delta to config and runtime state, return applied updates."""
     global REPORT_INTERVAL_SECONDS, _shadow_target_power_kw, _ven_enabled
     global _meter_base_min_kw, _meter_base_max_kw, _meter_jitter_pct
     global _voltage_enabled, _voltage_nominal, _voltage_jitter_pct
@@ -1502,6 +1522,7 @@ def _apply_shadow_delta(delta: dict[str, Any]) -> dict[str, Any]:
 
 
 def on_shadow_delta(_client, _userdata, msg):
+    """MQTT callback for device shadow delta updates."""
     if not SHADOW_TOPIC_DELTA:
         return
 
@@ -1526,6 +1547,7 @@ def on_shadow_delta(_client, _userdata, msg):
 
 
 def on_shadow_get_accepted(_client, _userdata, msg):
+    """MQTT callback for device shadow get accepted."""
     if not SHADOW_TOPIC_GET_ACCEPTED:
         return
 
@@ -1555,6 +1577,7 @@ def on_shadow_get_accepted(_client, _userdata, msg):
 
 
 def on_shadow_get_rejected(_client, _userdata, msg):
+    """MQTT callback for device shadow get rejected."""
     if not SHADOW_TOPIC_GET_REJECTED:
         return
 
@@ -1568,6 +1591,7 @@ def on_shadow_get_rejected(_client, _userdata, msg):
 
 
 def _log_unhandled_message(_client, _userdata, msg):
+    """Default MQTT callback for unhandled messages."""
     try:
         payload = msg.payload.decode()
     except Exception:
@@ -1576,6 +1600,7 @@ def _log_unhandled_message(_client, _userdata, msg):
 
 
 def _publish_ack(op: str, ok: bool, data: dict | None = None, error: str | None = None, correlation_id: str | None = None) -> None:
+    """Publish an acknowledgment message to backend ACK topic."""
     if not BACKEND_ACK_TOPIC:
         return
     ack = {
@@ -1594,6 +1619,7 @@ def _publish_ack(op: str, ok: bool, data: dict | None = None, error: str | None 
 
 
 def _apply_config_payload(obj: dict[str, Any]) -> dict[str, Any]:
+    """Apply config dict using /config semantics and shadow delta logic."""
     """Apply a config dict using the same semantics as /config and shadow deltas.
 
     Returns the updates that were applied (for echo/ack) and merges them to the
@@ -1629,6 +1655,7 @@ def _apply_config_payload(obj: dict[str, Any]) -> dict[str, Any]:
 
 
 def _apply_preset(name: str) -> dict[str, Any]:
+    """Apply a named preset to config and circuit toggles."""
     """Apply a named preset: adjust config and circuit toggles.
 
     Returns a summary of changes.
@@ -1697,6 +1724,7 @@ def _apply_preset(name: str) -> dict[str, Any]:
 
 
 def on_backend_cmd(_client, _userdata, msg):
+    """Handle control-plane commands from backend via MQTT."""
     """Handle control-plane commands published by the backend over IoT Core.
 
     Expected JSON structure (flexible):
@@ -1922,6 +1950,7 @@ client.loop_start()
 # ── simple /health endpoint -------------------------------------------
 def health_snapshot() -> tuple[int, dict]:
     """Return a status code and JSON payload describing service health."""
+    """Return a status code and JSON payload describing service health."""
     payload = {
         "ok": connected,
         "status": "connected" if connected else "disconnected",
@@ -1952,6 +1981,7 @@ def health_snapshot() -> tuple[int, dict]:
 
 
 class HealthHandler(BaseHTTPRequestHandler):
+    """HTTP handler for health, config, live, and control UI endpoints."""
     def do_HEAD(self):
         path = urlparse(self.path).path
         while "//" in path:
@@ -2384,6 +2414,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(resp).encode())
 
 def _start_health_server():
+    """Start the HTTP health/config/control server in a background thread."""
     _srv_cls = _ThreadingHTTPServer or HTTPServer
     server = _srv_cls(("0.0.0.0", HEALTH_PORT), HealthHandler)
     try:
@@ -2399,6 +2430,7 @@ print(f"🩺 Health server running on port {HEALTH_PORT}")
 
 # ── message handler ────────────────────────────────────────────────────
 def _next_power_reading() -> float:
+    """Simulate next power reading based on config and target."""
     with _shadow_state_lock:
         target = _shadow_target_power_kw
 
@@ -2415,6 +2447,7 @@ def _next_power_reading() -> float:
 
 
 def _next_voltage_reading() -> float:
+    """Simulate next voltage reading based on config and jitter."""
     with _shadow_state_lock:
         nominal = _voltage_nominal
         jit = _voltage_jitter_pct
@@ -2423,6 +2456,7 @@ def _next_voltage_reading() -> float:
 
 
 def on_event(_client, _userdata, msg):
+    """MQTT callback for event messages; publish response and update shadow."""
     payload = json.loads(msg.payload.decode())
     print(f"Received event via MQTT: {payload}")
     response = {"ven_id": payload.get("ven_id", "ven123"), "response": "ack"}
@@ -2434,6 +2468,7 @@ def on_event(_client, _userdata, msg):
 
 # ── main loop ──────────────────────────────────────────────────────────
 def main(iterations: int | None = None) -> None:
+    """Main VEN agent loop: publish telemetry, handle events, update shadow."""
     global _last_publish_time
     client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
     client.subscribe(MQTT_TOPIC_EVENTS)
