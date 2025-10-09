@@ -16,3 +16,4 @@ alembic
 pydantic
 pydantic-settings
 asyncpg
+aiohttp

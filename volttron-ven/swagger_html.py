@@ -1,0 +1,23 @@
+# Contains the Swagger UI HTML for the VEN agent
+
+SWAGGER_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Docs</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@4/swagger-ui.css">
+</head>
+<body>
+    <div style="position:fixed;top:0;left:0;right:0;background:#0b5;color:#fff;padding:8px 12px;z-index:99;">
+        <strong>VOLTTRON VEN</strong>
+        <a href="/ui" style="color:#fff;margin-left:12px;text-decoration:underline;">Control UI</a>
+        <a href="/config" style="color:#fff;margin-left:12px;text-decoration:underline;">Current Config (JSON)</a>
+    </div>
+    <div id="swagger-ui" style="margin-top:48px;"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@4/swagger-ui-bundle.js"></script>
+    <script>
+        window.onload = () => { SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' }); };
+    </script>
+</body>
+</html>
+"""
