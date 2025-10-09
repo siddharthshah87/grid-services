@@ -1,0 +1,9 @@
+{
+  "eventId": "evt-1",
+  "requestedReductionKw": 500,
+  "actualReductionKw": 480,
+  "deliveredKwh": 960,
+  "baselineKw": 1000,
+  "startTs": 1700000000,
+  "endTs": 1700003600
+}

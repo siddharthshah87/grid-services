@@ -1,0 +1,8 @@
+{
+  "op": "shedLoad",
+  "correlationId": "abc123",
+  "ok": true,
+  "ts": 1700000000,
+  "venId": "ven-123",
+  "data": { "shedAmount": 5.0 }
+}
