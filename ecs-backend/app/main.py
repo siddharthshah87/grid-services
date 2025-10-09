@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import sys
@@ -14,7 +15,7 @@ from app.dependencies import get_session
 app = FastAPI(
     title="OpenADR VTN Admin API",
     version="0.1.0",
-    docs_url="/docs",
+    docs_url=None,
     openapi_url="/openapi.json",
 )
 
@@ -27,11 +28,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
 app.include_router(health.router, prefix="/health", tags=["Health"])
-app.include_router(api_stats.router, prefix="/api/stats", tags=["Stats"]) 
+app.include_router(api_stats.router, prefix="/api/stats", tags=["Stats"])
 app.include_router(ven.router, prefix="/api/vens", tags=["VENs"])
 app.include_router(event.router, prefix="/api/events", tags=["Events"])
+
+# Custom docs endpoint
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    return get_swagger_ui_html(openapi_url=app.openapi_url, title=app.title)
 
 # Startup/shutdown hooks
 

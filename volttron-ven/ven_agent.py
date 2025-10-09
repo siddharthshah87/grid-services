@@ -2612,91 +2612,110 @@ def main(iterations: int | None = None) -> None:
             try:
                 validate_telem_payload(telem)
             except Exception as err:
-                print(f"Telemetry validation error: {err}", file=sys.stderr)
+                import logging
+                logging.basicConfig(level=logging.ERROR)
+                logging.error(f"Telemetry validation error: {err}", exc_info=True)
                 # Optionally: skip publish or send error telemetry
+                # Publish error telemetry for observability
+                error_payload = {
+                    "schemaVersion": SCHEMA_VERSION,
+                    "venId": VEN_ID,
+                    "timestamp": now,
+                    "error": str(err)
+                }
+                try:
+                    client.publish(MQTT_TOPIC_METERING, json.dumps(error_payload), qos=1)
+                except Exception as pub_err:
+                    logging.error(f"Publish error telemetry failed: {pub_err}", exc_info=True)
                 return
 
             # Back-compat: keep previous topic payload plus enriched telem keys
-            metering_payload.update(telem)
-
+            import logging
+            logging.basicConfig(level=logging.ERROR)
             try:
-                client.publish(MQTT_TOPIC_STATUS, json.dumps(status_payload), qos=1)
-                client.publish(MQTT_TOPIC_METERING, json.dumps(metering_payload), qos=1)
-            except Exception as pub_err:
-                print(f"Publish error: {pub_err}", file=sys.stderr)
+                payload = json.loads(msg.payload.decode())
+                op = str(payload.get("op") or "set").lower()
+                corr = payload.get("correlationId")
+                data = payload.get("data")
 
-            # Publish richer loads snapshot occasionally (optional)
-            try:
-                global _loads_pub_counter
-                _loads_pub_counter = (_loads_pub_counter + 1) % max(1, LOADS_PUBLISH_EVERY)
-                if BACKEND_LOADS_TOPIC and _loads_pub_counter == 0:
-                    loads_msg = {
-                        "schemaVersion": SCHEMA_VERSION,
-                        "venId": VEN_ID,
-                        "timestamp": now,
-                        "loads": loads_snap,
+                if op in ("set", "setconfig"):
+                    with _with_update_source("backend_cmd"):
+                        updates = _apply_config_payload(data if isinstance(data, dict) else payload)
+                    _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
+                    return
+                if op == "enable":
+                    with _with_update_source("backend_cmd"):
+                        updates = _apply_config_payload({"enabled": True})
+                    _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
+                    return
+                if op == "disable":
+                    with _with_update_source("backend_cmd"):
+                        updates = _apply_config_payload({"enabled": False})
+                    _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
+                    return
+                if op == "get":
+                    what = str(payload.get("what") or "status").lower()
+                    if what == "config":
+                        with _shadow_state_lock:
+                            cfg = {
+                                "report_interval_seconds": REPORT_INTERVAL_SECONDS,
+                                "target_power_kw": _shadow_target_power_kw,
+                                "enabled": _ven_enabled,
+                                "meter_base_min_kw": _meter_base_min_kw,
+                                "meter_base_max_kw": _meter_base_max_kw,
+                                "meter_jitter_pct": _meter_jitter_pct,
+                                "voltage_enabled": _voltage_enabled,
+                                "voltage_nominal": _voltage_nominal,
+                                "voltage_jitter_pct": _voltage_jitter_pct,
+                                "current_enabled": _current_enabled,
+                                "power_factor": _power_factor,
+                            }
+                        _publish_ack(op, True, {"config": cfg}, correlation_id=corr)
+                    else:
+                        _code, status = health_snapshot()
+                        _publish_ack(op, True, {"status": status}, correlation_id=corr)
+                    return
+                if op == "ping":
+                    _publish_ack(op, True, {"pong": True, "ts": int(time.time())}, correlation_id=corr)
+                    return
+                if op == "shedload":
+                    # Handle load shedding command
+                    shed_amount = None
+                    if isinstance(data, dict):
+                        shed_amount = data.get("amountKw") or data.get("shed_kw")
+                    # Simulate load shedding by adjusting target power
+                    if shed_amount is not None:
+                        with _shadow_state_lock:
+                            _shadow_target_power_kw = max(0.0, float(shed_amount))
+                        _publish_ack(op, True, {"shedAmount": shed_amount}, correlation_id=corr)
+                    else:
+                        logging.error("No shed amount provided in shedLoad command", exc_info=True)
+                        _publish_ack(op, False, {"error": "No shed amount provided"}, correlation_id=corr)
+                    return
+                if op == "event":
+                    ev = data if isinstance(data, dict) else {}
+                    # Record event in shadow and optionally adjust target
+                    ev_id = ev.get("event_id") or f"backend_{int(time.time())}"
+                    shed_kw = ev.get("shed_kw")
+                    start_ts = int(ev.get("start_ts") or int(time.time()))
+                    duration_s = int(ev.get("duration_s") or 0)
+                    end_ts = int(ev.get("end_ts") or (start_ts + duration_s if duration_s > 0 else start_ts))
+                    req_kw = ev.get("requestedReductionKw") or ev.get("requested_kw")
+                    updates: dict[str, Any] = {
+                        "status": {"last_backend_event_ts": int(time.time())},
+                        "events": {"last_backend": {"event_id": ev_id, **ev}},
                     }
-                    client.publish(BACKEND_LOADS_TOPIC, json.dumps(loads_msg), qos=1)
-            except Exception:
-                pass
-            print("Published VEN status and metering data to MQTT")
-            _last_publish_time = time.time()
-            # store last metering for /live UI endpoint
-            try:
-                global _last_metering_sample
-                _last_metering_sample = dict(metering_payload)
-            except Exception:
-                pass
-            with _shadow_state_lock:
-                target_power_kw = _shadow_target_power_kw
-
-            # Compute loads and metrics snapshot for shadow
-            loads_snap = _circuits_snapshot()
-            metrics = {
-                "currentPowerKw": power_kw,
-                "shedAvailabilityKw": _compute_shed_availability(),
-            }
-            if step.get("battery_soc") is not None:
-                metrics["batterySoc"] = step.get("battery_soc")
-            if event_id is not None:
-                metrics["activeEventId"] = event_id
-            # Event summary handling
-            event_summary = _maybe_finalize_event(now)
-
-            shadow_update = {
-                "status": {
-                    "ven": "ready",
-                    "last_publish_ts": now,
-                    "mqtt_connected": connected
-                },
-                "metering": metering_payload,
-                "report_interval_seconds": REPORT_INTERVAL_SECONDS,
-                "ven": {"venId": VEN_ID, "enabled": _ven_enabled, "status": "connected" if connected else "disconnected", "lastPublishTs": now},
-                "loads": loads_snap,
-                "metrics": metrics,
-                "schemaVersion": SCHEMA_VERSION,
-            }
-            if event_summary:
-                shadow_update.setdefault("metrics", {}).update({"lastEventSummary": event_summary})
-
-            if target_power_kw is not None:
-                shadow_update["target_power_kw"] = target_power_kw
-
-            # Include current knob configuration in reported state for visibility.
-            with _shadow_state_lock:
-                shadow_update.update({
-                    "enabled": _ven_enabled,
-                    "meter_base_min_kw": _meter_base_min_kw,
-                    "meter_base_max_kw": _meter_base_max_kw,
-                    "meter_jitter_pct": _meter_jitter_pct,
-                    "voltage_enabled": _voltage_enabled,
-                    "voltage_nominal": _voltage_nominal,
-                    "voltage_jitter_pct": _voltage_jitter_pct,
-                    "current_enabled": _current_enabled,
-                    "power_factor": _power_factor,
-                })
-
-            _shadow_merge_report(shadow_update)
+                    if isinstance(shed_kw, (int, float)):
+                        # For a simple demo, interpret shed_kw as a target power cap
+                        updates["target_power_kw"] = max(0.0, float(shed_kw))
+                        with _shadow_state_lock:
+                            try:
+                                _shadow_target_power_kw = float(updates["target_power_kw"])
+                            except Exception as e:
+                                logging.error(f"Failed to set target_power_kw: {e}", exc_info=True)
+                    return
+            except Exception as err:
+                logging.error(f"Error handling backend command: {err}", exc_info=True)
 
             count += 1
             if iterations is not None and count >= iterations:

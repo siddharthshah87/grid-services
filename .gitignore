@@ -9,3 +9,5 @@ terraform.tfstate.*
 __pycache__/
 ecs-frontend/node_modules/
 ecs-frontend/dist/
+.hypothesis/
+.vscode/
