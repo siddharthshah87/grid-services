@@ -1,94 +1,157 @@
-from fastapi import APIRouter, HTTPException
-from typing import List
+from __future__ import annotations
 
+from datetime import UTC, datetime
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app import crud
+from app.dependencies import get_session
+from app.models.event import Event as EventModel
+from app.models.telemetry import VenTelemetry
 from app.schemas.api_models import Event, EventCreate, EventMetrics, EventWithMetrics
-from app.data.dummy import (
-    list_events,
-    get_event as get_dummy_event,
-    set_event as set_dummy_event,
-    current_event as get_current_event,
-    event_metrics as calc_event_metrics,
-)
-
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[Event])
-async def list_events_v2():
-    return list_events()
+async def _ensure_event(session: AsyncSession, event_id: str) -> EventModel:
+    event = await crud.get_event(session, event_id)
+    if event is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    return event
+
+
+def _event_to_api(event: EventModel, reduction: float = 0.0) -> Event:
+    return Event(
+        id=event.event_id,
+        status=event.status,
+        startTime=event.start_time,
+        endTime=event.end_time,
+        requestedReductionKw=event.requested_reduction_kw,
+        actualReductionKw=reduction,
+    )
+
+
+async def _reduction_map(session: AsyncSession, event_ids: list[str]) -> dict[str, float]:
+    if not event_ids:
+        return {}
+    stmt = (
+        select(VenTelemetry.event_id, func.coalesce(func.sum(VenTelemetry.shed_power_kw), 0.0))
+        .where(VenTelemetry.event_id.in_(event_ids))
+        .group_by(VenTelemetry.event_id)
+    )
+    result = await session.execute(stmt)
+    return {row[0]: float(row[1] or 0.0) for row in result.all()}
+
+
+async def _event_metrics(session: AsyncSession, event_id: str) -> EventMetrics:
+    stmt = (
+        select(
+            func.coalesce(func.sum(VenTelemetry.shed_power_kw), 0.0),
+            func.count(func.distinct(VenTelemetry.ven_id)),
+        )
+        .where(VenTelemetry.event_id == event_id)
+    )
+    result = await session.execute(stmt)
+    total, responding = result.one_or_none() or (0.0, 0)
+    return EventMetrics(
+        currentReductionKw=float(total or 0.0),
+        vensResponding=int(responding or 0),
+        avgResponseMs=0,
+    )
+
+
+@router.get("/", response_model=list[Event])
+async def list_events_v2(session: AsyncSession = Depends(get_session)):
+    events = await crud.list_events(session)
+    reductions = await _reduction_map(session, [event.event_id for event in events])
+    return [_event_to_api(event, reductions.get(event.event_id, 0.0)) for event in events]
 
 
 @router.get("/current", response_model=EventWithMetrics | None)
-async def current_event_v2():
-    evt = get_current_event()
-    if not evt:
-        return None
-    metrics = calc_event_metrics(evt.id)
-    # Enrich the response with metrics for the UI
-    data = evt.model_dump()
-    if metrics:
-        data.update(
-            {
-                "currentReductionKw": metrics.currentReductionKw,
-                "vensResponding": metrics.vensResponding,
-                "avgResponseMs": metrics.avgResponseMs,
-            }
-        )
-    return EventWithMetrics(**data)
-
-
-@router.get("/history", response_model=List[Event])
-async def history_events_v2(start: str | None = None, end: str | None = None):
-    return list_events()
-
-
-@router.post("/", response_model=Event, status_code=201)
-async def create_event_v2(payload: EventCreate):
-    new_id = f"evt-{len(list_events()) + 1}"
-    evt = Event(
-        id=new_id,
-        status="scheduled",
-        startTime=payload.startTime,
-        endTime=payload.endTime,
-        requestedReductionKw=payload.requestedReductionKw,
-        actualReductionKw=0,
+async def current_event_v2(session: AsyncSession = Depends(get_session)):
+    now = datetime.now(UTC)
+    stmt = (
+        select(EventModel)
+        .where(EventModel.status.in_(["active", "in_progress"]))
+        .order_by(EventModel.start_time.asc())
+        .limit(1)
     )
-    return set_dummy_event(evt)
+    result = await session.execute(stmt)
+    event = result.scalar_one_or_none()
+    if event is None:
+        stmt = (
+            select(EventModel)
+            .where(EventModel.start_time <= now, EventModel.end_time >= now)
+            .order_by(EventModel.start_time.asc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        event = result.scalar_one_or_none()
+    if event is None:
+        return None
+    metrics = await _event_metrics(session, event.event_id)
+    base = _event_to_api(event, metrics.currentReductionKw)
+    return EventWithMetrics(**base.model_dump(), **metrics.model_dump())
+
+
+@router.get("/history", response_model=list[Event])
+async def history_events_v2(
+    session: AsyncSession = Depends(get_session),
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
+):
+    stmt = select(EventModel)
+    if start is not None:
+        stmt = stmt.where(EventModel.start_time >= start)
+    if end is not None:
+        stmt = stmt.where(EventModel.start_time <= end)
+    stmt = stmt.order_by(EventModel.start_time.asc())
+    result = await session.execute(stmt)
+    events = result.scalars().all()
+    reductions = await _reduction_map(session, [event.event_id for event in events])
+    return [_event_to_api(event, reductions.get(event.event_id, 0.0)) for event in events]
+
+
+@router.post("/", response_model=Event, status_code=status.HTTP_201_CREATED)
+async def create_event_v2(payload: EventCreate, session: AsyncSession = Depends(get_session)):
+    event_id = f"evt-{uuid4().hex[:8]}"
+    event = await crud.create_event(
+        session,
+        event_id=event_id,
+        status=payload.status or "scheduled",
+        start_time=payload.startTime,
+        end_time=payload.endTime,
+        requested_reduction_kw=payload.requestedReductionKw,
+    )
+    reduction = (await _reduction_map(session, [event.event_id])).get(event.event_id, 0.0)
+    return _event_to_api(event, reduction)
 
 
 @router.get("/{event_id}", response_model=Event)
-async def get_event_v2(event_id: str):
-    evt = get_dummy_event(event_id)
-    if not evt:
-        raise HTTPException(status_code=404, detail="Event not found")
-    return evt
+async def get_event_v2(event_id: str, session: AsyncSession = Depends(get_session)):
+    event = await _ensure_event(session, event_id)
+    reduction = (await _reduction_map(session, [event.event_id])).get(event.event_id, 0.0)
+    return _event_to_api(event, reduction)
 
 
-@router.delete("/{event_id}", status_code=204)
-async def delete_event_v2(event_id: str):
-    evt = get_dummy_event(event_id)
-    if not evt:
-        raise HTTPException(status_code=404, detail="Event not found")
-    from app.data.dummy import EVENTS
-
-    if event_id in EVENTS:
-        del EVENTS[event_id]
-    return {"status": "deleted"}
+@router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_event_v2(event_id: str, session: AsyncSession = Depends(get_session)):
+    event = await _ensure_event(session, event_id)
+    await crud.delete_event(session, event)
+    return None
 
 
-@router.post("/{event_id}/stop", status_code=202)
-async def stop_event_v2(event_id: str):
-    evt = get_dummy_event(event_id)
-    if not evt:
-        raise HTTPException(status_code=404, detail="Event not found")
-    evt.status = "completed"
-    set_dummy_event(evt)
-    return {"status": "stopping", "eventId": event_id}
+@router.post("/{event_id}/stop", status_code=status.HTTP_202_ACCEPTED)
+async def stop_event_v2(event_id: str, session: AsyncSession = Depends(get_session)):
+    event = await _ensure_event(session, event_id)
+    updated = await crud.update_event(session, event, {"status": "completed"})
+    return {"status": "stopping", "eventId": updated.event_id}
+
 
 @router.get("/{event_id}/metrics", response_model=EventMetrics)
-async def event_metrics_v2(event_id: str):
-    metrics = calc_event_metrics(event_id)
-    if not metrics:
-        raise HTTPException(status_code=404, detail="Event not found")
-    return metrics
+async def event_metrics_v2(event_id: str, session: AsyncSession = Depends(get_session)):
+    await _ensure_event(session, event_id)
+    return await _event_metrics(session, event_id)

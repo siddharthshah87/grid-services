@@ -21,7 +21,7 @@ os.environ.setdefault("DB_NAME", "test")
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.core.config import Settings  # noqa: E402  pylint: disable=wrong-import-position
-from app.models import LoadSnapshot, TelemetryLoad, TelemetryReading  # noqa: E402
+from app.models import LoadSnapshot, VenLoadSample, VenTelemetry  # noqa: E402
 from app.services import MQTTConsumer  # noqa: E402
 
 
@@ -103,7 +103,7 @@ async def test_metering_message_persists_records(db_fixture):
     await consumer.handle_message(config.mqtt_topic_metering, json.dumps(payload).encode())
 
     async with session_factory() as session:
-        telemetry_rows = (await session.execute(select(TelemetryReading))).scalars().all()
+        telemetry_rows = (await session.execute(select(VenTelemetry))).scalars().all()
         assert len(telemetry_rows) == 1
         reading = telemetry_rows[0]
         assert reading.ven_id == "ven-1"
@@ -113,7 +113,7 @@ async def test_metering_message_persists_records(db_fixture):
         assert reading.event_id == "evt-1"
         assert reading.battery_soc == pytest.approx(0.42)
 
-        load_rows = (await session.execute(select(TelemetryLoad))).scalars().all()
+        load_rows = (await session.execute(select(VenLoadSample))).scalars().all()
         assert len(load_rows) == 1
         load = load_rows[0]
         assert load.load_id == "load-1"

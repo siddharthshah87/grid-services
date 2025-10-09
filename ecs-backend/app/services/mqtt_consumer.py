@@ -13,7 +13,7 @@ import paho.mqtt.client as mqtt
 from paho.mqtt.client import MQTTMessage
 
 from app.core.config import Settings, settings
-from app.models import LoadSnapshot, TelemetryLoad, TelemetryReading
+from app.models import LoadSnapshot, VenLoadSample, VenTelemetry
 from app.schemas.telemetry import LoadSnapshotPayload, TelemetryPayload
 
 logger = logging.getLogger(__name__)
@@ -203,7 +203,7 @@ class MQTTConsumer:
         if shed_kw is None:
             shed_kw = model.legacy_shed_kw
 
-        reading = TelemetryReading(
+        reading = VenTelemetry(
             ven_id=model.ven_id,
             timestamp=timestamp,
             used_power_kw=used_kw,
@@ -216,7 +216,7 @@ class MQTTConsumer:
 
         for load in model.loads:
             reading.loads.append(
-                TelemetryLoad(
+                VenLoadSample(
                     load_id=load.load_id,
                     name=load.name,
                     type=load.type,
