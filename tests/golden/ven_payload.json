@@ -1,0 +1,23 @@
+{
+  "id": "ven-123",
+  "name": "Main Street Facility",
+  "status": "active",
+  "location": { "lat": 37.42, "lon": -122.08 },
+  "metrics": {
+    "currentPowerKw": 12.4,
+    "shedAvailabilityKw": 5.0,
+    "activeEventId": "evt-1",
+    "shedLoadIds": []
+  },
+  "createdAt": "2024-07-10T15:00:00Z",
+  "loads": [
+    {
+      "id": "load-1",
+      "type": "hvac",
+      "capacityKw": 10.0,
+      "shedCapabilityKw": 5.0,
+      "currentPowerKw": 7.5,
+      "name": "Main HVAC"
+    }
+  ]
+}

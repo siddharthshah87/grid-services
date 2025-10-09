@@ -1783,6 +1783,19 @@ def on_backend_cmd(_client, _userdata, msg):
         if op == "ping":
             _publish_ack(op, True, {"pong": True, "ts": int(time.time())}, correlation_id=corr)
             return
+        if op == "shedload":
+            # Handle load shedding command
+            shed_amount = None
+            if isinstance(data, dict):
+                shed_amount = data.get("amountKw") or data.get("shed_kw")
+            # Simulate load shedding by adjusting target power
+            if shed_amount is not None:
+                with _shadow_state_lock:
+                    _shadow_target_power_kw = max(0.0, float(shed_amount))
+                _publish_ack(op, True, {"shedAmount": shed_amount}, correlation_id=corr)
+            else:
+                _publish_ack(op, False, {"error": "No shed amount provided"}, correlation_id=corr)
+            return
         if op == "event":
             ev = data if isinstance(data, dict) else {}
             # Record event in shadow and optionally adjust target
@@ -2580,6 +2593,29 @@ def main(iterations: int | None = None) -> None:
             ]
             if "battery_soc" in step:
                 telem["batterySoc"] = step["battery_soc"]
+
+            # Validate telemetry payload before publishing
+            def validate_telem_payload(payload):
+                required_fields = [
+                    "schemaVersion", "venId", "timestamp", "usedPowerKw", "shedPowerKw", "loads"
+                ]
+                if payload.get("schemaVersion") != "1.0":
+                    raise ValueError(f"Telemetry schemaVersion must be '1.0', got {payload.get('schemaVersion')}")
+                for field in required_fields:
+                    if field not in payload:
+                        raise ValueError(f"Missing required telemetry field: {field}")
+                if not isinstance(payload["loads"], list):
+                    raise TypeError("Telemetry 'loads' must be a list")
+                for load in payload["loads"]:
+                    if "id" not in load or "currentPowerKw" not in load:
+                        raise ValueError("Each load must have 'id' and 'currentPowerKw'")
+            try:
+                validate_telem_payload(telem)
+            except Exception as err:
+                print(f"Telemetry validation error: {err}", file=sys.stderr)
+                # Optionally: skip publish or send error telemetry
+                return
+
             # Back-compat: keep previous topic payload plus enriched telem keys
             metering_payload.update(telem)
 
