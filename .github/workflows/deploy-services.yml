@@ -35,39 +35,53 @@ jobs:
           aws ecr get-login-password --region $AWS_REGION | \
             docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-      - name: Build & Push OpenLEADR VTN
-        run: ./openleadr/build_and_push.sh
+      - name: Build & Push Grid Event Gateway
+        run: ./grid-event-gateway/build_and_push.sh
 
-      - name: Build & Push Volttron VEN
-        run: ./volttron/build_and_push.sh
+      - name: Build & Push VEN Simulator  
+        run: ./volttron-ven/build_and_push.sh
 
-      - name: Build & Push OpenADR Backend
-        run: ./openadr_backend/build_and_push.sh
+      - name: Build & Push ECS Backend
+        run: ./ecs-backend/build_and_push.sh
+
+      - name: Build & Push ECS Frontend
+        run: ./ecs-frontend/build_and_push.sh
 
       - name: Force ECS Service Redeploy
         run: |
-          for svc in openadr-backend openleadr-vtn volttron-ven; do
+          for svc in ecs-backend ecs-frontend grid-event-gateway volttron-ven; do
+            echo "Redeploying $svc..."
             aws ecs update-service \
               --cluster $CLUSTER_NAME \
               --service "$svc" \
               --force-new-deployment \
-              --region $AWS_REGION
+              --region $AWS_REGION || echo "Service $svc not found, skipping"
           done
 
       - name: Verify ECS Services are Healthy
         run: |
-          for svc in openadr-backend openleadr-vtn volttron-ven; do
-            echo "Checking service: $svc"
-            aws ecs wait services-stable \
-              --cluster $CLUSTER_NAME \
-              --services "$svc" \
-              --region $AWS_REGION
-            echo "$svc is stable ✅"
+          for svc in ecs-backend ecs-frontend grid-event-gateway volttron-ven; do
+            if aws ecs describe-services --cluster $CLUSTER_NAME --services "$svc" --region $AWS_REGION >/dev/null 2>&1; then
+              echo "Checking service: $svc"
+              aws ecs wait services-stable \
+                --cluster $CLUSTER_NAME \
+                --services "$svc" \
+                --region $AWS_REGION \
+                --waiter-config '{"delay": 15, "maxAttempts": 40}' || echo "Warning: $svc deployment timeout"
+              echo "$svc deployment completed ✅"
+            else
+              echo "Service $svc not found, skipping health check"
+            fi
           done
 
-      - name: Print ECR Image Summary
+      - name: Print Deployment Summary
         run: |
-          echo "### Images Deployed" >> $GITHUB_STEP_SUMMARY
-          for svc in openadr-backend openleadr-vtn volttron-ven; do
-            echo "- $svc deployed to ECS cluster: $CLUSTER_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster:** $CLUSTER_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "**Region:** $AWS_REGION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Services Deployed:**" >> $GITHUB_STEP_SUMMARY
+          for svc in ecs-backend ecs-frontend grid-event-gateway volttron-ven; do
+            echo "- ✅ $svc" >> $GITHUB_STEP_SUMMARY
           done

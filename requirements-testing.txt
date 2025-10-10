@@ -1,0 +1,37 @@
+# Comprehensive requirements for Grid Services
+# Pinned versions for reproducible builds
+# Generated and validated on 2025-10-10
+
+# Core FastAPI stack
+fastapi==0.118.2
+uvicorn==0.34.0
+pydantic==2.12.0
+pydantic-settings==2.11.0
+
+# Database
+SQLAlchemy==2.0.38
+aiosqlite==0.21.0
+asyncpg==0.30.0
+alembic==1.16.5
+
+# MQTT & AWS Integration
+paho-mqtt==2.0.0
+boto3==1.40.49
+awscrt==0.28.1
+awsiotsdk==1.26.0
+
+# HTTP clients
+aiohttp==3.13.0
+httpx==0.28.1
+requests==2.32.3
+
+# OpenLEADR protocol support
+openleadr==0.8.24
+
+# Testing framework
+pytest==8.4.2
+pytest-asyncio==1.2.0
+hypothesis==6.140.3
+
+# Code quality
+flake8==7.3.0

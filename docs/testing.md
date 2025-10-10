@@ -18,7 +18,7 @@ Install dependencies (use a virtual environment to avoid Debian’s externally-m
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip setuptools wheel
-pip install -r requirements-dev.txt
+pip install -r requirements-testing.txt
 ```
 
 Tip (Debian/Ubuntu): if you hit "externally-managed-environment" when using the
