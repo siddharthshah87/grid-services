@@ -38,7 +38,9 @@ app.include_router(event.router, prefix="/api/events", tags=["Events"])
 async def custom_swagger_ui_html():
     return get_swagger_ui_html(openapi_url=app.openapi_url, title=app.title)
 
+
 # Startup/shutdown hooks
+
 
 logging.basicConfig(
     level=logging.INFO,

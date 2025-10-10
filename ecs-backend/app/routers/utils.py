@@ -55,10 +55,31 @@ def build_ven_payload(
     """Convert ORM rows into an API response object."""
 
     location = Location(lat=ven.latitude or 0.0, lon=ven.longitude or 0.0)
+
+    # Get current power from status or telemetry
+    current_power = (
+        status.current_power_kw if status and status.current_power_kw is not None
+        else telemetry.used_power_kw if telemetry and telemetry.used_power_kw is not None
+        else 0.0
+    )
+
+    # Get shed availability from status or telemetry
+    shed_availability = (
+        status.shed_availability_kw if status and status.shed_availability_kw is not None
+        else telemetry.shed_power_kw if telemetry and telemetry.shed_power_kw is not None
+        else 0.0
+    )
+
+    # Get active event ID from status or telemetry
+    active_event = (
+        status.active_event_id if status and status.active_event_id
+        else (telemetry.event_id if telemetry and telemetry.event_id else None)
+    )
+
     metrics = VenMetrics(
-        currentPowerKw=(status.current_power_kw if status and status.current_power_kw is not None else telemetry.used_power_kw if telemetry and telemetry.used_power_kw is not None else 0.0),
-        shedAvailabilityKw=(status.shed_availability_kw if status and status.shed_availability_kw is not None else telemetry.shed_power_kw if telemetry and telemetry.shed_power_kw is not None else 0.0),
-        activeEventId=status.active_event_id if status and status.active_event_id else (telemetry.event_id if telemetry and telemetry.event_id else None),
+        currentPowerKw=current_power,
+        shedAvailabilityKw=shed_availability,
+        activeEventId=active_event,
         shedLoadIds=[
             load.load_id
             for load in (telemetry.loads if telemetry else [])

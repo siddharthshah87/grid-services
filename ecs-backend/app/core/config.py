@@ -88,14 +88,15 @@ class Settings(BaseSettings):
         )
 
 
-
-
 _settings_instance = None
+
+
 def get_settings():
     global _settings_instance
     if _settings_instance is None:
         _settings_instance = Settings()
     return _settings_instance
+
 
 # Backward compatibility: settings variable for legacy imports
 settings = get_settings()

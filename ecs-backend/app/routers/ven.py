@@ -204,8 +204,8 @@ async def ven_load_history(
             filtered.append(
                 SimpleNamespace(
                     timestamp=telem.timestamp,
-                    used_power_kw=sum(l.current_power_kw or 0.0 for l in loads),
-                    shed_power_kw=sum(l.shed_capability_kw or 0.0 for l in loads),
+                    used_power_kw=sum(load.current_power_kw or 0.0 for load in loads),
+                    shed_power_kw=sum(load.shed_capability_kw or 0.0 for load in loads),
                     requested_reduction_kw=telem.requested_reduction_kw,
                     event_id=telem.event_id,
                 )

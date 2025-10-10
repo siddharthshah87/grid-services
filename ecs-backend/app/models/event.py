@@ -3,6 +3,7 @@ from sqlalchemy.sql import func
 
 from . import Base
 
+
 class Event(Base):
     __tablename__ = "events"
 

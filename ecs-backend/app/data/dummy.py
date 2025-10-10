@@ -85,7 +85,6 @@ def _init_vens() -> None:
     }
 
 
-
 def init_dummy_data():
     _init_vens()
 
@@ -120,7 +119,7 @@ def get_network_stats() -> NetworkStats:
     vens = list_vens()
     ven_count = len(vens)
     controllable = sum(v.metrics.shedAvailabilityKw for v in vens)
-    potential = sum(sum(l.shedCapabilityKw for l in v.loads) for v in vens)
+    potential = sum(sum(load.shedCapabilityKw for load in v.loads) for v in vens)
     household = sum(max(0.0, v.metrics.currentPowerKw) for v in vens)
     # Extended fields for UI
     online_vens = sum(1 for v in vens if v.status == "online")
@@ -147,15 +146,15 @@ def get_load_type_stats() -> List[LoadTypeStats]:
     for v in list_vens():
         if not v.loads:
             continue
-        for l in v.loads:
-            if l.type not in agg:
-                agg[l.type] = LoadTypeStats(
-                    type=l.type, totalCapacityKw=0.0, totalShedCapabilityKw=0.0, currentUsageKw=0.0
+        for load in v.loads:
+            if load.type not in agg:
+                agg[load.type] = LoadTypeStats(
+                    type=load.type, totalCapacityKw=0.0, totalShedCapabilityKw=0.0, currentUsageKw=0.0
                 )
-            entry = agg[l.type]
-            entry.totalCapacityKw += l.capacityKw
-            entry.totalShedCapabilityKw += l.shedCapabilityKw
-            entry.currentUsageKw += max(0.0, l.currentPowerKw)
+            entry = agg[load.type]
+            entry.totalCapacityKw += load.capacityKw
+            entry.totalShedCapabilityKw += load.shedCapabilityKw
+            entry.currentUsageKw += max(0.0, load.currentPowerKw)
     # Round for nicer output
     for k, v in agg.items():
         v.totalCapacityKw = round(v.totalCapacityKw, 2)

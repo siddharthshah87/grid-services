@@ -21,10 +21,11 @@ async_session = sessionmaker(
     expire_on_commit=False
 )
 
+
 async def get_db():
     async with async_session() as session:
         yield session
 
+
 # Alias used by routers for dependency injection
 get_session = get_db
-
