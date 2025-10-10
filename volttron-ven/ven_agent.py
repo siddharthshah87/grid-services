@@ -1957,6 +1957,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(payload).encode())
 
     def do_POST(self):
+        global _ven_enabled
         path = urlparse(self.path).path
         while "//" in path:
             path = path.replace("//", "/")
@@ -2105,6 +2106,24 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"applied": applied, "preset": name}).encode())
+            return
+
+        if path == "/start":
+            with _shadow_state_lock:
+                _ven_enabled = True
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "started", "enabled": True}).encode())
+            return
+
+        if path == "/stop":
+            with _shadow_state_lock:
+                _ven_enabled = False
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "stopped", "enabled": False}).encode())
             return
 
         self.send_response(404)
