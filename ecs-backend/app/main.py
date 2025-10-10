@@ -33,6 +33,7 @@ app.include_router(api_stats.router, prefix="/api/stats", tags=["Stats"])
 app.include_router(ven.router, prefix="/api/vens", tags=["VENs"])
 app.include_router(event.router, prefix="/api/events", tags=["Events"])
 
+
 # Custom docs endpoint
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
