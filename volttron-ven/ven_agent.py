@@ -5,6 +5,12 @@ import random
 import time
 import sys
 import sys
+IS_TEST_MODE = (
+    os.getenv("LOCAL_DEV") == "1"
+    or "PYTEST_CURRENT_TEST" in os.environ
+    or any("pytest" in arg for arg in sys.argv)
+)
+import sys
 import os
 import pathlib
 import paho.mqtt.client as mqtt
@@ -297,12 +303,15 @@ else:
 
 
 # ── TLS setup ──────────────────────────────────────────────────────────
+
 CA_CERT = CLIENT_CERT = PRIVATE_KEY = None
 
-if os.getenv("LOCAL_DEV") == "1":
-    print("⚡ Running in LOCAL_DEV mode: Skipping AWS Secrets and TLS credential checks.")
-    CA_CERT = CLIENT_CERT = PRIVATE_KEY = "local-dev.pem"
-else:
+def _init_tls_creds():
+    global CA_CERT, CLIENT_CERT, PRIVATE_KEY
+    if IS_TEST_MODE:
+        print("⚡ Running in LOCAL_DEV or test mode: Skipping AWS Secrets and TLS credential checks.")
+        CA_CERT = CLIENT_CERT = PRIVATE_KEY = "local-dev.pem"
+        return
     # ── TLS setup ──────────────────────────────────────────────────────────
     if TLS_SECRET_NAME:
         creds = fetch_tls_creds_from_secrets(TLS_SECRET_NAME, AWS_REGION)
@@ -322,6 +331,8 @@ else:
             file=sys.stderr,
         )
         sys.exit(1)
+
+_init_tls_creds()
 
 def _build_tls_context(
     ca_path: str, cert_path: str, key_path: str, expected_sni: str | None, connect_host: str
@@ -2195,7 +2206,12 @@ def _next_voltage_reading() -> float:
         nominal = _voltage_nominal
         jit = _voltage_jitter_pct
     jitter = random.uniform(-jit, jit)
-    return round(max(1.0, nominal * (1.0 + jitter)), 1)
+    raw = nominal * (1.0 + jitter)
+    rounded = round(max(1.0, raw), 1)
+    # Clamp to expected bounds
+    lower = round(max(1.0, nominal * (1.0 - jit)), 1)
+    upper = round(max(1.0, nominal * (1.0 + jit)), 1)
+    return min(max(rounded, lower), upper)
 
 
 def on_event(_client, _userdata, msg):

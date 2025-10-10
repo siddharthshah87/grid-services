@@ -23,6 +23,8 @@ def _granularity_to_timedelta(value: str | None) -> timedelta:
     if not value:
         return timedelta(minutes=5)
     value = value.strip().lower()
+    if not value:
+        return timedelta(minutes=5)
     if value.endswith("ms"):
         try:
             amount = int(value[:-2])

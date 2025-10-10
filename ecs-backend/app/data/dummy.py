@@ -85,7 +85,9 @@ def _init_vens() -> None:
     }
 
 
-_init_vens()
+
+def init_dummy_data():
+    _init_vens()
 
 
 # Simple in-memory events timeline
@@ -143,6 +145,8 @@ def get_network_stats() -> NetworkStats:
 def get_load_type_stats() -> List[LoadTypeStats]:
     agg: Dict[str, LoadTypeStats] = {}
     for v in list_vens():
+        if not v.loads:
+            continue
         for l in v.loads:
             if l.type not in agg:
                 agg[l.type] = LoadTypeStats(

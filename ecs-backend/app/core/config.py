@@ -1,8 +1,6 @@
-# BaseSettings moved to the pydantic-settings package in Pydantic v2
 from __future__ import annotations
-
+# BaseSettings moved to the pydantic-settings package in Pydantic v2
 from collections.abc import Iterable
-
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -90,4 +88,14 @@ class Settings(BaseSettings):
         )
 
 
-settings = Settings()
+
+
+_settings_instance = None
+def get_settings():
+    global _settings_instance
+    if _settings_instance is None:
+        _settings_instance = Settings()
+    return _settings_instance
+
+# Backward compatibility: settings variable for legacy imports
+settings = get_settings()
