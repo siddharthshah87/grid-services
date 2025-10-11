@@ -60,48 +60,50 @@ module "ecs_task_roles" {
   tls_secret_arn = aws_secretsmanager_secret.volttron_tls.arn
 }
 
-module "grid_event_gateway_alb" {
-  source            = "../../modules/alb"
-  name              = "grid-event-gateway-alb"
-  vpc_id            = module.vpc.vpc_id
-  public_subnets    = module.vpc.public_subnets
-  listener_port     = 80
-  target_port       = 8080
-  health_check_path = "/health"
-}
-module "ecs_service_grid_event_gateway" {
-  source               = "../../modules/ecs-service-openadr"
-  name                 = "grid-event-gateway"
-  cluster_id           = module.ecs_cluster.id
-  subnet_ids           = module.vpc.public_subnets
-  security_group_id    = module.ecs_security_group.id
-  execution_role_arn   = module.ecs_task_roles.execution
-  task_role_arn        = module.ecs_task_roles.iot_mqtt
-  image                = "${module.ecr_grid_event_gateway.repository_url}:latest"
-  mqtt_topic_events    = "oadr/event/ven1"
-  mqtt_topic_responses = "oadr/response/ven1"
-  mqtt_topic_metering  = "oadr/meter/ven1"
-  iot_endpoint         = module.iot_core.endpoint
-  iot_connect_host     = module.vpc.iot_data_endpoint_dns
-  iot_tls_server_name  = module.iot_core.endpoint
-  container_port       = 8080
-  vens_port            = 8081
-  target_group_arn     = module.grid_event_gateway_alb.target_group_arn
-  environment_secrets = [
-    {
-      name      = "CERT_BUNDLE_JSON"
-      valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:grid-event-gateway-iot-cert-bundle-oWaWux"
-    }
-  ]
-
-  # Ensure the ECS service waits for the ALB listener and target group to be
-  # created before attempting to register. This avoids race conditions during
-  # provisioning.
-  depends_on = [
-    module.grid_event_gateway_alb.listener,
-    module.grid_event_gateway_alb.target_group
-  ]
-}
+# Temporarily disabled Grid Event Gateway ALB to reduce costs
+# module "grid_event_gateway_alb" {
+#   source            = "../../modules/alb"
+#   name              = "grid-event-gateway-alb"
+#   vpc_id            = module.vpc.vpc_id
+#   public_subnets    = module.vpc.public_subnets
+#   listener_port     = 80
+#   target_port       = 8080
+#   health_check_path = "/health"
+# }
+# Temporarily disabled Grid Event Gateway to reduce costs
+# module "ecs_service_grid_event_gateway" {
+#   source               = "../../modules/ecs-service-openadr"
+#   name                 = "grid-event-gateway"
+#   cluster_id           = module.ecs_cluster.id
+#   subnet_ids           = module.vpc.public_subnets
+#   security_group_id    = module.ecs_security_group.id
+#   execution_role_arn   = module.ecs_task_roles.execution
+#   task_role_arn        = module.ecs_task_roles.iot_mqtt
+#   image                = "${module.ecr_grid_event_gateway.repository_url}:latest"
+#   mqtt_topic_events    = "oadr/event/ven1"
+#   mqtt_topic_responses = "oadr/response/ven1"
+#   mqtt_topic_metering  = "oadr/meter/ven1"
+#   iot_endpoint         = module.iot_core.endpoint
+#   iot_connect_host     = module.vpc.iot_data_endpoint_dns
+#   iot_tls_server_name  = module.iot_core.endpoint
+#   container_port       = 8080
+#   vens_port            = 8081
+#   target_group_arn     = module.grid_event_gateway_alb.target_group_arn
+#   environment_secrets = [
+#     {
+#       name      = "CERT_BUNDLE_JSON"
+#       valueFrom = "arn:aws:secretsmanager:us-west-2:923675928909:secret:grid-event-gateway-iot-cert-bundle-oWaWux"
+#     }
+#   ]
+# 
+#   # Ensure the ECS service waits for the ALB listener and target group to be
+#   # created before attempting to register. This avoids race conditions during
+#   # provisioning.
+#   depends_on = [
+#     module.grid_event_gateway_alb.listener,
+#     module.grid_event_gateway_alb.target_group
+#   ]
+# }
 
 module "ecs_service_volttron" {
   source                 = "../../modules/ecs-service-volttron"
@@ -144,8 +146,8 @@ module "aurora_postgresql" {
   vpc_id             = module.vpc.vpc_id
   subnet_ids         = module.vpc.private_subnet_ids
   security_group_ids = [module.ecs_security_group.id]
-  backup_retention   = 7
-  db_instance_class  = "db.t4g.medium"
+  backup_retention   = 1                # Reduced from 7 days for dev
+  db_instance_class  = "db.t4g.micro"  # Downgraded from db.t4g.medium
 }
 
 # Application load balancer for the backend service
@@ -185,14 +187,15 @@ resource "aws_security_group_rule" "ecs_from_backend_alb" {
   source_security_group_id = module.backend_alb.security_group_id
 }
 
-resource "aws_security_group_rule" "ecs_from_grid_event_gateway_alb" {
-  type                     = "ingress"
-  from_port                = 8080
-  to_port                  = 8080
-  protocol                 = "tcp"
-  security_group_id        = module.ecs_security_group.id
-  source_security_group_id = module.grid_event_gateway_alb.security_group_id
-}
+# Disabled with Grid Event Gateway service
+# resource "aws_security_group_rule" "ecs_from_grid_event_gateway_alb" {
+#   type                     = "ingress"
+#   from_port                = 8080
+#   to_port                  = 8080
+#   protocol                 = "tcp"
+#   security_group_id        = module.ecs_security_group.id
+#   source_security_group_id = module.grid_event_gateway_alb.security_group_id
+# }
 
 resource "aws_security_group_rule" "ecs_from_volttron_alb" {
   count                    = var.enable_volttron_alb_rule ? 1 : 0
@@ -270,9 +273,9 @@ module "ecs_service_backend" {
   security_group_id = module.ecs_security_group.id
   target_group_arn  = module.backend_alb.target_group_arn
 
-  # resources
-  cpu            = 256
-  memory         = 512
+  # resources - optimized for dev environment
+  cpu            = 128  # Reduced from 256
+  memory         = 256  # Reduced from 512
   container_port = 8000
 
   # roles
@@ -332,8 +335,9 @@ module "ecs_service_frontend" {
   security_group_id = module.ecs_security_group.id
   target_group_arn  = module.frontend_alb.target_group_arn
 
-  cpu            = 256
-  memory         = 512
+  # resources - optimized for dev environment  
+  cpu            = 128  # Reduced from 256
+  memory         = 256  # Reduced from 512
   container_port = 80
 
   execution_role_arn = module.ecs_task_roles.execution
