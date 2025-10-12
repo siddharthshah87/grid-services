@@ -28,8 +28,9 @@ async def db_check(session: AsyncSession = Depends(get_session)):
     """
     try:
         # Test basic connectivity
-        await session.execute(text("SELECT 1"))
-        
+        # Try to connect to database
+        result = await session.execute(text("SELECT 1"))
+
         # Check for required tables
         tables = ["vens", "events"]
         for table in tables:
@@ -41,7 +42,10 @@ async def db_check(session: AsyncSession = Depends(get_session)):
                 {"t": table},
             )
             if result.scalar() is None:
-                return {"status": "error", "details": f"table '{table}' missing"}
+                return {
+                    "status": "error",
+                    "details": f"table '{table}' missing"
+                }
         return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "details": str(e)}
@@ -54,17 +58,22 @@ async def demo_status(session: AsyncSession = Depends(get_session)):
         # Count VENs
         vens = await crud.list_vens(session)
         ven_count = len(vens)
-        
+
         # Count recent telemetry
         recent_telemetry = await session.execute(
-            text("SELECT COUNT(*) FROM ven_telemetry WHERE timestamp > NOW() - INTERVAL '5 minutes'")
+            text(
+                "SELECT COUNT(*) FROM ven_telemetry "
+                "WHERE timestamp > NOW() - INTERVAL '5 minutes'"
+            )
         )
         telemetry_count = recent_telemetry.scalar() or 0
-        
+
         # Count events
-        events_result = await session.execute(text("SELECT COUNT(*) FROM events"))
+        events_result = await session.execute(
+            text("SELECT COUNT(*) FROM events")
+        )
         event_count = events_result.scalar() or 0
-        
+
         return {
             "status": "ok",
             "demo_ready": True,
@@ -80,7 +89,7 @@ async def demo_status(session: AsyncSession = Depends(get_session)):
         }
     except Exception as e:
         return {
-            "status": "error", 
+            "status": "error",
             "demo_ready": False,
             "error": str(e)
         }

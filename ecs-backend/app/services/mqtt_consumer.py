@@ -98,7 +98,8 @@ class MQTTConsumer:
         self._client.loop_start()
         self._started = True
         logger.info(
-            "MQTT consumer connected", extra={"topics": topics, "host": self._config.mqtt_host}
+            "Starting MQTT consumer",
+            extra={"client_id": self.client_id, "host": self.host}
         )
 
     async def stop(self) -> None:
@@ -119,14 +120,19 @@ class MQTTConsumer:
         self._queue = None
         self._started = False
 
-    def _on_connect(self, client: mqtt.Client, _userdata: Any, _flags: dict[str, Any], rc: int) -> None:
+    def _on_connect(
+        self, client: mqtt.Client, _userdata: Any, _flags: dict[str, Any], rc: int
+    ) -> None:
         if rc != 0:
             logger.error("MQTT client failed to connect", extra={"rc": rc})
             return
         assert self._config.mqtt_topics  # guard above ensures not empty
         for topic in self._config.mqtt_topics:
             client.subscribe(topic)
-        logger.info("MQTT client subscribed", extra={"topics": self._config.mqtt_topics})
+        logger.info(
+            "MQTT client subscribed",
+            extra={"topics": self._config.mqtt_topics}
+        )
 
     def _on_disconnect(self, _client: mqtt.Client, _userdata: Any, rc: int) -> None:
         if rc != 0:
@@ -148,21 +154,31 @@ class MQTTConsumer:
         try:
             decoded = payload.decode("utf-8")
         except UnicodeDecodeError:
-            logger.warning("Received non-UTF8 payload", extra={"topic": topic, "payload_preview": payload[:100]})
+            logger.warning(
+                "Received non-UTF8 payload",
+                extra={"topic": topic, "payload_preview": payload[:100]}
+            )
             return
 
         try:
             data = json.loads(decoded)
         except json.JSONDecodeError as e:
             logger.warning(
-                "Discarding invalid JSON payload", 
-                extra={"topic": topic, "error": str(e), "payload_preview": decoded[:200]}
+                "Discarding invalid JSON payload",
+                extra={
+                    "topic": topic,
+                    "error": str(e),
+                    "payload_preview": decoded[:200]
+                }
             )
             return
 
         # Validate basic structure for demo reliability
         if not isinstance(data, dict):
-            logger.warning("Payload is not a JSON object", extra={"topic": topic, "type": type(data).__name__})
+            logger.warning(
+                "Payload is not a JSON object",
+                extra={"topic": topic, "type": type(data).__name__}
+            )
             return
 
         if topic == self._config.mqtt_topic_metering:
@@ -181,9 +197,9 @@ class MQTTConsumer:
             except Exception as e:
                 # Enhanced logging for demo troubleshooting
                 logger.exception(
-                    "Failed to process MQTT message", 
+                    "Failed to process MQTT message",
                     extra={
-                        "topic": message.topic, 
+                        "topic": message.topic,
                         "payload_size": len(message.payload),
                         "error": str(e)
                     }
