@@ -24,7 +24,9 @@ def test_event_payload_property(payload):
 import json
 
 def test_event_payload_schema():
-    with open("tests/golden/event_payload.json") as f:
+    import os
+    golden_path = os.path.join(os.path.dirname(__file__), "golden", "event_payload.json")
+    with open(golden_path) as f:
         payload = json.load(f)
     required = ["eventId", "requestedReductionKw", "actualReductionKw", "deliveredKwh", "baselineKw", "startTs", "endTs"]
     for field in required:

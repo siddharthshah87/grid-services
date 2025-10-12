@@ -17,7 +17,9 @@ def test_backend_cmd_property(payload):
 import json
 
 def test_backend_cmd_schema():
-    with open("tests/golden/backend_cmd.json") as f:
+    import os
+    golden_path = os.path.join(os.path.dirname(__file__), "golden", "backend_cmd.json")
+    with open(golden_path) as f:
         payload = json.load(f)
     required = ["op", "correlationId", "venId", "data"]
     for field in required:

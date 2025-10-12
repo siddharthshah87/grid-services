@@ -35,17 +35,21 @@ def test_ven_payload_property(payload):
     assert isinstance(ven.loads, list)
 import json
 import sys
-sys.path.insert(0, './ecs-backend/app')
+import os
+# Add the ecs-backend app directory to sys.path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'ecs-backend', 'app'))
 from schemas.api_models import Ven
 
 import pytest
 
 def load_payload(path):
-    with open(path) as f:
+    import os
+    golden_path = os.path.join(os.path.dirname(__file__), "golden", path)
+    with open(golden_path) as f:
         return json.load(f)
 
 def test_ven_payload_schema():
-    payload = load_payload("tests/golden/ven_payload.json")
+    payload = load_payload("ven_payload.json")
     ven = Ven(**payload)
     assert ven.id
     assert ven.metrics.currentPowerKw >= 0
@@ -56,19 +60,19 @@ def test_ven_payload_schema():
         assert "currentPowerKw" in load.model_dump()
 
 def test_ven_payload_missing_field():
-    payload = load_payload("tests/golden/ven_payload.json")
+    payload = load_payload("ven_payload.json")
     del payload["id"]
     with pytest.raises(Exception):
         Ven(**payload)
 
 def test_ven_payload_invalid_type():
-    payload = load_payload("tests/golden/ven_payload.json")
+    payload = load_payload("ven_payload.json")
     payload["metrics"]["currentPowerKw"] = "not-a-number"
     with pytest.raises(Exception):
         Ven(**payload)
 
 def test_ven_payload_large_loads():
-    payload = load_payload("tests/golden/ven_payload.json")
+    payload = load_payload("ven_payload.json")
     payload["loads"] = [payload["loads"][0]] * 1000
     ven = Ven(**payload)
     assert len(ven.loads) == 1000

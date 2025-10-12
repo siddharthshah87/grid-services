@@ -20,10 +20,14 @@ def test_ven_ack_property(payload):
     assert "shedAmount" in payload["data"]
 import json
 import sys
-sys.path.insert(0, './ecs-backend/app')
+import os
+# Add the ecs-backend app directory to sys.path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'ecs-backend', 'app'))
 
 def test_ven_ack_schema():
-    with open("tests/golden/ven_ack.json") as f:
+    import os
+    golden_path = os.path.join(os.path.dirname(__file__), "golden", "ven_ack.json")
+    with open(golden_path) as f:
         payload = json.load(f)
     # Minimal schema check
     required = ["op", "correlationId", "ok", "ts", "venId", "data"]
