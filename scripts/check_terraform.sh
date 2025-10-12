@@ -7,7 +7,8 @@ terraform fmt -recursive -check
 # Validate each environment under envs/
 for env_dir in envs/*; do
   if [[ -d "$env_dir" ]]; then
-    terraform validate "$env_dir"
+    echo "Validating $env_dir..."
+    (cd "$env_dir" && terraform validate)
   fi
 done
 
