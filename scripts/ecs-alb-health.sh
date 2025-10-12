@@ -10,14 +10,18 @@ set -Eeuo pipefail
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 REGION="${AWS_REGION:-us-west-2}"
-PROFILE="${AWS_PROFILE:-default}"
 CLUSTER="${1:-hems-ecs-cluster}"
 LOG_LINES="${LOG_LINES:-10}"
 TIMEOUT="${TIMEOUT:-20s}"          # per‑AWS‑call cap
 
 # ─── AWS CLI wrapper ──────────────────────────────────────────────────────────
-AWS_BASE=(aws --region "$REGION" --profile "$PROFILE" \
-              --cli-connect-timeout 5 --cli-read-timeout 30 --no-paginate)
+# Skip profile if in Codespaces or CI
+if [[ -n "${CODESPACES:-}" || -n "${CI:-}" ]]; then
+  AWS_BASE=(aws --region "$REGION" --cli-connect-timeout 5 --cli-read-timeout 30 --no-paginate)
+else
+  PROFILE="${AWS_PROFILE:-default}"
+  AWS_BASE=(aws --region "$REGION" --profile "$PROFILE" --cli-connect-timeout 5 --cli-read-timeout 30 --no-paginate)
+fi
 # run an AWS call with an outer timeout (kills after TIMEOUT)
 timeout_cmd() { timeout -k 5 "$TIMEOUT" "${AWS_BASE[@]}" "$@"; }
 
@@ -88,8 +92,13 @@ main() {
     echo
   fi
   echo "─── ECS and ALB Health check ───"
-  echo "▶︎ Health run $(date -u '+%Y-%m-%dT%H:%M:%SZ') ($REGION, profile=$PROFILE)
+  if [[ -n "${CODESPACES:-}" || -n "${CI:-}" ]]; then
+    echo "▶︎ Health run $(date -u '+%Y-%m-%dT%H:%M:%SZ') ($REGION, codespaces)
 "
+  else
+    echo "▶︎ Health run $(date -u '+%Y-%m-%dT%H:%M:%SZ') ($REGION, profile=$PROFILE)
+"
+  fi
   echo "=== Cluster: $CLUSTER ==="
 
   # Fetch all service ARNs once
