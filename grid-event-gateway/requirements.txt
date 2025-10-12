@@ -1,5 +1,5 @@
 openleadr==0.5.32
-signxml==3.2.1
+signxml==3.1.0
 pyOpenSSL==25.3.0
 cryptography==46.0.2
 lxml==4.9.4
