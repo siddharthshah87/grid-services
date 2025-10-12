@@ -30,12 +30,24 @@ Configure AWS access using one of these methods:
 
 #### Option 1: AWS SSO (Recommended)
 ```bash
-# Use the provided authentication script
-./scripts/authenticate_aws.sh
+# Step 1: Get your SSO start URL from AWS administrator or:
+# - AWS Console → IAM Identity Center → "AWS access portal URL"
+# - Format: https://d-xxxxxxxxxx.awsapps.com/start
 
-# Or manually configure SSO
+# Step 2: Configure SSO
 aws configure sso
+# You'll be prompted for:
+# - SSO start URL: https://d-xxxxxxxxxx.awsapps.com/start
+# - SSO region: us-west-2 (or your organization's region)
+# - Account ID: 923675928909 (or your account)
+# - Role name: AdministratorAccess-923675928909 (or your role)
+# - Profile name: AdministratorAccess-923675928909
+
+# Step 3: Login
 aws sso login --profile AdministratorAccess-923675928909
+
+# Step 4: Use the provided authentication script
+./scripts/authenticate_aws.sh
 ```
 
 #### Option 2: aws-vault (Alternative)
