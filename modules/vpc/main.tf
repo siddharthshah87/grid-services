@@ -1,10 +1,10 @@
 locals {
   # Keep essential VPC endpoints to avoid breaking changes
   interface_services = [
-    "secretsmanager",  # Required for certificate access
-    "ecr.api",         # Required for ECS image pulls
-    "ecr.dkr",         # Required for ECS image pulls
-    "iot.data",        # Required for MQTT communication
+    "secretsmanager", # Required for certificate access
+    "ecr.api",        # Required for ECS image pulls
+    "ecr.dkr",        # Required for ECS image pulls
+    "iot.data",       # Required for MQTT communication
     # Removed only "logs" for minor cost savings
   ]
 }

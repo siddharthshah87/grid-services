@@ -142,14 +142,14 @@ module "aurora_postgresql" {
   source             = "../../modules/rds-postgresql"
   name               = "opendar-aurora"
   db_name            = "ecsbackenddb"
-  engine_version     = "15.12"  # Keep current version, can't downgrade
+  engine_version     = "15.12" # Keep current version, can't downgrade
   username           = "ecs_backend_admin"
   password           = "Grid2025!" # Use Secrets Manager in production
   vpc_id             = data.aws_vpc.existing.id
   subnet_ids         = data.aws_subnets.private.ids
   security_group_ids = [module.ecs_security_group.id]
-  backup_retention   = 1                # Reduced from 7 days for dev
-  db_instance_class  = "db.t4g.medium"  # Keep current class - micro not supported for 15.12
+  backup_retention   = 1               # Reduced from 7 days for dev
+  db_instance_class  = "db.t4g.medium" # Keep current class - micro not supported for 15.12
 }
 
 # Application load balancer for the backend service
@@ -276,8 +276,8 @@ module "ecs_service_backend" {
   target_group_arn  = module.backend_alb.target_group_arn
 
   # resources - optimized for dev environment  
-  cpu            = 256  # Valid Fargate combination
-  memory         = 512  # Valid Fargate combination
+  cpu            = 256 # Valid Fargate combination
+  memory         = 512 # Valid Fargate combination
   container_port = 8000
 
   # roles
@@ -338,8 +338,8 @@ module "ecs_service_frontend" {
   target_group_arn  = module.frontend_alb.target_group_arn
 
   # resources - optimized for dev environment
-  cpu            = 256  # Valid Fargate combination
-  memory         = 512  # Valid Fargate combination
+  cpu            = 256 # Valid Fargate combination
+  memory         = 512 # Valid Fargate combination
   container_port = 80
 
   execution_role_arn = module.ecs_task_roles.execution
