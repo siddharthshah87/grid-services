@@ -148,13 +148,21 @@ class MQTTConsumer:
         try:
             decoded = payload.decode("utf-8")
         except UnicodeDecodeError:
-            logger.warning("Received non-UTF8 payload", extra={"topic": topic})
+            logger.warning("Received non-UTF8 payload", extra={"topic": topic, "payload_preview": payload[:100]})
             return
 
         try:
             data = json.loads(decoded)
-        except json.JSONDecodeError:
-            logger.warning("Discarding invalid JSON payload", extra={"topic": topic})
+        except json.JSONDecodeError as e:
+            logger.warning(
+                "Discarding invalid JSON payload", 
+                extra={"topic": topic, "error": str(e), "payload_preview": decoded[:200]}
+            )
+            return
+
+        # Validate basic structure for demo reliability
+        if not isinstance(data, dict):
+            logger.warning("Payload is not a JSON object", extra={"topic": topic, "type": type(data).__name__})
             return
 
         if topic == self._config.mqtt_topic_metering:
@@ -170,8 +178,16 @@ class MQTTConsumer:
             message = await self._queue.get()
             try:
                 await self.handle_message(message.topic, message.payload)
-            except Exception:  # pragma: no cover - logged for investigation
-                logger.exception("Failed to process MQTT message", extra={"topic": message.topic})
+            except Exception as e:
+                # Enhanced logging for demo troubleshooting
+                logger.exception(
+                    "Failed to process MQTT message", 
+                    extra={
+                        "topic": message.topic, 
+                        "payload_size": len(message.payload),
+                        "error": str(e)
+                    }
+                )
             finally:
                 self._queue.task_done()
 

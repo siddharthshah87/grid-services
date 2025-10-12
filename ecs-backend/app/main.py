@@ -19,12 +19,17 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-# CORS (adjust origins as needed)
+# CORS (configured for demo environment)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with frontend origin in production
+    allow_origins=[
+        "https://app.gridcircuit.link",
+        "https://gridcircuit.link", 
+        "http://localhost:3000",  # For local development
+        "http://localhost:5173",  # For Vite dev server
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["*"],
 )
 
