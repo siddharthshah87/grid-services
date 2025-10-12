@@ -26,7 +26,7 @@ httpx==0.28.1
 requests==2.32.3
 
 # OpenLEADR protocol support
-openleadr==0.8.24
+openleadr==0.5.32
 
 # Testing framework
 pytest==8.4.2
