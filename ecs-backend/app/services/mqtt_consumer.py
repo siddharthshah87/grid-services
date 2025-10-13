@@ -167,8 +167,11 @@ class MQTTConsumer:
                 ctx.verify_mode = ssl.CERT_REQUIRED
                 
                 self._client.tls_set_context(ctx)
-                # Disable paho's built-in hostname check since we're using custom SNI
-                self._client.tls_insecure_set(True)
+                # Only disable paho's hostname check for VPC endpoints
+                # Public endpoints need proper hostname verification
+                is_vpc_endpoint = "vpce" in self._config.mqtt_host
+                if is_vpc_endpoint:
+                    self._client.tls_insecure_set(True)
             else:
                 # Standard TLS configuration
                 self._client.tls_set(
@@ -232,9 +235,9 @@ class MQTTConsumer:
 
     def _on_disconnect(self, _client: mqtt.Client, _userdata: Any, rc: int) -> None:
         if rc != 0:
-            logger.warning("Unexpected MQTT disconnect", extra={"rc": rc})
+            logger.warning(f"Unexpected MQTT disconnect with rc={rc} ({mqtt.error_string(rc)})")
         else:
-            logger.info("MQTT client disconnected")
+            logger.info("MQTT client disconnected cleanly")
 
     def _on_message(self, _client: mqtt.Client, _userdata: Any, msg: MQTTMessage) -> None:
         if not self._queue or not self._loop:

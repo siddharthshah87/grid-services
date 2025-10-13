@@ -2,6 +2,10 @@
 
 variable "name_prefix" { default = "ecs" }
 variable "tls_secret_arn" {}
+variable "additional_secret_arns" {
+  type    = list(string)
+  default = []
+}
 
 # IAM Role for ECS Task Execution
 resource "aws_iam_role" "execution" {
@@ -74,7 +78,7 @@ resource "aws_iam_policy" "allow_tls_secret_access" {
       {
         Effect   = "Allow",
         Action   = ["secretsmanager:GetSecretValue"],
-        Resource = var.tls_secret_arn
+        Resource = concat([var.tls_secret_arn], var.additional_secret_arns)
       }
     ]
   })

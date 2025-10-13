@@ -50,6 +50,14 @@ resource "aws_iot_certificate" "volttron" {
   }
 }
 
+resource "aws_iot_certificate" "backend" {
+  active = true
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 resource "aws_iot_thing" "volttron" {
   name = "${var.prefix}_thing"
 
@@ -62,9 +70,19 @@ resource "aws_iot_thing" "volttron" {
 ############################################################
 #  Attachments (policy → cert, cert → thing)
 ############################################################
-resource "aws_iot_policy_attachment" "cert_policy" {
+resource "aws_iot_policy_attachment" "cert_policy_volttron" {
   policy = aws_iot_policy.allow_publish_subscribe.name
   target = aws_iot_certificate.volttron.arn
+
+  # Prevent the destroy-before-detach race:
+  lifecycle {
+    create_before_destroy = false
+  }
+}
+
+resource "aws_iot_policy_attachment" "cert_policy_backend" {
+  policy = aws_iot_policy.allow_publish_subscribe.name
+  target = aws_iot_certificate.backend.arn
 
   # Prevent the destroy-before-detach race:
   lifecycle {

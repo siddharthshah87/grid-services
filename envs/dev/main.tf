@@ -57,9 +57,10 @@ module "ecs_security_group" {
 }
 
 module "ecs_task_roles" {
-  source         = "../../modules/iam-roles/ecs_task_roles"
-  name_prefix    = "grid-sim"
-  tls_secret_arn = aws_secretsmanager_secret.volttron_tls.arn
+  source                 = "../../modules/iam-roles/ecs_task_roles"
+  name_prefix            = "grid-sim"
+  tls_secret_arn         = aws_secretsmanager_secret.volttron_tls.arn
+  additional_secret_arns = [aws_secretsmanager_secret.backend_tls.arn]
 }
 
 # Temporarily disabled Grid Event Gateway ALB to reduce costs
@@ -297,9 +298,10 @@ module "ecs_service_backend" {
   mqtt_host            = module.iot_core.endpoint  # Temporarily use public endpoint
 
   # TLS certificates for AWS IoT Core authentication
-  ca_cert_secret_arn     = "${aws_secretsmanager_secret.volttron_tls.arn}:ca_cert::"
-  client_cert_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:client_cert::"
-  private_key_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:private_key::"
+  # Backend uses its own certificate (different from VOLTTRON VEN)
+  ca_cert_secret_arn     = "${aws_secretsmanager_secret.backend_tls.arn}:ca_cert::"
+  client_cert_secret_arn = "${aws_secretsmanager_secret.backend_tls.arn}:client_cert::"
+  private_key_secret_arn = "${aws_secretsmanager_secret.backend_tls.arn}:private_key::"
 
   aws_region = var.aws_region
 
