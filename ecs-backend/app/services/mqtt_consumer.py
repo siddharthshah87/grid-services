@@ -4,6 +4,8 @@ import asyncio
 import json
 import logging
 import contextlib
+import os
+import tempfile
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -54,6 +56,41 @@ class MQTTConsumer:
         self._client: mqtt.Client | None = None
         self._started = False
 
+    def _setup_tls_cert_file(self, cert_type: str, cert_config: str | None) -> str | None:
+        """Handle TLS certificates - either file paths or PEM content from environment variables."""
+        if not cert_config:
+            return None
+            
+        # If it's a file path that exists, use it directly
+        if os.path.isfile(cert_config):
+            return cert_config
+            
+        # Check for PEM content from environment variables (used in ECS with secrets)
+        env_var_map = {
+            "ca_cert": "CA_CERT_PEM",
+            "client_cert": "CLIENT_CERT_PEM", 
+            "client_key": "PRIVATE_KEY_PEM"
+        }
+        
+        pem_env_var = env_var_map.get(cert_type)
+        if pem_env_var:
+            pem_content = os.getenv(pem_env_var)
+            if pem_content:
+                # Create temporary file with PEM content
+                temp_fd, temp_path = tempfile.mkstemp(suffix=f"_{cert_type}.pem")
+                try:
+                    with os.fdopen(temp_fd, 'w') as temp_file:
+                        temp_file.write(pem_content)
+                    logger.info(f"Created temporary {cert_type} file", extra={"path": temp_path})
+                    return temp_path
+                except Exception as e:
+                    logger.error(f"Failed to create temporary {cert_type} file", extra={"error": str(e)})
+                    os.close(temp_fd)
+                    return None
+                    
+        # Fall back to using the config value as-is (file path)
+        return cert_config
+
     async def start(self) -> None:
         if self._started:
             return
@@ -75,10 +112,15 @@ class MQTTConsumer:
             self._client.username_pw_set(self._config.mqtt_username, self._config.mqtt_password)
 
         if self._config.mqtt_use_tls:
+            # Handle certificates - either file paths or PEM content from env vars
+            ca_certs = self._setup_tls_cert_file("ca_cert", self._config.mqtt_ca_cert)
+            certfile = self._setup_tls_cert_file("client_cert", self._config.mqtt_client_cert)
+            keyfile = self._setup_tls_cert_file("client_key", self._config.mqtt_client_key)
+            
             self._client.tls_set(
-                ca_certs=self._config.mqtt_ca_cert,
-                certfile=self._config.mqtt_client_cert,
-                keyfile=self._config.mqtt_client_key,
+                ca_certs=ca_certs,
+                certfile=certfile,
+                keyfile=keyfile,
             )
 
         self._client.on_connect = self._on_connect
@@ -99,7 +141,7 @@ class MQTTConsumer:
         self._started = True
         logger.info(
             "Starting MQTT consumer",
-            extra={"client_id": self.client_id, "host": self.host}
+            extra={"client_id": self._config.mqtt_client_id, "host": self._config.mqtt_host}
         )
 
     async def stop(self) -> None:

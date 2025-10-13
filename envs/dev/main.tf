@@ -290,6 +290,14 @@ module "ecs_service_backend" {
   db_password = module.aurora_postgresql.db_password
   db_name     = module.aurora_postgresql.db_name
 
+  # MQTT connection for VEN telemetry
+  mqtt_host = module.iot_core.endpoint
+
+  # TLS certificates for AWS IoT Core authentication
+  ca_cert_secret_arn     = "${aws_secretsmanager_secret.volttron_tls.arn}:ca_cert::"
+  client_cert_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:client_cert::"
+  private_key_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:private_key::"
+
   aws_region = var.aws_region
 
   depends_on = [

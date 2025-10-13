@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,11 +13,38 @@ from app.services import MQTTConsumer
 from app.core.config import settings
 from app.dependencies import get_session
 
+
+# Configure logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger("uvicorn")
+
+# Global MQTT consumer instance
+mqtt_consumer = MQTTConsumer(config=settings, session_factory=get_session)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting MQTT consumer...")
+    await mqtt_consumer.start()
+    logger.info("MQTT consumer started")
+    yield
+    # Shutdown
+    logger.info("Stopping MQTT consumer...")
+    await mqtt_consumer.stop()
+    logger.info("MQTT consumer stopped")
+
+
 app = FastAPI(
     title="OpenADR VTN Admin API",
     version="0.1.0",
     docs_url=None,
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 # CORS (configured for demo environment)
@@ -43,27 +71,3 @@ app.include_router(event.router, prefix="/api/events", tags=["Events"])
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
     return get_swagger_ui_html(openapi_url=app.openapi_url, title=app.title)
-
-
-# Startup/shutdown hooks
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger("uvicorn")
-
-
-mqtt_consumer = MQTTConsumer(config=settings, session_factory=get_session)
-
-
-@app.on_event("startup")
-async def start_services() -> None:
-    await mqtt_consumer.start()
-
-
-@app.on_event("shutdown")
-async def stop_services() -> None:
-    await mqtt_consumer.stop()

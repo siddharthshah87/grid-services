@@ -39,3 +39,27 @@ variable "db_name" {
   type = string
 }
 
+variable "mqtt_host" {
+  type        = string
+  description = "MQTT broker hostname (AWS IoT Core endpoint)"
+  default     = "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com"
+}
+
+variable "ca_cert_secret_arn" {
+  type        = string
+  description = "ARN of the CA certificate secret"
+  default     = null
+}
+
+variable "client_cert_secret_arn" {
+  type        = string
+  description = "ARN of the client certificate secret"
+  default     = null
+}
+
+variable "private_key_secret_arn" {
+  type        = string
+  description = "ARN of the private key secret"
+  default     = null
+}
+

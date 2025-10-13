@@ -39,6 +39,40 @@ resource "aws_ecs_task_definition" "this" {
         {
           name  = "DB_NAME"
           value = var.db_name
+        },
+        {
+          name  = "MQTT_ENABLED"
+          value = "true"
+        },
+        {
+          name  = "MQTT_HOST"
+          value = var.mqtt_host
+        },
+        {
+          name  = "MQTT_PORT"
+          value = "8883"
+        },
+        {
+          name  = "MQTT_USE_TLS"
+          value = "true"
+        },
+        {
+          name  = "MQTT_CLIENT_ID"
+          value = "backend-mqtt-consumer"
+        }
+      ]
+      secrets = [
+        {
+          name      = "CA_CERT_PEM"
+          valueFrom = var.ca_cert_secret_arn
+        },
+        {
+          name      = "CLIENT_CERT_PEM"
+          valueFrom = var.client_cert_secret_arn
+        },
+        {
+          name      = "PRIVATE_KEY_PEM"
+          valueFrom = var.private_key_secret_arn
         }
       ]
       logConfiguration = {
