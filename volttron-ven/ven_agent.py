@@ -2392,31 +2392,30 @@ def main(iterations: int | None = None) -> None:
                     client.publish(MQTT_TOPIC_METERING, json.dumps(error_payload), qos=1)
                 except Exception as pub_err:
                     logging.error(f"Publish error telemetry failed: {pub_err}", exc_info=True)
-                return
-                if op == "event":
-                    ev = data if isinstance(data, dict) else {}
-                    # Record event in shadow and optionally adjust target
-                    ev_id = ev.get("event_id") or f"backend_{int(time.time())}"
-                    shed_kw = ev.get("shed_kw")
-                    start_ts = int(ev.get("start_ts") or int(time.time()))
-                    duration_s = int(ev.get("duration_s") or 0)
-                    end_ts = int(ev.get("end_ts") or (start_ts + duration_s if duration_s > 0 else start_ts))
-                    req_kw = ev.get("requestedReductionKw") or ev.get("requested_kw")
-                    updates: dict[str, Any] = {
-                        "status": {"last_backend_event_ts": int(time.time())},
-                        "events": {"last_backend": {"event_id": ev_id, **ev}},
+                continue  # Skip this iteration but continue the loop
+            
+            # Publish valid telemetry to MQTT
+            try:
+                client.publish(MQTT_TOPIC_METERING, json.dumps(telem), qos=1)
+                _last_publish_time = now
+                print(f"📊 Published telemetry: {power_kw:.2f} kW (shed: {shed_power_kw:.3f} kW)")
+            except Exception as pub_err:
+                logging.error(f"Failed to publish telemetry: {pub_err}", exc_info=True)
+            
+            # Update shadow with current status
+            try:
+                shadow_update = {
+                    "status": {
+                        "last_telemetry_ts": now,
+                        "power_kw": power_kw,
+                        "shed_kw": shed_power_kw
                     }
-                    if isinstance(shed_kw, (int, float)):
-                        # For a simple demo, interpret shed_kw as a target power cap
-                        updates["target_power_kw"] = max(0.0, float(shed_kw))
-                        with _shadow_state_lock:
-                            try:
-                                _shadow_target_power_kw = float(updates["target_power_kw"])
-                            except Exception as e:
-                                logging.error(f"Failed to set target_power_kw: {e}", exc_info=True)
-                    return
-            except Exception as err:
-                logging.error(f"Error handling backend command: {err}", exc_info=True)
+                }
+                if event_id:
+                    shadow_update["status"]["active_event_id"] = event_id
+                _shadow_merge_report(shadow_update)
+            except Exception as shadow_err:
+                logging.error(f"Failed to update shadow: {shadow_err}", exc_info=True)
 
             count += 1
             if iterations is not None and count >= iterations:
