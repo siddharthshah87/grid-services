@@ -227,6 +227,27 @@ class MQTTConsumer:
             logger.warning("Telemetry payload missing timestamp", extra={"ven": model.ven_id})
             return
 
+        # Auto-register VEN if it doesn't exist
+        async with self._session_scope() as session:
+            from app import crud
+            ven = await crud.get_ven(session, model.ven_id)
+            if ven is None:
+                logger.info("Auto-registering new VEN", extra={"ven_id": model.ven_id})
+                try:
+                    await crud.create_ven(
+                        session,
+                        ven_id=model.ven_id,
+                        name=f"Auto-registered VEN {model.ven_id}",
+                        status="online",
+                        registration_id=model.ven_id,
+                        latitude=37.7749,  # Default San Francisco coordinates
+                        longitude=-122.4194,
+                    )
+                    logger.info("Successfully auto-registered VEN", extra={"ven_id": model.ven_id})
+                except Exception as e:
+                    logger.error("Failed to auto-register VEN", extra={"ven_id": model.ven_id, "error": str(e)})
+                    return
+
         used_kw = model.used_power_kw
         if used_kw is None:
             used_kw = model.legacy_power_kw
