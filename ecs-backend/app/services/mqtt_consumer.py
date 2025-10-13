@@ -58,14 +58,7 @@ class MQTTConsumer:
 
     def _setup_tls_cert_file(self, cert_type: str, cert_config: str | None) -> str | None:
         """Handle TLS certificates - either file paths or PEM content from environment variables."""
-        if not cert_config:
-            return None
-            
-        # If it's a file path that exists, use it directly
-        if os.path.isfile(cert_config):
-            return cert_config
-            
-        # Check for PEM content from environment variables (used in ECS with secrets)
+        # Check for PEM content from environment variables FIRST (used in ECS with secrets)
         env_var_map = {
             "ca_cert": "CA_CERT_PEM",
             "client_cert": "CLIENT_CERT_PEM", 
@@ -87,6 +80,14 @@ class MQTTConsumer:
                     logger.error(f"Failed to create temporary {cert_type} file", extra={"error": str(e)})
                     os.close(temp_fd)
                     return None
+        
+        # If no PEM env var, check if cert_config is provided
+        if not cert_config:
+            return None
+            
+        # If it's a file path that exists, use it directly
+        if os.path.isfile(cert_config):
+            return cert_config
                     
         # Fall back to using the config value as-is (file path)
         return cert_config
@@ -112,16 +113,69 @@ class MQTTConsumer:
             self._client.username_pw_set(self._config.mqtt_username, self._config.mqtt_password)
 
         if self._config.mqtt_use_tls:
+            import ssl
             # Handle certificates - either file paths or PEM content from env vars
+            # Must do this FIRST to ensure files exist before SSL context creation
             ca_certs = self._setup_tls_cert_file("ca_cert", self._config.mqtt_ca_cert)
             certfile = self._setup_tls_cert_file("client_cert", self._config.mqtt_client_cert)
             keyfile = self._setup_tls_cert_file("client_key", self._config.mqtt_client_key)
             
-            self._client.tls_set(
-                ca_certs=ca_certs,
-                certfile=certfile,
-                keyfile=keyfile,
+            # Verify we have valid certificate files
+            if not ca_certs or not certfile or not keyfile:
+                raise MQTTConsumerError("TLS certificates not properly configured")
+            
+            # Configure SNI for TLS when connecting to VPC endpoints
+            # The VPC endpoint DNS name won't match the IoT Core certificate, so we use SNI
+            # to tell AWS IoT which certificate to present
+            manual_hostname_override = (
+                self._config.mqtt_tls_server_name 
+                and self._config.mqtt_tls_server_name != self._config.mqtt_host
             )
+            
+            if manual_hostname_override:
+                logger.info(
+                    "Configuring TLS with SNI override",
+                    extra={
+                        "connect_host": self._config.mqtt_host,
+                        "sni_hostname": self._config.mqtt_tls_server_name,
+                        "ca_file": ca_certs,
+                        "cert_file": certfile,
+                        "key_file": keyfile
+                    }
+                )
+                # Create custom SSL context with SNI override
+                # This allows connecting to VPC endpoints while validating against IoT Core certificate
+                ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_certs)
+                ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
+                
+                # Enforce TLS 1.2+
+                try:
+                    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+                except Exception:
+                    pass
+                
+                # Monkey-patch wrap_socket to force server_hostname to the SNI value
+                orig_wrap = ctx.wrap_socket
+                sni_hostname = self._config.mqtt_tls_server_name
+                
+                def _wrap_socket_with_sni(sock, *args, **kwargs):
+                    kwargs["server_hostname"] = sni_hostname
+                    return orig_wrap(sock, *args, **kwargs)
+                
+                ctx.wrap_socket = _wrap_socket_with_sni
+                ctx.check_hostname = True
+                ctx.verify_mode = ssl.CERT_REQUIRED
+                
+                self._client.tls_set_context(ctx)
+                # Disable paho's built-in hostname check since we're using custom SNI
+                self._client.tls_insecure_set(True)
+            else:
+                # Standard TLS configuration
+                self._client.tls_set(
+                    ca_certs=ca_certs,
+                    certfile=certfile,
+                    keyfile=keyfile,
+                )
 
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect

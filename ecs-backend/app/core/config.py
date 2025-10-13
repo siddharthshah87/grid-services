@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     mqtt_password: str | None = Field(None, alias="MQTT_PASSWORD")
     mqtt_keepalive: int = Field(60, alias="MQTT_KEEPALIVE")
     mqtt_use_tls: bool = Field(True, alias="MQTT_USE_TLS")
+    mqtt_tls_server_name: str | None = Field(None, alias="MQTT_TLS_SERVER_NAME")
     mqtt_ca_cert: str | None = Field(None, alias="MQTT_CA_CERT")
     mqtt_client_cert: str | None = Field(None, alias="MQTT_CLIENT_CERT")
     mqtt_client_key: str | None = Field(None, alias="MQTT_CLIENT_KEY")

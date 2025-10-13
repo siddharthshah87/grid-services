@@ -48,3 +48,9 @@ data "aws_internet_gateway" "existing" {
 data "aws_iot_endpoint" "data" {
   endpoint_type = "iot:Data-ATS"
 }
+
+# Get IoT Core VPC endpoint for private connectivity
+data "aws_vpc_endpoint" "iot_data" {
+  vpc_id       = data.aws_vpc.existing.id
+  service_name = "com.amazonaws.us-west-2.iot.data"
+}

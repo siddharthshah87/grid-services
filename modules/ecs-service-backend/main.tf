@@ -59,6 +59,10 @@ resource "aws_ecs_task_definition" "this" {
         {
           name  = "MQTT_CLIENT_ID"
           value = "backend-mqtt-consumer"
+        },
+        {
+          name  = "MQTT_TLS_SERVER_NAME"
+          value = var.mqtt_tls_server_name != null ? var.mqtt_tls_server_name : var.mqtt_host
         }
       ]
       secrets = [

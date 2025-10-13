@@ -45,6 +45,12 @@ variable "mqtt_host" {
   default     = "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com"
 }
 
+variable "mqtt_tls_server_name" {
+  type        = string
+  description = "TLS SNI server name for certificate verification (IoT Core endpoint)"
+  default     = null
+}
+
 variable "ca_cert_secret_arn" {
   type        = string
   description = "ARN of the CA certificate secret"

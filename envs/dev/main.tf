@@ -122,7 +122,7 @@ module "ecs_service_volttron" {
   mqtt_topic_metering    = "oadr/meter/ven1"
   mqtt_topic_status      = "ven/status/ven1"
   iot_endpoint           = module.iot_core.endpoint
-  iot_connect_host       = data.aws_iot_endpoint.data.endpoint_address
+  iot_connect_host       = data.aws_vpc_endpoint.iot_data.dns_entry[0].dns_name
   iot_tls_server_name    = module.iot_core.endpoint
   iot_thing_name         = module.iot_core.thing_name
   ca_cert_secret_arn     = "${aws_secretsmanager_secret.volttron_tls.arn}:ca_cert::"
@@ -291,7 +291,10 @@ module "ecs_service_backend" {
   db_name     = module.aurora_postgresql.db_name
 
   # MQTT connection for VEN telemetry
-  mqtt_host = module.iot_core.endpoint
+  # TODO: Re-enable VPC endpoint once SNI configuration is fully tested
+  # mqtt_host            = data.aws_vpc_endpoint.iot_data.dns_entry[0].dns_name
+  # mqtt_tls_server_name = module.iot_core.endpoint
+  mqtt_host            = module.iot_core.endpoint  # Temporarily use public endpoint
 
   # TLS certificates for AWS IoT Core authentication
   ca_cert_secret_arn     = "${aws_secretsmanager_secret.volttron_tls.arn}:ca_cert::"
