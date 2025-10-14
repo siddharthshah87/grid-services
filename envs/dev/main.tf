@@ -120,7 +120,7 @@ module "ecs_service_volttron" {
   image                  = "${module.ecr_volttron.repository_url}:latest"
   mqtt_topic_events      = "oadr/event/ven1"
   mqtt_topic_responses   = "oadr/response/ven1"
-  mqtt_topic_metering    = "oadr/meter/ven1"
+  mqtt_topic_metering    = "volttron/metering"
   mqtt_topic_status      = "ven/status/ven1"
   iot_endpoint           = module.iot_core.endpoint
   iot_connect_host       = data.aws_vpc_endpoint.iot_data.dns_entry[0].dns_name

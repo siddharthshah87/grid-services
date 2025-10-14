@@ -3,17 +3,18 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import contextlib
 import os
+import ssl
 import tempfile
-from contextlib import asynccontextmanager
+import time
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Callable
 
-import paho.mqtt.client as mqtt
-from paho.mqtt.client import MQTTMessage
-
+import gmqtt
+from gmqtt.mqtt.constants import MQTTv311
+import gmqtt
 from app.core.config import Settings, settings
 from app.models import LoadSnapshot, VenLoadSample, VenTelemetry
 from app.schemas.telemetry import LoadSnapshotPayload, TelemetryPayload
@@ -51,46 +52,44 @@ class MQTTConsumer:
             self._session_factory = session_factory
 
         self._queue: asyncio.Queue[_QueuedMessage] | None = None
-        self._loop: asyncio.AbstractEventLoop | None = None
         self._worker: asyncio.Task[None] | None = None
-        self._client: mqtt.Client | None = None
+        self._client: gmqtt.Client | None = None
         self._started = False
 
-    def _setup_tls_cert_file(self, cert_type: str, cert_config: str | None) -> str | None:
+    def _setup_tls_cert_file(self, cert_type: str) -> str | None:
         """Handle TLS certificates - either file paths or PEM content from environment variables."""
-        # Check for PEM content from environment variables FIRST (used in ECS with secrets)
         env_var_map = {
-            "ca_cert": "CA_CERT_PEM",
-            "client_cert": "CLIENT_CERT_PEM", 
-            "client_key": "PRIVATE_KEY_PEM"
+            "ca_cert": ("CA_CERT_PEM", self._config.mqtt_ca_cert),
+            "client_cert": ("CLIENT_CERT_PEM", self._config.mqtt_client_cert),
+            "client_key": ("PRIVATE_KEY_PEM", self._config.mqtt_client_key),
         }
         
-        pem_env_var = env_var_map.get(cert_type)
+        pem_env_var, config_path = env_var_map.get(cert_type, (None, None))
+        
+        # Prefer PEM content from environment variables (used in ECS with secrets)
         if pem_env_var:
             pem_content = os.getenv(pem_env_var)
             if pem_content:
-                # Create temporary file with PEM content
-                temp_fd, temp_path = tempfile.mkstemp(suffix=f"_{cert_type}.pem")
                 try:
+                    # Create temporary file with PEM content
+                    temp_fd, temp_path = tempfile.mkstemp(suffix=f"_{cert_type}.pem")
                     with os.fdopen(temp_fd, 'w') as temp_file:
                         temp_file.write(pem_content)
                     logger.info(f"Created temporary {cert_type} file", extra={"path": temp_path})
                     return temp_path
                 except Exception as e:
                     logger.error(f"Failed to create temporary {cert_type} file", extra={"error": str(e)})
-                    os.close(temp_fd)
+                    if 'temp_fd' in locals() and temp_fd is not None:
+                        os.close(temp_fd)
                     return None
+
+        # If no PEM env var, check if config_path is a valid file
+        if config_path and os.path.isfile(config_path):
+            return config_path
         
-        # If no PEM env var, check if cert_config is provided
-        if not cert_config:
-            return None
-            
-        # If it's a file path that exists, use it directly
-        if os.path.isfile(cert_config):
-            return cert_config
-                    
-        # Fall back to using the config value as-is (file path)
-        return cert_config
+        # Fallback for cases where the config value might be a path that doesn't exist yet
+        # or is not a file.
+        return config_path
 
     async def start(self) -> None:
         if self._started:
@@ -100,170 +99,121 @@ class MQTTConsumer:
             return
         if not self._config.mqtt_host:
             raise MQTTConsumerError("MQTT_HOST must be provided when MQTT_ENABLED is true")
+        
         topics = self._config.mqtt_topics
         if not topics:
             raise MQTTConsumerError("At least one MQTT topic must be configured")
 
-        self._loop = asyncio.get_running_loop()
         self._queue = asyncio.Queue()
         self._worker = asyncio.create_task(self._process_queue())
 
-        # Use MQTT 3.1.1 protocol (required by AWS IoT Core)
-        self._client = mqtt.Client(
-            client_id=self._config.mqtt_client_id or None,
-            protocol=mqtt.MQTTv311
-        )
-        # Enable paho-mqtt debug logging to diagnose disconnect issues
-        self._client.enable_logger(logger=logger)
-        
-        # Configure reconnect behavior and queue limits
-        self._client.reconnect_delay_set(min_delay=1, max_delay=60)
-        try:
-            self._client.max_inflight_messages_set(20)
-            self._client.max_queued_messages_set(200)
-        except Exception:
-            pass  # Older paho-mqtt versions may not have these methods
-        
-        if self._config.mqtt_username and self._config.mqtt_password:
-            self._client.username_pw_set(self._config.mqtt_username, self._config.mqtt_password)
+        client_id = self._config.mqtt_client_id or gmqtt.client.get_client_id()
+        self._client = gmqtt.Client(client_id)
 
+        # Assign callbacks
+        self._client.on_connect = self._on_connect
+        self._client.on_message = self._on_message
+        self._client.on_disconnect = self._on_disconnect
+        self._client.on_subscribe = self._on_subscribe
+
+        # Set will message
+        # self._client.set_will_message(will_message)
+
+        if self._config.mqtt_username and self._config.mqtt_password:
+            self._client.set_auth_credentials(self._config.mqtt_username, self._config.mqtt_password)
+
+        ssl_context = None
         if self._config.mqtt_use_tls:
-            import ssl
-            # Handle certificates - either file paths or PEM content from env vars
-            # Must do this FIRST to ensure files exist before SSL context creation
-            ca_certs = self._setup_tls_cert_file("ca_cert", self._config.mqtt_ca_cert)
-            certfile = self._setup_tls_cert_file("client_cert", self._config.mqtt_client_cert)
-            keyfile = self._setup_tls_cert_file("client_key", self._config.mqtt_client_key)
-            
-            # Verify we have valid certificate files
+            ca_certs = self._setup_tls_cert_file("ca_cert")
+            certfile = self._setup_tls_cert_file("client_cert")
+            keyfile = self._setup_tls_cert_file("client_key")
+
             if not ca_certs or not certfile or not keyfile:
                 raise MQTTConsumerError("TLS certificates not properly configured")
-            
-            # Configure SNI for TLS when connecting to VPC endpoints
-            # The VPC endpoint DNS name won't match the IoT Core certificate, so we use SNI
-            # to tell AWS IoT which certificate to present
-            manual_hostname_override = (
-                self._config.mqtt_tls_server_name 
-                and self._config.mqtt_tls_server_name != self._config.mqtt_host
-            )
-            
-            if manual_hostname_override:
-                logger.info(
-                    "Configuring TLS with SNI override",
-                    extra={
-                        "connect_host": self._config.mqtt_host,
-                        "sni_hostname": self._config.mqtt_tls_server_name,
-                        "ca_file": ca_certs,
-                        "cert_file": certfile,
-                        "key_file": keyfile
-                    }
-                )
-                # Create custom SSL context with SNI override
-                # This allows connecting to VPC endpoints while validating against IoT Core certificate
-                ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_certs)
-                ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
-                
-                # Enforce TLS 1.2+
-                try:
-                    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-                except Exception:
-                    pass
-                
-                # Monkey-patch wrap_socket to force server_hostname to the SNI value
-                orig_wrap = ctx.wrap_socket
-                sni_hostname = self._config.mqtt_tls_server_name
-                
-                def _wrap_socket_with_sni(sock, *args, **kwargs):
-                    kwargs["server_hostname"] = sni_hostname
-                    return orig_wrap(sock, *args, **kwargs)
-                
-                ctx.wrap_socket = _wrap_socket_with_sni
-                ctx.check_hostname = True
-                ctx.verify_mode = ssl.CERT_REQUIRED
-                
-                self._client.tls_set_context(ctx)
-                # Only disable paho's hostname check for VPC endpoints
-                # Public endpoints need proper hostname verification
-                is_vpc_endpoint = "vpce" in self._config.mqtt_host
-                if is_vpc_endpoint:
-                    self._client.tls_insecure_set(True)
-            else:
-                # Standard TLS configuration
-                self._client.tls_set(
-                    ca_certs=ca_certs,
-                    certfile=certfile,
-                    keyfile=keyfile,
-                )
 
-        self._client.on_connect = self._on_connect
-        self._client.on_disconnect = self._on_disconnect
-        self._client.on_message = self._on_message
-        self._client.on_log = lambda client, userdata, level, buf: logger.info(f"PAHO: {buf}")
+            server_hostname = self._config.mqtt_tls_server_name or self._config.mqtt_host
+            
+            ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_certs)
+            ssl_context.load_cert_chain(certfile=certfile, keyfile=keyfile)
+            try:
+                ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+            except AttributeError:
+                pass # some older python versions dont have this
+            
+            # For gmqtt, we pass the server_hostname directly to the connect call
+            # and set check_hostname in the SSL context.
+            ssl_context.check_hostname = True
+            
+            logger.info(
+                "Configuring TLS",
+                extra={
+                    "connect_host": self._config.mqtt_host,
+                    "server_hostname": server_hostname,
+                    "ca_file": ca_certs,
+                }
+            )
 
         try:
-            await asyncio.to_thread(
-                self._client.connect,
+            await self._client.connect(
                 self._config.mqtt_host,
                 self._config.mqtt_port,
-                self._config.mqtt_keepalive,
+                ssl=ssl_context or self._config.mqtt_use_tls,
+                keepalive=self._config.mqtt_keepalive,
+                version=MQTTv311
             )
-        except OSError as exc:  # pragma: no cover - connection failures in prod
+        except (OSError, Exception) as exc:
             raise MQTTConsumerError(f"Failed to connect to MQTT broker: {exc}") from exc
 
-        self._client.loop_start()
         self._started = True
         logger.info(
             "Starting MQTT consumer",
-            extra={"client_id": self._config.mqtt_client_id, "host": self._config.mqtt_host}
+            extra={"client_id": client_id, "host": self._config.mqtt_host}
         )
 
     async def stop(self) -> None:
-        if not self._started:
+        if not self._started or not self._client:
             return
-        if self._client:
-            try:
-                self._client.loop_stop()
-                self._client.disconnect()
-            except Exception:  # pragma: no cover - defensive
-                logger.exception("Error stopping MQTT client")
+        try:
+            await self._client.disconnect()
+        except Exception:
+            logger.exception("Error stopping MQTT client")
+        
         if self._worker:
             self._worker.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
+            with suppress(asyncio.CancelledError):
                 await self._worker
+        
         self._worker = None
         self._client = None
         self._queue = None
         self._started = False
+        logger.info("MQTT consumer stopped")
 
-    def _on_connect(
-        self, client: mqtt.Client, _userdata: Any, _flags: dict[str, Any], rc: int
-    ) -> None:
+    def _on_connect(self, client: gmqtt.Client, flags: dict[str, Any], rc: int, properties: Any) -> None:
         if rc != 0:
-            logger.error("MQTT client failed to connect", extra={"rc": rc})
+            logger.error("MQTT client failed to connect", extra={"rc": rc, "error": gmqtt.constants.CONNACK_RETURN_CODES.get(rc)})
             return
-        assert self._config.mqtt_topics  # guard above ensures not empty
+        
+        assert self._config.mqtt_topics
         for topic in self._config.mqtt_topics:
-            client.subscribe(topic)
-        logger.info(
-            "MQTT client subscribed",
-            extra={"topics": self._config.mqtt_topics}
-        )
+            client.subscribe(topic, qos=1)
 
-    def _on_disconnect(self, _client: mqtt.Client, _userdata: Any, rc: int) -> None:
-        if rc != 0:
-            logger.warning(f"Unexpected MQTT disconnect with rc={rc} ({mqtt.error_string(rc)})")
+    def _on_subscribe(self, client: gmqtt.Client, mid: int, qos: list[int], properties: Any) -> None:
+        logger.info("MQTT client subscribed", extra={"mid": mid, "qos": qos})
+
+    def _on_disconnect(self, client: gmqtt.Client, packet: Any, exc: Exception | None = None) -> None:
+        if exc:
+            logger.warning("Unexpected MQTT disconnect", extra={"exception": str(exc)})
         else:
             logger.info("MQTT client disconnected cleanly")
 
-    def _on_message(self, _client: mqtt.Client, _userdata: Any, msg: MQTTMessage) -> None:
-        if not self._queue or not self._loop:
+    def _on_message(self, client: gmqtt.Client, topic: str, payload: bytes, qos: int, properties: Any) -> int:
+        if not self._queue:
             logger.warning("Received MQTT message before consumer initialisation")
-            return
-        payload = msg.payload or b""
-        asyncio.run_coroutine_threadsafe(
-            self._queue.put(_QueuedMessage(topic=msg.topic, payload=payload)),
-            self._loop,
-        )
+            return 0
+        
+        self._queue.put_nowait(_QueuedMessage(topic=topic, payload=payload))
+        return 0
 
     async def handle_message(self, topic: str, payload: bytes) -> None:
         try:
@@ -288,7 +238,6 @@ class MQTTConsumer:
             )
             return
 
-        # Validate basic structure for demo reliability
         if not isinstance(data, dict):
             logger.warning(
                 "Payload is not a JSON object",
@@ -310,7 +259,6 @@ class MQTTConsumer:
             try:
                 await self.handle_message(message.topic, message.payload)
             except Exception as e:
-                # Enhanced logging for demo troubleshooting
                 logger.exception(
                     "Failed to process MQTT message",
                     extra={
@@ -333,16 +281,21 @@ class MQTTConsumer:
             await session.rollback()
             raise
         finally:
-            await generator.aclose()
+            with suppress(StopAsyncIteration):
+                await generator.aclose()
 
     async def _persist_metering(self, payload: dict[str, Any]) -> None:
-        model = TelemetryPayload.model_validate(payload)
+        try:
+            model = TelemetryPayload.model_validate(payload)
+        except Exception as e:
+            logger.warning("Failed to validate telemetry payload", extra={"error": str(e), "payload": payload})
+            return
+
         timestamp = _coerce_timestamp(model.timestamp)
         if not timestamp:
             logger.warning("Telemetry payload missing timestamp", extra={"ven": model.ven_id})
             return
 
-        # Auto-register VEN if it doesn't exist
         async with self._session_scope() as session:
             from app import crud
             ven = await crud.get_ven(session, model.ven_id)
@@ -355,31 +308,20 @@ class MQTTConsumer:
                         name=f"Auto-registered VEN {model.ven_id}",
                         status="online",
                         registration_id=model.ven_id,
-                        latitude=37.7749,  # Default San Francisco coordinates
-                        longitude=-122.4194,
                     )
-                    logger.info("Successfully auto-registered VEN", extra={"ven_id": model.ven_id})
                 except Exception as e:
                     logger.error("Failed to auto-register VEN", extra={"ven_id": model.ven_id, "error": str(e)})
                     return
 
-        used_kw = model.used_power_kw
-        if used_kw is None:
-            used_kw = model.legacy_power_kw
-
-        shed_kw = model.shed_power_kw
-        if shed_kw is None:
-            shed_kw = model.legacy_shed_kw
-
         reading = VenTelemetry(
             ven_id=model.ven_id,
             timestamp=timestamp,
-            used_power_kw=used_kw,
-            shed_power_kw=shed_kw,
+            used_power_kw=model.used_power_kw,
+            shed_power_kw=model.shed_power_kw,
             requested_reduction_kw=model.requested_reduction_kw,
             event_id=model.event_id,
             battery_soc=model.battery_soc,
-            raw_payload=model.dump_raw(),
+            raw_payload=payload,
         )
 
         for load in model.loads:
@@ -403,7 +345,12 @@ class MQTTConsumer:
         logger.debug("Persisted telemetry", extra={"ven": model.ven_id, "timestamp": timestamp.isoformat()})
 
     async def _persist_load_snapshot(self, payload: dict[str, Any]) -> None:
-        model = LoadSnapshotPayload.model_validate(payload)
+        try:
+            model = LoadSnapshotPayload.model_validate(payload)
+        except Exception as e:
+            logger.warning("Failed to validate load snapshot payload", extra={"error": str(e), "payload": payload})
+            return
+            
         timestamp = _coerce_timestamp(model.timestamp)
         if not timestamp:
             logger.warning("Load snapshot missing timestamp", extra={"ven": model.ven_id})
@@ -427,7 +374,6 @@ class MQTTConsumer:
         ]
 
         if not records:
-            logger.debug("Empty loads snapshot", extra={"ven": model.ven_id})
             return
 
         async with self._session_scope() as session:
@@ -438,9 +384,7 @@ class MQTTConsumer:
 
 def _coerce_timestamp(value: Any) -> datetime | None:
     if isinstance(value, datetime):
-        if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+        return value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
     if isinstance(value, (int, float)):
         try:
             return datetime.fromtimestamp(value, tz=timezone.utc)
@@ -448,9 +392,8 @@ def _coerce_timestamp(value: Any) -> datetime | None:
             return None
     if isinstance(value, str):
         try:
-            if value.endswith("Z"):
-                value = value[:-1] + "+00:00"
-            return datetime.fromisoformat(value).astimezone(timezone.utc)
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
         except ValueError:
             return None
     return None

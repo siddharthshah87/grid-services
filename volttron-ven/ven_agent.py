@@ -42,6 +42,13 @@ _voltage_jitter_pct = 0.01
 _current_enabled = False
 _power_factor = 1.0
 _active_event = None
+_last_metering_sample = None
+# State variables now accessed via device_simulator module:
+# - device_simulator.load_limits
+# - device_simulator.circuits  
+# - device_simulator.circuit_priority
+# - device_simulator.power_history
+# - device_simulator.active_event
 
 # ── OpenAPI spec --------------------------------------------------------
 OPENAPI_SPEC = {
@@ -465,6 +472,7 @@ def _with_update_source(source: str):
 
 
 # Import device simulator logic
+import device_simulator
 from device_simulator import (
     circuits_snapshot as _circuits_snapshot,
     shed_capability_for as _shed_capability_for,
@@ -480,7 +488,7 @@ def _compute_shed_availability() -> float:
     """Estimate instantaneous shed availability across loads and storage."""
     """Estimate instantaneous shed availability across loads and storage."""
     avail = 0.0
-    for c in _circuits:
+    for c in device_simulator.circuits:
         if not c.get("enabled", True):
             continue
         typ = c.get("type")
@@ -1048,7 +1056,7 @@ def _apply_preset(name: str) -> dict[str, Any]:
         changes["config"] = _apply_config_payload(desired)
         # circuits
         with _shadow_state_lock:
-            for c in _circuits:
+            for c in device_simulator.circuits:
                 if c["type"] in ("hvac", "heater", "misc", "pv"):
                     c["enabled"] = True
                 else:
@@ -1065,7 +1073,7 @@ def _apply_preset(name: str) -> dict[str, Any]:
         }
         changes["config"] = _apply_config_payload(desired)
         with _shadow_state_lock:
-            for c in _circuits:
+            for c in device_simulator.circuits:
                 if c["type"] in ("ev", "heater"):
                     c["enabled"] = False
                 elif c["type"] in ("hvac", "misc"):
@@ -1085,7 +1093,7 @@ def _apply_preset(name: str) -> dict[str, Any]:
         }
         changes["config"] = _apply_config_payload(desired)
         with _shadow_state_lock:
-            for c in _circuits:
+            for c in device_simulator.circuits:
                 if c["type"] == "pv":
                     c["enabled"] = True
                 elif c["type"] == "battery":
@@ -1213,7 +1221,7 @@ def on_backend_cmd(_client, _userdata, msg):
                 return
             updated = None
             with _shadow_state_lock:
-                for c in _circuits:
+                for c in device_simulator.circuits:
                     if c["id"] == load_id:
                         if "enabled" in d:
                             c["enabled"] = bool(d.get("enabled"))
@@ -1225,7 +1233,7 @@ def on_backend_cmd(_client, _userdata, msg):
                                 pass
                         if "priority" in d:
                             try:
-                                _circuit_priority[c.get("type", "misc")] = int(d.get("priority"))
+                                device_simulator.circuit_priority[c.get("type", "misc")] = int(d.get("priority"))
                             except Exception:
                                 pass
                         if "connected" in d:
@@ -1264,11 +1272,11 @@ def on_backend_cmd(_client, _userdata, msg):
             with _shadow_state_lock:
                 # Determine current expected power and set a limit
                 base_limit = None
-                for c in _circuits:
+                for c in device_simulator.circuits:
                     if c["id"] == load_id and c.get("enabled", True):
                         cur = float(c.get("current_kw", 0.0))
                         base_limit = max(0.0, cur - reduce_kw)
-                        _load_limits[load_id] = {"limit_kw": base_limit, "until": now + duration_s}
+                        device_simulator.load_limits[load_id] = {"limit_kw": base_limit, "until": now + duration_s}
                         break
             if base_limit is None:
                 _publish_ack(op, False, error="load not found or disabled", correlation_id=corr)
@@ -1295,8 +1303,8 @@ def on_backend_cmd(_client, _userdata, msg):
             remaining = req
             with _shadow_state_lock:
                 loads_sorted = sorted(
-                    [c for c in _circuits if c.get("enabled", True) and c.get("type") not in ("pv",)],
-                    key=lambda c: _circuit_priority.get(c.get("type", "misc"), 5),
+                    [c for c in device_simulator.circuits if c.get("enabled", True) and c.get("type") not in ("pv",)],
+                    key=lambda c: device_simulator.circuit_priority.get(c.get("type", "misc"), 5),
                     reverse=True,
                 )
                 for c in loads_sorted:
@@ -1305,7 +1313,7 @@ def on_backend_cmd(_client, _userdata, msg):
                     cur = float(c.get("current_kw", 0.0))
                     shed = min(cur, remaining)
                     new_limit = max(0.0, cur - shed)
-                    _load_limits[c["id"]] = {"limit_kw": new_limit, "until": now + duration_s}
+                    device_simulator.load_limits[c["id"]] = {"limit_kw": new_limit, "until": now + duration_s}
                     remaining -= shed
             accepted = req - max(0.0, remaining)
             _publish_ack(op, True, {"targetKw": eff_target, "acceptedReduceKw": round(accepted,2), "until": now + duration_s}, correlation_id=corr)
@@ -1413,7 +1421,7 @@ def _apply_preset(name: str) -> dict[str, Any]:
         changes["config"] = _apply_config_payload(desired)
         # circuits
         with _shadow_state_lock:
-            for c in _circuits:
+            for c in device_simulator.circuits:
                 if c["type"] in ("hvac", "heater", "misc", "pv"):
                     c["enabled"] = True
                 else:
@@ -1430,7 +1438,7 @@ def _apply_preset(name: str) -> dict[str, Any]:
         }
         changes["config"] = _apply_config_payload(desired)
         with _shadow_state_lock:
-            for c in _circuits:
+            for c in device_simulator.circuits:
                 if c["type"] in ("ev", "heater"):
                     c["enabled"] = False
                 elif c["type"] in ("hvac", "misc"):
@@ -1450,7 +1458,7 @@ def _apply_preset(name: str) -> dict[str, Any]:
         }
         changes["config"] = _apply_config_payload(desired)
         with _shadow_state_lock:
-            for c in _circuits:
+            for c in device_simulator.circuits:
                 if c["type"] == "pv":
                     c["enabled"] = True
                 elif c["type"] == "battery":
@@ -1578,7 +1586,7 @@ def on_backend_cmd(_client, _userdata, msg):
                 return
             updated = None
             with _shadow_state_lock:
-                for c in _circuits:
+                for c in device_simulator.circuits:
                     if c["id"] == load_id:
                         if "enabled" in d:
                             c["enabled"] = bool(d.get("enabled"))
@@ -1590,7 +1598,7 @@ def on_backend_cmd(_client, _userdata, msg):
                                 pass
                         if "priority" in d:
                             try:
-                                _circuit_priority[c.get("type", "misc")] = int(d.get("priority"))
+                                device_simulator.circuit_priority[c.get("type", "misc")] = int(d.get("priority"))
                             except Exception:
                                 pass
                         updated = {k: c[k] for k in ("id","name","type","enabled","rated_kw")}
@@ -1612,11 +1620,11 @@ def on_backend_cmd(_client, _userdata, msg):
             with _shadow_state_lock:
                 # Determine current expected power and set a limit
                 base_limit = None
-                for c in _circuits:
+                for c in device_simulator.circuits:
                     if c["id"] == load_id and c.get("enabled", True):
                         cur = float(c.get("current_kw", 0.0))
                         base_limit = max(0.0, cur - reduce_kw)
-                        _load_limits[load_id] = {"limit_kw": base_limit, "until": now + duration_s}
+                        device_simulator.load_limits[load_id] = {"limit_kw": base_limit, "until": now + duration_s}
                         break
             if base_limit is None:
                 _publish_ack(op, False, error="load not found or disabled", correlation_id=corr)
@@ -1643,8 +1651,8 @@ def on_backend_cmd(_client, _userdata, msg):
             remaining = req
             with _shadow_state_lock:
                 loads_sorted = sorted(
-                    [c for c in _circuits if c.get("enabled", True) and c.get("type") not in ("pv",)],
-                    key=lambda c: _circuit_priority.get(c.get("type", "misc"), 5),
+                    [c for c in device_simulator.circuits if c.get("enabled", True) and c.get("type") not in ("pv",)],
+                    key=lambda c: device_simulator.circuit_priority.get(c.get("type", "misc"), 5),
                     reverse=True,
                 )
                 for c in loads_sorted:
@@ -1653,7 +1661,7 @@ def on_backend_cmd(_client, _userdata, msg):
                     cur = float(c.get("current_kw", 0.0))
                     shed = min(cur, remaining)
                     new_limit = max(0.0, cur - shed)
-                    _load_limits[c["id"]] = {"limit_kw": new_limit, "until": now + duration_s}
+                    device_simulator.load_limits[c["id"]] = {"limit_kw": new_limit, "until": now + duration_s}
                     remaining -= shed
             accepted = req - max(0.0, remaining)
             _publish_ack(op, True, {"targetKw": eff_target, "acceptedReduceKw": round(accepted,2), "until": now + duration_s}, correlation_id=corr)
@@ -1818,7 +1826,7 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.send_header("X-App-Build", APP_BUILD)
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            html = _load_static_html("ui.html", CONFIG_UI_HTML)
+            html = _load_static_html("ui.html", "")
             self.wfile.write(html.encode("utf-8"))
             return
 
@@ -1904,7 +1912,7 @@ class HealthHandler(BaseHTTPRequestHandler):
                 "events": events,
                 "loads": loads_live,
                 "activeEvent": active_event,
-                "sheddingLoadIds": [lid for lid, lim in _load_limits.items() if int(lim.get("until", 0)) > int(time.time())],
+                "sheddingLoadIds": [lid for lid, lim in device_simulator.load_limits.items() if int(lim.get("until", 0)) > int(time.time())],
                 "lastEventSummary": last_event_summary,
             }
             self.send_response(code)
@@ -2028,7 +2036,7 @@ class HealthHandler(BaseHTTPRequestHandler):
                 return
             updated = None
             with _shadow_state_lock:
-                for c in _circuits:
+                for c in device_simulator.circuits:
                     if c["id"] == cid:
                         if isinstance(body, dict) and "enabled" in body:
                             try:
@@ -2075,7 +2083,7 @@ class HealthHandler(BaseHTTPRequestHandler):
                             "rated_kw": float(c.get("rated_kw", 0.0)),
                             "current_kw": float(c.get("current_kw", 0.0)),
                             "critical": bool(c.get("critical", False)),
-                            "priority": int(c.get("priority", _circuit_priority.get(c.get("type", "misc"), 5))),
+                            "priority": int(c.get("priority", device_simulator.circuit_priority.get(c.get("type", "misc"), 5))),
                             "connected": bool(c.get("connected", True)),
                             "mode": c.get("mode", "dynamic"),
                             "fixedKw": float(c.get("fixed_kw", 0.0)),
@@ -2247,7 +2255,7 @@ def on_event(_client, _userdata, msg):
 # ── main loop ──────────────────────────────────────────────────────────
 def main(iterations: int | None = None) -> None:
     """Main VEN agent loop: publish telemetry, handle events, update shadow."""
-    global _last_publish_time
+    global _last_publish_time, _last_metering_sample
     client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
     client.subscribe(MQTT_TOPIC_EVENTS)
     print("✅ MQTT setup complete, starting VEN agent loop")
@@ -2311,7 +2319,7 @@ def main(iterations: int | None = None) -> None:
 
             # Update history and event-derived metrics
             try:
-                _power_history.append((now, float(power_kw)))
+                device_simulator.power_history.append((now, float(power_kw)))
             except Exception:
                 pass
 
@@ -2330,7 +2338,7 @@ def main(iterations: int | None = None) -> None:
                     requested_kw = _active_event.get("requested_kw")
                     # Compute baseline if missing: avg of last 5 samples before start
                     if _active_event.get("baseline_kw") is None:
-                        prev = [v for (ts, v) in list(_power_history) if ts < st][-5:]
+                        prev = [v for (ts, v) in list(device_simulator.power_history) if ts < st][-5:]
                         if prev:
                             _active_event["baseline_kw"] = sum(prev) / len(prev)
                     base = _active_event.get("baseline_kw")
@@ -2398,6 +2406,7 @@ def main(iterations: int | None = None) -> None:
             try:
                 client.publish(MQTT_TOPIC_METERING, json.dumps(telem), qos=1)
                 _last_publish_time = now
+                _last_metering_sample = telem
                 print(f"📊 Published telemetry: {power_kw:.2f} kW (shed: {shed_power_kw:.3f} kW)")
             except Exception as pub_err:
                 logging.error(f"Failed to publish telemetry: {pub_err}", exc_info=True)
