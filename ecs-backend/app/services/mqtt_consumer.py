@@ -116,6 +116,14 @@ class MQTTConsumer:
         # Enable paho-mqtt debug logging to diagnose disconnect issues
         self._client.enable_logger(logger=logger)
         
+        # Configure reconnect behavior and queue limits
+        self._client.reconnect_delay_set(min_delay=1, max_delay=60)
+        try:
+            self._client.max_inflight_messages_set(20)
+            self._client.max_queued_messages_set(200)
+        except Exception:
+            pass  # Older paho-mqtt versions may not have these methods
+        
         if self._config.mqtt_username and self._config.mqtt_password:
             self._client.username_pw_set(self._config.mqtt_username, self._config.mqtt_password)
 
