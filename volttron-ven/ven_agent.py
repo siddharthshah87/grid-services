@@ -440,8 +440,6 @@ connected = False
 _last_connect_time: float | None = None
 _last_disconnect_time: float | None = None
 _last_publish_time: float | None = None
-_reconnect_lock = threading.Lock()
-_reconnect_in_progress = False
 # Use an RLock to avoid deadlocks when helper functions that also acquire the
 # same lock are called from within a locked section (e.g., /live assembling a
 # snapshot while holding the state lock).
@@ -621,7 +619,7 @@ def _on_connect(_client, _userdata, _flags, rc, *_args):
 
 def _on_disconnect(_client, _userdata, rc):
     """MQTT on_disconnect callback: handle reconnect logic."""
-    global connected, _reconnect_in_progress, _last_disconnect_time
+    global connected, _last_disconnect_time
     connected = False
     _last_disconnect_time = time.time()
     reason = "graceful" if rc == mqtt.MQTT_ERR_SUCCESS else f"unexpected (code {rc})"
@@ -630,35 +628,9 @@ def _on_disconnect(_client, _userdata, rc):
         "status": {"mqtt_connected": False, "last_disconnect_code": rc}
     })
 
-    if rc == mqtt.MQTT_ERR_SUCCESS or not _ven_enabled:
-        return
-
-    def _attempt_reconnect():
-        global _reconnect_in_progress
-        with _reconnect_lock:
-            if _reconnect_in_progress:
-                return
-            _reconnect_in_progress = True
-
-        try:
-            delay = 1
-            for attempt in range(1, MQTT_MAX_CONNECT_ATTEMPTS + 1):
-                try:
-                    _client.reconnect()
-                    return
-                except Exception as err:  # pragma: no cover - informational
-                    print(
-                        f"MQTT reconnect failed (try {attempt}/{MQTT_MAX_CONNECT_ATTEMPTS}): {err}",
-                        file=sys.stderr,
-                    )
-                    time.sleep(min(delay, 30))
-                    delay *= 2
-            print("❌ Could not reconnect to MQTT broker", file=sys.stderr)
-        finally:
-            with _reconnect_lock:
-                _reconnect_in_progress = False
-
-    threading.Thread(target=_attempt_reconnect, daemon=True).start()
+    # Note: paho-mqtt's loop_start() has built-in auto-reconnect when using reconnect_delay_set().
+    # Do NOT manually spawn reconnect threads here as it creates race conditions.
+    # The client will automatically attempt to reconnect based on reconnect_delay_set() settings.
 
 
 def _subscribe_topics() -> None:
@@ -1719,9 +1691,8 @@ def health_snapshot() -> tuple[int, dict]:
         "detail": (
             "MQTT connection established"
             if connected
-            else "MQTT client disconnected; background reconnect active"
+            else "MQTT client disconnected; paho auto-reconnect active"
         ),
-        "reconnect_in_progress": _reconnect_in_progress,
         "manual_tls_hostname_override": manual_hostname_override,
         "mqtt_connect_host": MQTT_CONNECT_HOST,
         "mqtt_port": MQTT_PORT,
