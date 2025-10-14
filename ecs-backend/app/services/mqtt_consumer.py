@@ -108,7 +108,14 @@ class MQTTConsumer:
         self._queue = asyncio.Queue()
         self._worker = asyncio.create_task(self._process_queue())
 
-        self._client = mqtt.Client(client_id=self._config.mqtt_client_id or None)
+        # Use MQTT 3.1.1 protocol (required by AWS IoT Core)
+        self._client = mqtt.Client(
+            client_id=self._config.mqtt_client_id or None,
+            protocol=mqtt.MQTTv311
+        )
+        # Enable paho-mqtt debug logging to diagnose disconnect issues
+        self._client.enable_logger(logger=logger)
+        
         if self._config.mqtt_username and self._config.mqtt_password:
             self._client.username_pw_set(self._config.mqtt_username, self._config.mqtt_password)
 
@@ -183,6 +190,7 @@ class MQTTConsumer:
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
+        self._client.on_log = lambda client, userdata, level, buf: logger.info(f"PAHO: {buf}")
 
         try:
             await asyncio.to_thread(
