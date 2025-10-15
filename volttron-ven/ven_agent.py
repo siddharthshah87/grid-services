@@ -1241,10 +1241,12 @@ def on_backend_cmd(_client, _userdata, msg):
       - { "op": "event", "data": { "event_id": "...", "shed_kw": 1.2, "start_ts": 123, "duration_s": 900 } }
     """
     global _shadow_target_power_kw
+    print(f"[DEBUG] Backend command received on topic: {msg.topic}")
     op = "unknown"
     corr = None
     try:
         payload = json.loads(msg.payload.decode())
+        print(f"[DEBUG] Backend command payload: {json.dumps(payload, indent=2)}")
         op = str(payload.get("op") or "set").lower()
         corr = payload.get("correlationId")
         data = payload.get("data")
