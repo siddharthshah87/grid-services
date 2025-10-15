@@ -592,6 +592,7 @@ def _manual_hostname_verification(mqtt_client: mqtt.Client) -> None:
 def _on_connect(_client, _userdata, _flags, rc, *_args):
     """MQTT on_connect callback: handle TLS verification and state update."""
     global connected, _last_connect_time
+    print(f"[DEBUG] _on_connect() called with rc={rc}", flush=True)
     if rc == 0:
         try:
             _manual_hostname_verification(_client)
@@ -635,25 +636,37 @@ def _on_disconnect(_client, _userdata, rc):
 
 def _subscribe_topics() -> None:
     """Subscribe to required MQTT topics for events and shadow sync."""
-    client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
-    client.subscribe(MQTT_TOPIC_EVENTS)
+    print("[DEBUG] _subscribe_topics() called", flush=True)
+    try:
+        client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
+        client.subscribe(MQTT_TOPIC_EVENTS)
+        print(f"[DEBUG] Subscribed to events topic: {MQTT_TOPIC_EVENTS}", flush=True)
 
-    if SHADOW_TOPIC_DELTA:
-        client.message_callback_add(SHADOW_TOPIC_DELTA, on_shadow_delta)
-        client.subscribe(SHADOW_TOPIC_DELTA)
+        # Subscribe to backend command topic if configured
+        if BACKEND_CMD_TOPIC:
+            client.message_callback_add(BACKEND_CMD_TOPIC, on_backend_cmd)
+            client.subscribe(BACKEND_CMD_TOPIC)
+            print(f"[DEBUG] Subscribed to backend command topic: {BACKEND_CMD_TOPIC}", flush=True)
 
-        if SHADOW_TOPIC_GET_ACCEPTED:
-            client.message_callback_add(SHADOW_TOPIC_GET_ACCEPTED, on_shadow_get_accepted)
-            client.subscribe(SHADOW_TOPIC_GET_ACCEPTED)
+        if SHADOW_TOPIC_DELTA:
+            client.message_callback_add(SHADOW_TOPIC_DELTA, on_shadow_delta)
+            client.subscribe(SHADOW_TOPIC_DELTA)
 
-        if SHADOW_TOPIC_GET_REJECTED:
-            client.message_callback_add(SHADOW_TOPIC_GET_REJECTED, on_shadow_get_rejected)
-            client.subscribe(SHADOW_TOPIC_GET_REJECTED)
+            if SHADOW_TOPIC_GET_ACCEPTED:
+                client.message_callback_add(SHADOW_TOPIC_GET_ACCEPTED, on_shadow_get_accepted)
+                client.subscribe(SHADOW_TOPIC_GET_ACCEPTED)
 
-        _shadow_request_sync()
-    else:
-        if not IOT_THING_NAME:
-            print("⚠️ IOT_THING_NAME not set; device shadow sync disabled.")
+            if SHADOW_TOPIC_GET_REJECTED:
+                client.message_callback_add(SHADOW_TOPIC_GET_REJECTED, on_shadow_get_rejected)
+                client.subscribe(SHADOW_TOPIC_GET_REJECTED)
+
+            _shadow_request_sync()
+        else:
+            if not IOT_THING_NAME:
+                print("⚠️ IOT_THING_NAME not set; device shadow sync disabled.")
+        print("[DEBUG] _subscribe_topics() completed successfully", flush=True)
+    except Exception as e:
+        print(f"[ERROR] _subscribe_topics() failed: {e}", file=sys.stderr, flush=True)
 
 
 def _ven_disable() -> None:
@@ -1079,221 +1092,7 @@ def _apply_preset(name: str) -> dict[str, Any]:
     return {"error": f"unknown preset: {name}"}
 
 
-def on_backend_cmd(_client, _userdata, msg):
-    """Handle control-plane commands from backend via MQTT."""
-    """Handle control-plane commands published by the backend over IoT Core.
-
-    Expected JSON structure (flexible):
-      - { "op": "set", "data": { ... same fields as /config ... } }
-      - { "op": "enable" } or { "op": "disable" }
-      - { "op": "get", "what": "status|config" }
-      - { "op": "ping" }
-      - { "op": "event", "data": { "event_id": "...", "shed_kw": 1.2, "start_ts": 123, "duration_s": 900 } }
-    """
-    global _shadow_target_power_kw
-    op = "unknown"
-    corr = None
-    try:
-        payload = json.loads(msg.payload.decode())
-        op = str(payload.get("op") or "set").lower()
-        corr = payload.get("correlationId")
-        data = payload.get("data")
-
-        if op in ("set", "setconfig"):
-            with _with_update_source("backend_cmd"):
-                updates = _apply_config_payload(data if isinstance(data, dict) else payload)
-            _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
-            return
-        if op == "enable":
-            with _with_update_source("backend_cmd"):
-                updates = _apply_config_payload({"enabled": True})
-            _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
-            return
-        if op == "disable":
-            with _with_update_source("backend_cmd"):
-                updates = _apply_config_payload({"enabled": False})
-            _publish_ack(op, True, {"applied": updates}, correlation_id=corr)
-            return
-        if op == "get":
-            what = str(payload.get("what") or "status").lower()
-            if what == "config":
-                with _shadow_state_lock:
-                    cfg = {
-                        "report_interval_seconds": REPORT_INTERVAL_SECONDS,
-                        "target_power_kw": _shadow_target_power_kw,
-                        "enabled": _ven_enabled,
-                        "meter_base_min_kw": _meter_base_min_kw,
-                        "meter_base_max_kw": _meter_base_max_kw,
-                        "meter_jitter_pct": _meter_jitter_pct,
-                        "voltage_enabled": _voltage_enabled,
-                        "voltage_nominal": _voltage_nominal,
-                        "voltage_jitter_pct": _voltage_jitter_pct,
-                        "current_enabled": _current_enabled,
-                        "power_factor": _power_factor,
-                    }
-                _publish_ack(op, True, {"config": cfg}, correlation_id=corr)
-            else:
-                _code, status = health_snapshot()
-                _publish_ack(op, True, {"status": status}, correlation_id=corr)
-            return
-        if op == "ping":
-            _publish_ack(op, True, {"pong": True, "ts": int(time.time())}, correlation_id=corr)
-            return
-        if op == "shedload":
-            # Handle load shedding command
-            shed_amount = None
-            if isinstance(data, dict):
-                shed_amount = data.get("amountKw") or data.get("shed_kw")
-            # Simulate load shedding by adjusting target power
-            if shed_amount is not None:
-                with _shadow_state_lock:
-                    _shadow_target_power_kw = max(0.0, float(shed_amount))
-                _publish_ack(op, True, {"shedAmount": shed_amount}, correlation_id=corr)
-            else:
-                _publish_ack(op, False, {"error": "No shed amount provided"}, correlation_id=corr)
-            return
-        if op == "event":
-            ev = data if isinstance(data, dict) else {}
-            # Record event in shadow and optionally adjust target
-            ev_id = ev.get("event_id") or f"backend_{int(time.time())}"
-            shed_kw = ev.get("shed_kw")
-            start_ts = int(ev.get("start_ts") or int(time.time()))
-            duration_s = int(ev.get("duration_s") or 0)
-            end_ts = int(ev.get("end_ts") or (start_ts + duration_s if duration_s > 0 else start_ts))
-            req_kw = ev.get("requestedReductionKw") or ev.get("requested_kw")
-            updates: dict[str, Any] = {
-                "status": {"last_backend_event_ts": int(time.time())},
-                "events": {"last_backend": {"event_id": ev_id, **ev}},
-            }
-            if isinstance(shed_kw, (int, float)):
-                # For a simple demo, interpret shed_kw as a target power cap
-                updates["target_power_kw"] = max(0.0, float(shed_kw))
-                with _shadow_state_lock:
-                    try:
-                        _shadow_target_power_kw = float(updates["target_power_kw"])
-                    except Exception:
-                        pass
-            # Track active event window
-            globals()["_active_event"] = {
-                "event_id": ev_id,
-                "start_ts": start_ts,
-                "end_ts": end_ts,
-                "requested_kw": float(req_kw) if isinstance(req_kw, (int, float)) else None,
-                "baseline_kw": None,
-                "delivered_kwh": 0.0,
-            }
-            _shadow_merge_report(updates)
-            _publish_ack(op, True, {"event_id": ev_id}, correlation_id=corr)
-            return
-        if op == "setload":
-            d = data if isinstance(data, dict) else {}
-            load_id = str(d.get("loadId") or "")
-            if not load_id:
-                _publish_ack(op, False, error="missing loadId", correlation_id=corr)
-                return
-            updated = None
-            with _shadow_state_lock:
-                for c in device_simulator.circuits:
-                    if c["id"] == load_id:
-                        if "enabled" in d:
-                            c["enabled"] = bool(d.get("enabled"))
-                        if "capacityKw" in d or "rated_kw" in d:
-                            cap = d.get("capacityKw", d.get("rated_kw"))
-                            try:
-                                c["rated_kw"] = max(0.0, float(cap))
-                            except Exception:
-                                pass
-                        if "priority" in d:
-                            try:
-                                device_simulator.circuit_priority[c.get("type", "misc")] = int(d.get("priority"))
-                            except Exception:
-                                pass
-                        if "connected" in d:
-                            try:
-                                c["connected"] = bool(d["connected"])
-                            except Exception:
-                                pass
-                        if "mode" in d:
-                            try:
-                                m = str(d["mode"]).lower()
-                                if m in ("dynamic","fixed"):
-                                    c["mode"] = m
-                            except Exception:
-                                pass
-                        if "fixed_kw" in d:
-                            try:
-                                c["fixed_kw"] = max(0.0, float(d["fixed_kw"]))
-                            except Exception:
-                                pass
-                        updated = {k: c[k] for k in ("id","name","type","enabled","rated_kw")}
-                        break
-            if updated is None:
-                _publish_ack(op, False, error=f"unknown loadId: {load_id}", correlation_id=corr)
-                return
-            _publish_ack(op, True, {"updated": updated}, correlation_id=corr)
-            return
-        if op == "shedload":
-            d = data if isinstance(data, dict) else {}
-            load_id = str(d.get("loadId") or "")
-            reduce_kw = float(d.get("reduceKw") or 0.0)
-            duration_s = int(d.get("durationS") or 0)
-            if not load_id or reduce_kw <= 0 or duration_s <= 0:
-                _publish_ack(op, False, error="require loadId, reduceKw>0, durationS>0", correlation_id=corr)
-                return
-            now = int(time.time())
-            with _shadow_state_lock:
-                # Determine current expected power and set a limit
-                base_limit = None
-                for c in device_simulator.circuits:
-                    if c["id"] == load_id and c.get("enabled", True):
-                        cur = float(c.get("current_kw", 0.0))
-                        base_limit = max(0.0, cur - reduce_kw)
-                        device_simulator.load_limits[load_id] = {"limit_kw": base_limit, "until": now + duration_s}
-                        break
-            if base_limit is None:
-                _publish_ack(op, False, error="load not found or disabled", correlation_id=corr)
-                return
-            _publish_ack(op, True, {"limitKw": base_limit, "until": now + duration_s}, correlation_id=corr)
-            return
-        if op == "shedpanel":
-            d = data if isinstance(data, dict) else {}
-            req = float(d.get("requestedReductionKw") or 0.0)
-            duration_s = int(d.get("durationS") or 0)
-            if req <= 0 or duration_s <= 0:
-                _publish_ack(op, False, error="require requestedReductionKw>0 and durationS>0", correlation_id=corr)
-                return
-            now = int(time.time())
-            # Set temporary panel target based on last metered power
-            eff_target = None
-            if _last_metering_sample and isinstance(_last_metering_sample.get("power_kw"), (int, float)):
-                eff_target = max(0.0, float(_last_metering_sample["power_kw"]) - req)
-            else:
-                eff_target = max(0.0, req)  # fallback
-            globals()["_panel_temp_target_kw"] = eff_target
-            globals()["_panel_temp_until_ts"] = now + duration_s
-            # Simple allocation: impose per-load limits starting with lowest priority (highest number)
-            remaining = req
-            with _shadow_state_lock:
-                loads_sorted = sorted(
-                    [c for c in device_simulator.circuits if c.get("enabled", True) and c.get("type") not in ("pv",)],
-                    key=lambda c: device_simulator.circuit_priority.get(c.get("type", "misc"), 5),
-                    reverse=True,
-                )
-                for c in loads_sorted:
-                    if remaining <= 0:
-                        break
-                    cur = float(c.get("current_kw", 0.0))
-                    shed = min(cur, remaining)
-                    new_limit = max(0.0, cur - shed)
-                    device_simulator.load_limits[c["id"]] = {"limit_kw": new_limit, "until": now + duration_s}
-                    remaining -= shed
-            accepted = req - max(0.0, remaining)
-            _publish_ack(op, True, {"targetKw": eff_target, "acceptedReduceKw": round(accepted,2), "until": now + duration_s}, correlation_id=corr)
-            return
-
-        _publish_ack(op, False, error=f"unknown op: {op}", correlation_id=corr)
-    except Exception as e:
-        _publish_ack(op, False, error=str(e), correlation_id=corr)
+# NOTE: on_backend_cmd defined below after helper functions
 
 client.on_connect = _on_connect
 client.on_disconnect = _on_disconnect
@@ -1460,6 +1259,7 @@ def on_backend_cmd(_client, _userdata, msg):
     corr = None
     try:
         payload = json.loads(msg.payload.decode())
+        print(f"[DEBUG] Backend command received on topic {msg.topic}: {payload}", flush=True)
         op = str(payload.get("op") or "set").lower()
         corr = payload.get("correlationId")
         data = payload.get("data")
@@ -2227,30 +2027,8 @@ def on_event(_client, _userdata, msg):
 def main(iterations: int | None = None) -> None:
     """Main VEN agent loop: publish telemetry, handle events, update shadow."""
     global _last_publish_time, _last_metering_sample
-    client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
-    client.subscribe(MQTT_TOPIC_EVENTS)
     print("✅ MQTT setup complete, starting VEN agent loop")
-    # Subscribe to backend control plane topic if configured
-    if BACKEND_CMD_TOPIC:
-        client.message_callback_add(BACKEND_CMD_TOPIC, on_backend_cmd)
-        client.subscribe(BACKEND_CMD_TOPIC)
-
-    if SHADOW_TOPIC_DELTA:
-        client.message_callback_add(SHADOW_TOPIC_DELTA, on_shadow_delta)
-        client.subscribe(SHADOW_TOPIC_DELTA)
-
-        if SHADOW_TOPIC_GET_ACCEPTED:
-            client.message_callback_add(SHADOW_TOPIC_GET_ACCEPTED, on_shadow_get_accepted)
-            client.subscribe(SHADOW_TOPIC_GET_ACCEPTED)
-
-        if SHADOW_TOPIC_GET_REJECTED:
-            client.message_callback_add(SHADOW_TOPIC_GET_REJECTED, on_shadow_get_rejected)
-            client.subscribe(SHADOW_TOPIC_GET_REJECTED)
-
-        _shadow_request_sync()
-    else:
-        if not IOT_THING_NAME:
-            print("⚠️ IOT_THING_NAME not set; device shadow sync disabled.")
+    # Note: Topic subscriptions are now handled in _subscribe_topics() which is called from _on_connect()
 
     count = 0
     while True:
