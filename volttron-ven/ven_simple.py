@@ -208,6 +208,8 @@ async def main() -> None:
     
     # Connect to MQTT broker
     try:
+        logger.info(f"🔗 Attempting connection to {MQTT_HOST}:{MQTT_PORT}...")
+        logger.debug(f"SSL context: {ssl_context is not None}, TLS: {MQTT_USE_TLS}")
         await client.connect(
             MQTT_HOST,
             MQTT_PORT,
@@ -215,9 +217,10 @@ async def main() -> None:
             keepalive=MQTT_KEEPALIVE,
             version=MQTTv311
         )
-        logger.info("🔗 Connection initiated...")
+        logger.info("🔗 Connection initiated successfully")
     except Exception as e:
-        logger.error(f"❌ Failed to connect: {e}")
+        logger.error(f"❌ Failed to connect to {MQTT_HOST}:{MQTT_PORT}: {e}")
+        logger.exception("Full traceback:")
         return
     
     # Start telemetry publishing task
