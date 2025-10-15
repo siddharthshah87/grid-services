@@ -450,7 +450,7 @@ _shadow_reported_state: dict[str, Any] = {
     "shadow_errors": {}
 }
 _shadow_target_power_kw: float | None = None
-_ven_enabled: bool = True
+_ven_enabled: bool = True  # VEN starts enabled; can be disabled via shadow/config
 _last_enable_change: dict[str, Any] | None = None  # {ts, to, source}
 ENABLE_DEBOUNCE_SECONDS = 5
 
@@ -562,7 +562,13 @@ def _shadow_merge_report(updates: dict[str, Any]) -> None:
         _merge_dict(_shadow_reported_state, updates)
         snapshot = deepcopy(_shadow_reported_state)
 
+    # Only publish if we're actually connected to avoid triggering disconnect loops
+    if not connected:
+        print(f"[DEBUG] Skipping shadow update - not connected (connected={connected})", flush=True)
+        return
+
     payload = json.dumps({"state": {"reported": snapshot}})
+    print(f"[DEBUG] Publishing shadow update (connected={connected})", flush=True)
     client.publish(SHADOW_TOPIC_UPDATE, payload, qos=1)
     print(f"Published thing shadow update: {payload}")
 
@@ -571,6 +577,11 @@ def _shadow_publish_desired(desired: dict[str, Any]) -> None:
     """Publish desired state to device shadow via MQTT."""
     if not SHADOW_TOPIC_UPDATE or not desired:
         return
+    
+    # Only publish if we're actually connected
+    if not connected:
+        return
+        
     payload = json.dumps({"state": {"desired": desired}})
     client.publish(SHADOW_TOPIC_UPDATE, payload, qos=1)
     print(f"Published desired shadow update: {desired}")
@@ -592,7 +603,6 @@ def _manual_hostname_verification(mqtt_client: mqtt.Client) -> None:
 def _on_connect(_client, _userdata, _flags, rc, *_args):
     """MQTT on_connect callback: handle TLS verification and state update."""
     global connected, _last_connect_time
-    print(f"[DEBUG] _on_connect() called with rc={rc}", flush=True)
     if rc == 0:
         try:
             _manual_hostname_verification(_client)
@@ -600,19 +610,11 @@ def _on_connect(_client, _userdata, _flags, rc, *_args):
             connected = False
             print(f"MQTT connection failed TLS hostname check: {err}", file=sys.stderr)
             _client.disconnect()
-            _shadow_merge_report({
-                "status": {"mqtt_connected": False},
-                "shadow_errors": {"tls_hostname": str(err)}
-            })
             return
         connected = True
         _last_connect_time = time.time()
-        _shadow_merge_report({"status": {"mqtt_connected": True}})
     else:
         connected = False
-        _shadow_merge_report({
-            "status": {"mqtt_connected": False, "last_connect_code": rc}
-        })
 
     status = "established" if connected else f"failed (code {rc})"
     print(f"MQTT connection {status} as client_id='{CLIENT_ID}'")
@@ -625,9 +627,6 @@ def _on_disconnect(_client, _userdata, rc):
     _last_disconnect_time = time.time()
     reason = "graceful" if rc == mqtt.MQTT_ERR_SUCCESS else f"unexpected (code {rc})"
     print(f"MQTT disconnected: {reason}", file=sys.stderr)
-    _shadow_merge_report({
-        "status": {"mqtt_connected": False, "last_disconnect_code": rc}
-    })
 
     # Note: paho-mqtt's loop_start() has built-in auto-reconnect when using reconnect_delay_set().
     # Do NOT manually spawn reconnect threads here as it creates race conditions.
@@ -636,37 +635,31 @@ def _on_disconnect(_client, _userdata, rc):
 
 def _subscribe_topics() -> None:
     """Subscribe to required MQTT topics for events and shadow sync."""
-    print("[DEBUG] _subscribe_topics() called", flush=True)
-    try:
-        client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
-        client.subscribe(MQTT_TOPIC_EVENTS)
-        print(f"[DEBUG] Subscribed to events topic: {MQTT_TOPIC_EVENTS}", flush=True)
+    client.message_callback_add(MQTT_TOPIC_EVENTS, on_event)
+    client.subscribe(MQTT_TOPIC_EVENTS)
 
-        # Subscribe to backend command topic if configured
-        if BACKEND_CMD_TOPIC:
-            client.message_callback_add(BACKEND_CMD_TOPIC, on_backend_cmd)
-            client.subscribe(BACKEND_CMD_TOPIC)
-            print(f"[DEBUG] Subscribed to backend command topic: {BACKEND_CMD_TOPIC}", flush=True)
+    # Subscribe to backend control plane topic if configured
+    if BACKEND_CMD_TOPIC:
+        client.message_callback_add(BACKEND_CMD_TOPIC, on_backend_cmd)
+        client.subscribe(BACKEND_CMD_TOPIC)
+        print(f"[DEBUG] Subscribed to backend command topic: {BACKEND_CMD_TOPIC}")
 
-        if SHADOW_TOPIC_DELTA:
-            client.message_callback_add(SHADOW_TOPIC_DELTA, on_shadow_delta)
-            client.subscribe(SHADOW_TOPIC_DELTA)
+    if SHADOW_TOPIC_DELTA:
+        client.message_callback_add(SHADOW_TOPIC_DELTA, on_shadow_delta)
+        client.subscribe(SHADOW_TOPIC_DELTA)
 
-            if SHADOW_TOPIC_GET_ACCEPTED:
-                client.message_callback_add(SHADOW_TOPIC_GET_ACCEPTED, on_shadow_get_accepted)
-                client.subscribe(SHADOW_TOPIC_GET_ACCEPTED)
+        if SHADOW_TOPIC_GET_ACCEPTED:
+            client.message_callback_add(SHADOW_TOPIC_GET_ACCEPTED, on_shadow_get_accepted)
+            client.subscribe(SHADOW_TOPIC_GET_ACCEPTED)
 
-            if SHADOW_TOPIC_GET_REJECTED:
-                client.message_callback_add(SHADOW_TOPIC_GET_REJECTED, on_shadow_get_rejected)
-                client.subscribe(SHADOW_TOPIC_GET_REJECTED)
+        if SHADOW_TOPIC_GET_REJECTED:
+            client.message_callback_add(SHADOW_TOPIC_GET_REJECTED, on_shadow_get_rejected)
+            client.subscribe(SHADOW_TOPIC_GET_REJECTED)
 
-            _shadow_request_sync()
-        else:
-            if not IOT_THING_NAME:
-                print("⚠️ IOT_THING_NAME not set; device shadow sync disabled.")
-        print("[DEBUG] _subscribe_topics() completed successfully", flush=True)
-    except Exception as e:
-        print(f"[ERROR] _subscribe_topics() failed: {e}", file=sys.stderr, flush=True)
+        _shadow_request_sync()
+    else:
+        if not IOT_THING_NAME:
+            print("⚠️ IOT_THING_NAME not set; device shadow sync disabled.")
 
 
 def _ven_disable() -> None:
@@ -687,13 +680,15 @@ def _ven_disable() -> None:
 def _ven_enable() -> None:
     """Enable VEN agent and connect MQTT client."""
     global _ven_enabled
-    if _ven_enabled:
+    if _ven_enabled and connected:
+        # Already enabled and connected
         return
     _ven_enabled = True
     # Try to connect and start loop, then resubscribe
     for attempt in range(1, MQTT_MAX_CONNECT_ATTEMPTS + 1):
         try:
-            client.connect(MQTT_CONNECT_HOST, MQTT_PORT, 60)
+            if not client.is_connected():
+                client.connect(MQTT_CONNECT_HOST, MQTT_PORT, 60)
             break
         except Exception as e:
             print(
@@ -1092,22 +1087,13 @@ def _apply_preset(name: str) -> dict[str, Any]:
     return {"error": f"unknown preset: {name}"}
 
 
-# NOTE: on_backend_cmd defined below after helper functions
+# NOTE: on_backend_cmd is defined later in the file (around line 1447)
 
 client.on_connect = _on_connect
 client.on_disconnect = _on_disconnect
 client.on_message = _log_unhandled_message
 
-for attempt in range(1, MQTT_MAX_CONNECT_ATTEMPTS + 1):
-    try:
-        client.connect(MQTT_CONNECT_HOST, MQTT_PORT, 60)
-        break
-    except Exception as e:
-        if client.is_connected():
-            try:
-                client.disconnect()
-            except Exception:
-                pass
+# Note: MQTT connection initialization moved to end of file (after all handlers defined)
 
 
 def _log_unhandled_message(_client, _userdata, msg):
@@ -1259,7 +1245,6 @@ def on_backend_cmd(_client, _userdata, msg):
     corr = None
     try:
         payload = json.loads(msg.payload.decode())
-        print(f"[DEBUG] Backend command received on topic {msg.topic}: {payload}", flush=True)
         op = str(payload.get("op") or "set").lower()
         corr = payload.get("correlationId")
         data = payload.get("data")
@@ -1479,7 +1464,7 @@ try:
 except Exception:
     pass
 
-client.loop_start()
+# Note: client.loop_start() is called in _ven_enable() to avoid duplicate network loops
 
 # ── simple /health endpoint -------------------------------------------
 def health_snapshot() -> tuple[int, dict]:
@@ -2027,8 +2012,10 @@ def on_event(_client, _userdata, msg):
 def main(iterations: int | None = None) -> None:
     """Main VEN agent loop: publish telemetry, handle events, update shadow."""
     global _last_publish_time, _last_metering_sample
+    
+    # Note: Topic subscriptions and message callbacks are handled in _subscribe_topics()
+    # which is called from _ven_enable() after MQTT connection is established.
     print("✅ MQTT setup complete, starting VEN agent loop")
-    # Note: Topic subscriptions are now handled in _subscribe_topics() which is called from _on_connect()
 
     count = 0
     while True:
@@ -2188,6 +2175,11 @@ def main(iterations: int | None = None) -> None:
         except Exception:
             pass
         time.sleep(sleep_s)
+
+# ── MQTT initialization (after all handlers defined) ──────────────────
+# Connect and start MQTT loop if VEN is enabled at startup
+if _ven_enabled:
+    _ven_enable()
 
 if __name__ == "__main__":
     main()
