@@ -17,9 +17,16 @@ import ssl
 import tempfile
 import time
 from datetime import datetime, timezone
+from threading import Thread
+import sys
 
 import gmqtt
 from gmqtt.mqtt.constants import MQTTv311
+from flask import Flask, jsonify
+
+# Force unbuffered output for logs
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
 
 # Configure logging
 logging.basicConfig(
@@ -32,10 +39,8 @@ logger = logging.getLogger(__name__)
 # Configuration from environment
 VEN_ID = os.getenv("VEN_ID", "volttron_thing")
 
-# Connection settings - use VPC endpoint for connection, public endpoint for TLS validation
-IOT_CONNECT_HOST = os.getenv("IOT_CONNECT_HOST", os.getenv("MQTT_HOST", "localhost"))
-IOT_TLS_SERVER_NAME = os.getenv("IOT_TLS_SERVER_NAME", os.getenv("MQTT_HOST", "localhost"))
-MQTT_HOST = os.getenv("MQTT_HOST", "localhost")  # Kept for backward compatibility
+# Connection settings - match backend's simple approach
+MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "8883"))
 MQTT_USE_TLS = os.getenv("MQTT_USE_TLS", "true").lower() == "true"
 MQTT_KEEPALIVE = int(os.getenv("MQTT_KEEPALIVE", "60"))
@@ -49,6 +54,23 @@ BACKEND_CMD_TOPIC = f"ven/cmd/{VEN_ID}"
 current_power_kw = 10.0
 shed_power_kw = 0.0
 connected = False
+
+# Flask app for health checks (runs in separate thread)
+app = Flask(__name__)
+
+@app.route('/health')
+def health():
+    """Health check endpoint for ECS."""
+    return jsonify({"status": "healthy"}), 200
+
+@app.route('/live')
+def live():
+    """Liveness check endpoint."""
+    return jsonify({"status": "alive", "connected": connected}), 200
+
+def run_flask():
+    """Run Flask health check server in background thread"""
+    app.run(host='0.0.0.0', port=8000, debug=False, use_reloader=False)
 
 
 def _setup_tls_cert_file(cert_type: str) -> str | None:
@@ -172,12 +194,16 @@ async def publish_telemetry(client: gmqtt.Client) -> None:
 
 async def main() -> None:
     """Main entry point."""
+    # Start Flask health check server in background thread
+    flask_thread = Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    logger.info("🏥 Health check server started on port 8000")
+    
     logger.info("=" * 60)
     logger.info("🚀 Starting Simplified VEN (Thread-Safe MQTT)")
     logger.info("=" * 60)
     logger.info(f"VEN ID: {VEN_ID}")
-    logger.info(f"Connect Host: {IOT_CONNECT_HOST}:{MQTT_PORT}")
-    logger.info(f"TLS Server Name: {IOT_TLS_SERVER_NAME}")
+    logger.info(f"MQTT Host: {MQTT_HOST}:{MQTT_PORT}")
     logger.info(f"TLS Enabled: {MQTT_USE_TLS}")
     logger.info(f"Report Interval: {REPORT_INTERVAL}s")
     logger.info(f"Telemetry Topic: {TELEMETRY_TOPIC}")
@@ -207,25 +233,38 @@ async def main() -> None:
         ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_certs)
         ssl_context.load_cert_chain(certfile=certfile, keyfile=keyfile)
         ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-        ssl_context.check_hostname = True
+        ssl_context.check_hostname = True  # Match backend's configuration
         
         logger.info(f"🔐 TLS configured (CA: {ca_certs})")
-        logger.info(f"🔐 TLS server hostname for validation: {IOT_TLS_SERVER_NAME}")
     
     # Connect to MQTT broker
     try:
-        logger.info(f"🔗 Attempting connection to {IOT_CONNECT_HOST}:{MQTT_PORT}...")
+        logger.info(f"🔗 Attempting connection to {MQTT_HOST}:{MQTT_PORT}...")
         logger.debug(f"SSL context: {ssl_context is not None}, TLS: {MQTT_USE_TLS}")
         await client.connect(
-            IOT_CONNECT_HOST,  # Use VPC endpoint for connection
+            MQTT_HOST,  # Connect directly to AWS IoT endpoint (like backend)
             MQTT_PORT,
             ssl=ssl_context or MQTT_USE_TLS,
             keepalive=MQTT_KEEPALIVE,
             version=MQTTv311
         )
-        logger.info("🔗 Connection initiated successfully")
+        logger.info("🔗 Connection initiated, waiting for on_connect callback...")
+        
+        # Wait for connection to be established (up to 10 seconds)
+        for i in range(20):
+            if connected:
+                logger.info("✅ Connection confirmed!")
+                break
+            await asyncio.sleep(0.5)
+            if i % 4 == 0:
+                logger.debug(f"Waiting for connection... ({i/2}s)")
+        
+        if not connected:
+            logger.error("❌ Connection timeout - on_connect callback never fired")
+            return
+            
     except Exception as e:
-        logger.error(f"❌ Failed to connect to {IOT_CONNECT_HOST}:{MQTT_PORT}: {e}")
+        logger.error(f"❌ Failed to connect to {MQTT_HOST}:{MQTT_PORT}: {e}")
         logger.exception("Full traceback:")
         return
     
