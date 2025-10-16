@@ -31,7 +31,11 @@ logger = logging.getLogger(__name__)
 
 # Configuration from environment
 VEN_ID = os.getenv("VEN_ID", "volttron_thing")
-MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
+
+# Connection settings - use VPC endpoint for connection, public endpoint for TLS validation
+IOT_CONNECT_HOST = os.getenv("IOT_CONNECT_HOST", os.getenv("MQTT_HOST", "localhost"))
+IOT_TLS_SERVER_NAME = os.getenv("IOT_TLS_SERVER_NAME", os.getenv("MQTT_HOST", "localhost"))
+MQTT_HOST = os.getenv("MQTT_HOST", "localhost")  # Kept for backward compatibility
 MQTT_PORT = int(os.getenv("MQTT_PORT", "8883"))
 MQTT_USE_TLS = os.getenv("MQTT_USE_TLS", "true").lower() == "true"
 MQTT_KEEPALIVE = int(os.getenv("MQTT_KEEPALIVE", "60"))
@@ -172,7 +176,8 @@ async def main() -> None:
     logger.info("🚀 Starting Simplified VEN (Thread-Safe MQTT)")
     logger.info("=" * 60)
     logger.info(f"VEN ID: {VEN_ID}")
-    logger.info(f"MQTT Host: {MQTT_HOST}:{MQTT_PORT}")
+    logger.info(f"Connect Host: {IOT_CONNECT_HOST}:{MQTT_PORT}")
+    logger.info(f"TLS Server Name: {IOT_TLS_SERVER_NAME}")
     logger.info(f"TLS Enabled: {MQTT_USE_TLS}")
     logger.info(f"Report Interval: {REPORT_INTERVAL}s")
     logger.info(f"Telemetry Topic: {TELEMETRY_TOPIC}")
@@ -205,13 +210,14 @@ async def main() -> None:
         ssl_context.check_hostname = True
         
         logger.info(f"🔐 TLS configured (CA: {ca_certs})")
+        logger.info(f"🔐 TLS server hostname for validation: {IOT_TLS_SERVER_NAME}")
     
     # Connect to MQTT broker
     try:
-        logger.info(f"🔗 Attempting connection to {MQTT_HOST}:{MQTT_PORT}...")
+        logger.info(f"🔗 Attempting connection to {IOT_CONNECT_HOST}:{MQTT_PORT}...")
         logger.debug(f"SSL context: {ssl_context is not None}, TLS: {MQTT_USE_TLS}")
         await client.connect(
-            MQTT_HOST,
+            IOT_CONNECT_HOST,  # Use VPC endpoint for connection
             MQTT_PORT,
             ssl=ssl_context or MQTT_USE_TLS,
             keepalive=MQTT_KEEPALIVE,
@@ -219,7 +225,7 @@ async def main() -> None:
         )
         logger.info("🔗 Connection initiated successfully")
     except Exception as e:
-        logger.error(f"❌ Failed to connect to {MQTT_HOST}:{MQTT_PORT}: {e}")
+        logger.error(f"❌ Failed to connect to {IOT_CONNECT_HOST}:{MQTT_PORT}: {e}")
         logger.exception("Full traceback:")
         return
     
