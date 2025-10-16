@@ -437,6 +437,7 @@ except Exception:
     pass
 
 connected = False
+_subscribed = False  # Track if we've already subscribed to MQTT topics
 _last_connect_time: float | None = None
 _last_disconnect_time: float | None = None
 _last_publish_time: float | None = None
@@ -642,7 +643,7 @@ def _subscribe_topics() -> None:
     if BACKEND_CMD_TOPIC:
         client.message_callback_add(BACKEND_CMD_TOPIC, on_backend_cmd)
         client.subscribe(BACKEND_CMD_TOPIC)
-        print(f"[DEBUG] Subscribed to backend command topic: {BACKEND_CMD_TOPIC}")
+        print(f"[DEBUG] Subscribed to backend command topic: {BACKEND_CMD_TOPIC}", flush=True)
 
     if SHADOW_TOPIC_DELTA:
         client.message_callback_add(SHADOW_TOPIC_DELTA, on_shadow_delta)

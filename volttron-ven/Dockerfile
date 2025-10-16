@@ -24,7 +24,8 @@ COPY . .
 
 # ---- runtime ENV with *safe* defaults --------------------------------
 # These are only fallbacks; ECS will override them with Secrets Manager
-ENV MQTT_TOPIC_METERING=volttron/metering \
+ENV PYTHONUNBUFFERED=1 \
+    MQTT_TOPIC_METERING=volttron/metering \
     MQTT_TOPIC_EVENTS=openadr/event \
     MQTT_TOPIC_RESPONSES=openadr/response \
     MQTT_TOPIC_STATUS=volttron/dev 

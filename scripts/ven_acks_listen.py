@@ -59,7 +59,7 @@ def main():
 
     stop = threading.Event()
 
-    def on_ack(topic_, payload, **kwargs):
+    def on_ack(topic, payload, dup, qos, retain, **kwargs):
         try:
             msg = json.loads(payload.decode())
         except Exception:
@@ -69,7 +69,8 @@ def main():
             return
         print(json.dumps(msg, indent=2))
 
-    conn.subscribe(topic=topic, qos=mqtt.QoS.AT_LEAST_ONCE, callback=on_ack)
+    subscribe_future, _ = conn.subscribe(topic=topic, qos=mqtt.QoS.AT_LEAST_ONCE, callback=on_ack)
+    subscribe_future.result()
 
     try:
         stop.wait()
