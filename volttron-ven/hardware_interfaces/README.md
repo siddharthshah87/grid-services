@@ -1,190 +1,279 @@
-# Hardware Interfaces
+# Hardware Interfaces for Physical VEN Implementation
 
-This directory contains Python modules for interfacing with physical hardware components used in the VEN (Virtual End Node) implementation.
+This package provides hardware interface modules for implementing physical Virtual End Node (VEN) demand response systems. It includes drivers for power measurement and load control hardware commonly used in grid-interactive applications.
+
+## Overview
+
+The hardware interfaces support two main categories of devices:
+1. **Load Control**: GPIO-based relay controllers for switching electrical loads
+2. **Power Measurement**: Energy meters for monitoring power consumption and generation
+
+## Module Structure
+
+Both hardware interfaces are implemented as single-file modules for consistency and ease of use:
+
+- **`gpio_relay_controller.py`** - Complete GPIO relay control implementation
+- **`evalstpm34_meter.py`** - Complete EVALSTPM34 energy meter implementation
 
 ## Modules
 
-### 1. GPIO Relay Controller (`gpio_relay_controller/`)
+### GPIO Relay Controller (`gpio_relay_controller.py`)
 
-Controls normally closed (NC) relays connected to GPIO pins for load switching in demand response scenarios.
+Controls electrical relays via Raspberry Pi GPIO pins for load shedding and switching operations.
 
 **Features:**
-- Individual relay control (on/off)
-- Bulk relay operations
-- Status monitoring
-- Safe initialization and cleanup
-- Hardware abstraction for testing (simulation mode)
-- Emergency shutoff capability
+- Multiple relay control with individual configuration
+- Thread-safe operations with proper resource management
+- Context manager support for automatic cleanup
+- Comprehensive error handling with custom exceptions
+- Emergency safety functions
 
 **Hardware Requirements:**
-- Raspberry Pi with GPIO pins
-- Normally closed relays connected to GPIO pins
-- Appropriate relay driver circuits
+- Raspberry Pi (any model with GPIO)
+- Relay modules (5V or 3.3V logic compatible)  
+- Proper electrical isolation and safety measures
+- RPi.GPIO Python library (`pip install RPi.GPIO`)
 
-**Example Usage:**
-```python
-from hardware_interfaces.gpio_relay_controller import GPIORelayController, RelayConfig, RelayState
+### EVALSTPM34 Energy Meter (`evalstpm34_meter.py`)
 
-# Configure relays
-relay_configs = [
-    RelayConfig("load_1", gpio_pin=18, name="Main Load"),
-    RelayConfig("load_2", gpio_pin=19, name="Secondary Load"),
-]
-
-# Initialize controller
-with GPIORelayController(relay_configs) as controller:
-    # Turn off a relay (open circuit)
-    controller.turn_off_relay("load_1")
-    
-    # Turn on a relay (close circuit)
-    controller.turn_on_relay("load_1")
-    
-    # Set multiple relays
-    controller.set_multiple_relays({
-        "load_1": RelayState.OPEN,
-        "load_2": RelayState.CLOSED,
-    })
-```
-
-### 2. EVALSTPM34 Meter Interface (`evalstpm34_meter/`)
-
-Interfaces with EVALSTPM34 evaluation boards via UART for power metering, current/voltage sensing, and calibration.
+Interface for STMicroelectronics EVALSTPM34 energy metering evaluation board via UART.
 
 **Features:**
-- Real-time power measurements (V, I, P, Q, S, PF)
-- Dual channel support
-- Energy accumulation
-- Temperature monitoring
-- Calibration support with EOL procedures
-- Hardware abstraction for testing (simulation mode)
+- Dual-channel power measurement (voltage, current, power, energy)
+- Real-time monitoring of electrical parameters
+- Energy accumulation with reset capability
+- Temperature and frequency measurement
+- CRC-protected UART communication
+- Configurable measurement ranges and calibration
 
 **Hardware Requirements:**
 - EVALSTPM34 evaluation board
-- UART connection (USB-to-Serial adapter)
-- Proper power supply and signal conditioning
+- UART connection (USB-to-Serial adapter or built-in UART)
+- Proper current and voltage sensor connections
+- pyserial Python library (`pip install pyserial`)
 
-**Example Usage:**
+## Quick Start
+
+### Basic Relay Control
+
 ```python
-from hardware_interfaces.evalstpm34_meter import EVALSTPM34Meter, MeterConfig
+from hardware_interfaces import GPIORelayController, RelayConfig, RelayState
+
+# Configure relays
+relays = [
+    RelayConfig("load1", gpio_pin=18, name="Main Load"),
+    RelayConfig("load2", gpio_pin=19, name="Secondary Load")
+]
+
+# Use relay controller
+with GPIORelayController(relays) as controller:
+    # Turn off a load
+    controller.turn_off_relay("load1")
+    
+    # Set multiple relays
+    controller.set_multiple_relays({
+        "load1": RelayState.OPEN,
+        "load2": RelayState.CLOSED
+    })
+    
+    # Get current states
+    states = controller.get_all_relay_states()
+    print(f"Current states: {states}")
+```
+
+### Basic Power Measurement
+
+```python
+from hardware_interfaces import EVALSTPM34Meter, MeterConfig
 
 # Configure meter
+config = MeterConfig(
+    meter_id="main_meter",
+    uart_port="/dev/ttyUSB0",
+    baud_rate=115200,
+    voltage_range_ch1="230V",
+    current_range_ch1="5A"
+)
+
+# Read power measurements
+with EVALSTPM34Meter(config) as meter:
+    # Get instantaneous values
+    reading = meter.read_instantaneous_values()
+    print(f"Power: {reading.active_power_ch1:.1f}W")
+    print(f"Voltage: {reading.voltage_ch1:.1f}V")
+    print(f"Current: {reading.current_ch1:.2f}A")
+    
+    # Get energy accumulations
+    energy = meter.read_energy_values()
+    print(f"Energy consumed: {energy.active_energy_ch1:.2f}Wh")
+```
+
+### Integrated Demand Response
+
+```python
+from hardware_interfaces import GPIORelayController, EVALSTPM34Meter
+from hardware_interfaces.gpio_relay_controller import RelayConfig, RelayState
+from hardware_interfaces.evalstpm34_meter import MeterConfig
+
+# Setup configurations
+relay_config = [RelayConfig("load1", gpio_pin=18, name="Controllable Load")]
+meter_config = MeterConfig("meter1", uart_port="/dev/ttyUSB0")
+
+# Implement demand response logic
+with GPIORelayController(relay_config) as relays, \
+     EVALSTPM34Meter(meter_config) as meter:
+    
+    # Monitor power consumption
+    baseline = meter.read_instantaneous_values()
+    baseline_power = baseline.active_power_ch1
+    
+    # Check if demand response is needed
+    if baseline_power > 1500:  # 1.5kW threshold
+        print("High power consumption detected - shedding load")
+        relays.turn_off_relay("load1")
+        
+        # Verify load reduction
+        time.sleep(2)
+        reduced = meter.read_instantaneous_values()
+        reduction = baseline_power - reduced.active_power_ch1
+        print(f"Load reduced by {reduction:.1f}W")
+```
+
+## EVALSTPM34 Meter Details
+
+### Communication Protocol
+
+The EVALSTPM34 uses UART communication with the following frame structure:
+- **Frame Format**: `[STX][CMD][LEN][DATA][CRC][ETX]`
+- **Baud Rate**: 115200 (default)
+- **Data Bits**: 8
+- **Parity**: None
+- **Stop Bits**: 1
+- **CRC**: 8-bit CRC-CCITT for data integrity
+
+### Measurement Capabilities
+
+**Channel 1 & 2 (Dual Channel)**:
+- RMS Voltage (V)
+- RMS Current (A) 
+- Active Power (W)
+- Reactive Power (VAR)
+- Apparent Power (VA)
+- Power Factor
+
+**Common Measurements**:
+- Line Frequency (Hz)
+- Internal Temperature (°C)
+- Energy Accumulation (Wh, VARh)
+
+### Configuration Options
+
+```python
 config = MeterConfig(
     meter_id="meter_001",
     uart_port="/dev/ttyUSB0",
     baud_rate=115200,
-    name="Main Power Meter"
-)
-
-# Initialize meter
-with EVALSTPM34Meter(config) as meter:
-    # Take a reading
-    reading = meter.read_instantaneous_values()
+    timeout=1.0,
     
-    print(f"CH1: {reading.voltage_ch1:.1f}V, {reading.current_ch1:.2f}A")
-    print(f"CH2: {reading.voltage_ch2:.1f}V, {reading.current_ch2:.2f}A")
-    print(f"Total Power: {reading.active_power_ch1 + reading.active_power_ch2:.1f}W")
-```
-
-## Installation
-
-1. Install required Python packages:
-```bash
-pip install -r requirements.txt
-```
-
-2. For Raspberry Pi GPIO support:
-```bash
-sudo apt-get update
-sudo apt-get install python3-rpi.gpio
-```
-
-3. For UART communication:
-```bash
-sudo apt-get install python3-serial
-```
-
-## Simulation Mode
-
-Both modules support simulation mode for development and testing without physical hardware:
-
-- **GPIO Relay Controller**: Automatically detects if RPi.GPIO is available
-- **EVALSTPM34 Meter**: Automatically detects if pySerial is available
-- Can be forced with `simulation_mode=True` parameter
-
-## Testing
-
-Run the test suite:
-```bash
-cd volttron-ven
-python -m pytest tests/hardware_interfaces/ -v
-```
-
-Run the example script:
-```bash
-cd volttron-ven
-python example_hardware_usage.py
-```
-
-## Calibration (EVALSTPM34)
-
-The EVALSTPM34 meter supports calibration procedures for accurate measurements:
-
-```python
-from hardware_interfaces.evalstpm34_meter.calibration import CalibrationManager
-
-# Initialize calibration manager
-cal_manager = CalibrationManager()
-
-# Perform EOL calibration
-calibration = cal_manager.perform_eol_calibration(
-    meter=meter,
-    reference_voltage=120.0,
-    reference_current=5.0,
-    calibrated_by="technician_001"
+    # Calibration factors (set during installation)
+    voltage_calibration_ch1=1.0,
+    current_calibration_ch1=1.0,
+    voltage_calibration_ch2=1.0, 
+    current_calibration_ch2=1.0,
+    
+    # Measurement ranges
+    voltage_range_ch1="230V",  # "110V", "230V", "400V"
+    current_range_ch1="5A",    # "1A", "5A", "10A", "20A"
+    voltage_range_ch2="230V",
+    current_range_ch2="5A"
 )
-
-# Save calibration data
-cal_manager.save_calibration(calibration)
 ```
 
-## Integration with VEN
+### Error Handling
 
-These hardware interfaces are designed to be integrated with the main VEN agent for demand response operations:
+Both interfaces provide comprehensive error handling:
+- Connection monitoring and automatic recovery
+- CRC verification for meter communications
+- Thread-safe operations with proper locking
+- Detailed logging for debugging
 
-1. **Load Control**: Use GPIO relay controller to shed/restore loads based on OpenADR events
-2. **Power Monitoring**: Use EVALSTPM34 meter to monitor baseline and real-time power consumption
-3. **Measurement & Verification**: Combine both modules to measure actual load reduction
+## Installation Requirements
 
-## Hardware Wiring
+```bash
+# For GPIO control on Raspberry Pi
+pip install RPi.GPIO
 
-### GPIO Relay Controller
-- Connect relay control pins to GPIO pins (18, 19, 20, etc.)
-- Use appropriate relay driver circuits (transistors, optocouplers)
-- Ensure proper isolation between control and power circuits
-- Consider using relay modules with built-in drivers
+# For UART communication
+pip install pyserial
+
+# Standard requirements
+pip install dataclasses typing
+```
+
+## Hardware Setup
+
+### GPIO Relays
+1. Connect relay modules to Raspberry Pi GPIO pins
+2. Ensure proper voltage levels (3.3V or 5V logic)
+3. Use optical isolation for high-voltage switching
+4. Follow electrical safety guidelines
 
 ### EVALSTPM34 Meter
-- Connect UART pins (TX, RX, GND) to USB-Serial adapter
-- Connect power supply (typically 3.3V or 5V)
-- Connect current transformers and voltage dividers as per datasheet
-- Ensure proper grounding and isolation
+1. Connect EVALSTPM34 board to system via USB-UART adapter
+2. Configure current transformers and voltage dividers
+3. Set appropriate measurement ranges in software
+4. Perform calibration for accurate measurements
 
 ## Safety Considerations
 
-⚠️ **WARNING**: These modules control electrical loads and measure live power circuits.
+⚠️ **ELECTRICAL SAFETY WARNING**
+- Always follow electrical safety codes and regulations
+- Use proper isolation and protection devices
+- Ensure qualified personnel perform electrical connections
+- Test all safety systems before deployment
+- Consider fail-safe operation modes for critical systems
 
-- Always follow electrical safety practices
-- Use proper isolation and protection circuits
-- Test thoroughly in simulation mode before connecting to real hardware
-- Have qualified personnel review hardware connections
-- Include emergency shutoff mechanisms
-- Consider fail-safe designs (normally closed relays for critical loads)
+## Integration with VEN Agent
 
-## Future Enhancements
+These hardware interfaces are designed to integrate with the VOLTTRON VEN agent:
 
-- Support for additional relay types (normally open, latching)
-- Multiple EVALSTPM34 meter support
-- Enhanced calibration procedures
-- Integration with cloud-based calibration databases
-- Support for other power metering ICs
-- Advanced fault detection and diagnostics
+```python
+# In ven_agent.py, add hardware interface support
+from hardware_interfaces import GPIORelayController, EVALSTPM34Meter
+
+class PhysicalVEN:
+    def __init__(self):
+        self.relays = GPIORelayController(relay_configs)
+        self.meter = EVALSTPM34Meter(meter_config)
+    
+    def shed_load(self, load_id: str, amount_kw: float):
+        """Implement actual load shedding"""
+        self.relays.turn_off_relay(load_id)
+    
+    def get_power_measurement(self) -> float:
+        """Get real power measurement"""
+        reading = self.meter.read_instantaneous_values()
+        return reading.active_power_ch1 + reading.active_power_ch2
+```
+
+## Troubleshooting
+
+### GPIO Issues
+- Check that script runs with sufficient privileges (`sudo`)
+- Verify GPIO pin assignments don't conflict
+- Test individual pins with simple blink programs
+
+### UART/Meter Issues
+- Verify UART device path (`/dev/ttyUSB0`, `/dev/ttyAMA0`, etc.)
+- Check baud rate and communication parameters
+- Test basic serial communication with terminal programs
+- Ensure proper hardware connections and power supply
+
+### Performance Optimization
+- Use appropriate polling intervals for measurements
+- Implement caching for frequently accessed values
+- Consider separate threads for continuous monitoring
+
+## License
+
+This hardware interface package is part of the Grid Services Infrastructure project and follows the same licensing terms.

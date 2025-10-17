@@ -1,19 +1,45 @@
 """
-Hardware Interfaces Package
+Hardware interfaces for physical VEN implementations.
 
-This package contains hardware interface modules for the physical VEN implementation:
-- gpio_relay_controller: Controls GPIO-based relays for load switching
-- evalstpm34_meter: Interfaces with EVALSTPM34 metering boards via UART
+This package provides interfaces for controlling hardware components
+commonly used in Virtual End Node (VEN) demand response systems.
 """
 
-__version__ = "0.1.0"
-__author__ = "Grid Services Team"
+from .gpio_relay_controller import (
+    GPIORelayController,
+    RelayConfig,
+    RelayState,
+    GPIORelayError,
+    RelayNotFoundError,
+    GPIOInitializationError,
+    RelayOperationError,
+    create_relay_config
+)
 
-# Import main classes for easy access
-from .gpio_relay_controller import GPIORelayController
-from .evalstpm34_meter import EVALSTPM34Meter
+from .evalstpm34_meter import (
+    EVALSTPM34Meter,
+    MeterConfig,
+    InstantaneousValues,
+    EnergyValues,
+    STPM34Command,
+    STPM34Status
+)
 
 __all__ = [
-    "GPIORelayController",
-    "EVALSTPM34Meter",
+    'GPIORelayController',
+    'RelayConfig', 
+    'RelayState',
+    'GPIORelayError',
+    'RelayNotFoundError',
+    'GPIOInitializationError',
+    'RelayOperationError',
+    'create_relay_config',
+    'EVALSTPM34Meter',
+    'MeterConfig',
+    'InstantaneousValues',
+    'EnergyValues',
+    'STPM34Command',
+    'STPM34Status'
 ]
+
+__version__ = '1.0.0'

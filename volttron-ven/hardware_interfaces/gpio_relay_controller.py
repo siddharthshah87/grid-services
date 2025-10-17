@@ -1,8 +1,9 @@
 """
 GPIO Relay Controller
 
-Manages normally closed (NC) relays connected to GPIO pins for load control
-in demand response applications.
+This module provides an interface for controlling normally closed (NC) relays
+connected to GPIO pins on a Raspberry Pi. Used for load switching in demand
+response scenarios.
 
 Features:
 - Individual relay control (on/off)
@@ -18,15 +19,32 @@ from typing import Dict, List, Optional, Union
 from dataclasses import dataclass
 from enum import Enum
 
-from .exceptions import GPIORelayError, RelayNotFoundError, GPIOInitializationError, RelayOperationError
-
-# Optional GPIO library import for Raspberry Pi
+# GPIO library import for Raspberry Pi
 try:
     import RPi.GPIO as GPIO
-    GPIO_AVAILABLE = True
 except ImportError:
-    GPIO_AVAILABLE = False
-    logging.warning("RPi.GPIO not available. GPIO operations will be simulated.")
+    raise ImportError("RPi.GPIO library is required for GPIO operations. Install with: pip install RPi.GPIO")
+
+
+# Custom exceptions
+class GPIORelayError(Exception):
+    """Base exception for GPIO relay operations."""
+    pass
+
+
+class RelayNotFoundError(GPIORelayError):
+    """Raised when attempting to operate on a relay that doesn't exist."""
+    pass
+
+
+class GPIOInitializationError(GPIORelayError):
+    """Raised when GPIO initialization fails."""
+    pass
+
+
+class RelayOperationError(GPIORelayError):
+    """Raised when relay operation (on/off) fails."""
+    pass
 
 
 class RelayState(Enum):
@@ -54,51 +72,34 @@ class GPIORelayController:
     - HIGH signal = relay open = current blocked
     """
     
-    def __init__(self, relays: List[RelayConfig], simulation_mode: bool = None):
+    def __init__(self, relays: List[RelayConfig]):
         """
         Initialize the GPIO relay controller.
         
         Args:
             relays: List of relay configurations
-            simulation_mode: Force simulation mode (None = auto-detect)
         """
         self.logger = logging.getLogger(__name__)
         self.relays = {relay.relay_id: relay for relay in relays}
         self.relay_states: Dict[str, RelayState] = {}
         
-        # Determine if we should use simulation mode
-        if simulation_mode is None:
-            self.simulation_mode = not GPIO_AVAILABLE
-        else:
-            self.simulation_mode = simulation_mode
-            
-        if not self.simulation_mode and not GPIO_AVAILABLE:
-            raise GPIOInitializationError("GPIO library not available but simulation mode disabled")
-        
         self._initialize_gpio()
         
     def _initialize_gpio(self):
         """Initialize GPIO pins and set initial states."""
-        if self.simulation_mode:
-            self.logger.info("Initializing GPIO relay controller in simulation mode")
-            # Simulate GPIO initialization
+        try:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setwarnings(False)
+            
             for relay_id, relay in self.relays.items():
+                GPIO.setup(relay.gpio_pin, GPIO.OUT)
+                initial_gpio_state = GPIO.LOW if relay.initial_state == RelayState.CLOSED else GPIO.HIGH
+                GPIO.output(relay.gpio_pin, initial_gpio_state)
                 self.relay_states[relay_id] = relay.initial_state
-                self.logger.info(f"Simulated: Initialized relay {relay_id} on pin {relay.gpio_pin}")
-        else:
-            try:
-                GPIO.setmode(GPIO.BCM)
-                GPIO.setwarnings(False)
+                self.logger.info(f"Initialized relay {relay_id} on pin {relay.gpio_pin}")
                 
-                for relay_id, relay in self.relays.items():
-                    GPIO.setup(relay.gpio_pin, GPIO.OUT)
-                    initial_gpio_state = GPIO.LOW if relay.initial_state == RelayState.CLOSED else GPIO.HIGH
-                    GPIO.output(relay.gpio_pin, initial_gpio_state)
-                    self.relay_states[relay_id] = relay.initial_state
-                    self.logger.info(f"Initialized relay {relay_id} on pin {relay.gpio_pin}")
-                    
-            except Exception as e:
-                raise GPIOInitializationError(f"Failed to initialize GPIO: {e}")
+        except Exception as e:
+            raise GPIOInitializationError(f"Failed to initialize GPIO: {e}")
     
     def set_relay_state(self, relay_id: str, state: RelayState) -> bool:
         """
@@ -121,16 +122,11 @@ class GPIORelayController:
         relay = self.relays[relay_id]
         
         try:
-            if self.simulation_mode:
-                # Simulate relay operation
-                self.relay_states[relay_id] = state
-                self.logger.info(f"Simulated: Set relay {relay_id} to {state.value}")
-            else:
-                # For NC relays: LOW = closed, HIGH = open
-                gpio_state = GPIO.LOW if state == RelayState.CLOSED else GPIO.HIGH
-                GPIO.output(relay.gpio_pin, gpio_state)
-                self.relay_states[relay_id] = state
-                self.logger.info(f"Set relay {relay_id} (pin {relay.gpio_pin}) to {state.value}")
+            # For NC relays: LOW = closed, HIGH = open
+            gpio_state = GPIO.LOW if state == RelayState.CLOSED else GPIO.HIGH
+            GPIO.output(relay.gpio_pin, gpio_state)
+            self.relay_states[relay_id] = state
+            self.logger.info(f"Set relay {relay_id} (pin {relay.gpio_pin}) to {state.value}")
             
             return True
             
@@ -245,8 +241,7 @@ class GPIORelayController:
             "gpio_pin": relay.gpio_pin,
             "name": relay.name,
             "description": relay.description,
-            "current_state": current_state.value,
-            "simulation_mode": self.simulation_mode
+            "current_state": current_state.value
         }
     
     def list_relays(self) -> List[str]:
@@ -263,14 +258,11 @@ class GPIORelayController:
         Clean up GPIO resources.
         Call this when shutting down the controller.
         """
-        if not self.simulation_mode:
-            try:
-                GPIO.cleanup()
-                self.logger.info("GPIO cleanup completed")
-            except Exception as e:
-                self.logger.error(f"Error during GPIO cleanup: {e}")
-        else:
-            self.logger.info("Simulation mode cleanup completed")
+        try:
+            GPIO.cleanup()
+            self.logger.info("GPIO cleanup completed")
+        except Exception as e:
+            self.logger.error(f"Error during GPIO cleanup: {e}")
     
     def __enter__(self):
         """Context manager entry."""

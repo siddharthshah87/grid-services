@@ -9,9 +9,7 @@ import time
 import logging
 from datetime import datetime
 
-from hardware_interfaces import GPIORelayController, EVALSTPM34Meter
-from hardware_interfaces.gpio_relay_controller import RelayConfig, RelayState
-from hardware_interfaces.evalstpm34_meter import MeterConfig
+from hardware_interfaces import GPIORelayController, EVALSTPM34Meter, RelayConfig, RelayState, MeterConfig
 
 # Configure logging
 logging.basicConfig(
@@ -104,7 +102,13 @@ def main():
         uart_port="/dev/ttyUSB0",  # Adjust based on actual connection
         baud_rate=115200,
         name="Main Power Meter",
-        description="Primary circuit power measurement"
+        description="Primary circuit power measurement",
+        voltage_calibration_ch1=1.0,
+        current_calibration_ch1=1.0,
+        voltage_calibration_ch2=1.0,
+        current_calibration_ch2=1.0,
+        voltage_range_ch1="230V",
+        current_range_ch1="5A"
     )
     
     try:
@@ -124,6 +128,12 @@ def main():
                     logger.info(f"  Temperature: {reading.temperature:.1f}°C")
                 
                 time.sleep(1)
+            
+            # Read energy values
+            logger.info("Reading energy accumulations...")
+            energy = meter.read_energy_values()
+            logger.info(f"Energy CH1: {energy.active_energy_ch1:.2f}Wh, {energy.reactive_energy_ch1:.2f}VARh")
+            logger.info(f"Energy CH2: {energy.active_energy_ch2:.2f}Wh, {energy.reactive_energy_ch2:.2f}VARh")
             
             # Example of using readings for demand response
             total_power = reading.active_power_ch1 + reading.active_power_ch2
