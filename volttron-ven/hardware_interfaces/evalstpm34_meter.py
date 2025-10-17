@@ -10,12 +10,13 @@ The STPM34 is a dual-channel energy metering ASIC that provides:
 - RMS voltage and current values
 - Power factor calculation
 - Frequency measurement
-- Temperature measurement
 
-Communication Protocol:
-- UART interface (typically 115200 baud)
-- 8-bit data frames with specific command structure
-- CRC-8 checksum for data integrity
+Communication Protocol (from STPM32/33/34 datasheet):
+- UART interface: 9600 baud default, 8-N-1 format
+- 4-byte command frame + 1 optional CRC byte
+- Frame format: [READ_ADDR, WRITE_ADDR, DATA_LSB, DATA_MSB, CRC]
+- Response: 4 bytes of previous requested data + CRC
+- CRC polynomial: 0x07 (x8+x2+x+1), byte-reversed for UART
 """
 
 import serial
@@ -30,24 +31,23 @@ from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
-class STPM34Command(Enum):
-    """STPM34 UART command codes"""
-    # Read commands
-    READ_STATUS = 0x48
-    READ_CH1_RMS_VOLTAGE = 0x49
-    READ_CH1_RMS_CURRENT = 0x4A
-    READ_CH1_ACTIVE_POWER = 0x4B
-    READ_CH1_REACTIVE_POWER = 0x4C
-    READ_CH1_APPARENT_POWER = 0x4D
-    READ_CH2_RMS_VOLTAGE = 0x4E
-    READ_CH2_RMS_CURRENT = 0x4F
-    READ_CH2_ACTIVE_POWER = 0x50
-    READ_CH2_REACTIVE_POWER = 0x51
-    READ_CH2_APPARENT_POWER = 0x52
-    READ_FREQUENCY = 0x53
-    READ_TEMPERATURE = 0x54
-    READ_ENERGY_CH1 = 0x55
-    READ_ENERGY_CH2 = 0x56
+class STPM34Register:
+    """EVALSTPM34 register addresses based on datasheet."""
+    # Configuration registers (examples from datasheet)
+    DSP_CR1 = 0x00          # DSP Control Register 1
+    DSP_CR2 = 0x01          # DSP Control Register 2
+    DSP_CR3 = 0x02          # DSP Control Register 3
+    
+    # Status and control
+    US_REG_STATUS = 0x28    # UART/SPI Status register (datasheet confirmed)
+    US_REG1 = 0x24         # UART control register (CRC control)
+    
+    # Measurement registers (these are examples - exact addresses need verification)
+    FIRST_MEASUREMENT = 0x48  # Default read register at startup
+    
+    # Special addresses
+    DUMMY_READ = 0xFF       # Increments internal read pointer
+    DUMMY_WRITE = 0xFF      # No write operation (ignore data bytes)
     
     # Write/Configuration commands
     RESET = 0x70
@@ -71,7 +71,7 @@ class MeterConfig:
     """Configuration for EVALSTPM34 meter"""
     meter_id: str
     uart_port: str = "/dev/ttyUSB0"
-    baud_rate: int = 115200
+    baud_rate: int = 9600
     timeout: float = 1.0
     name: str = "EVALSTPM34"
     description: str = "EVALSTPM34 Energy Meter"
