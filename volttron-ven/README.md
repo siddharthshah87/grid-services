@@ -15,10 +15,20 @@ This is a **local-first** Virtual End Node (VEN) for Demand Response (DR) event 
 
 ## Quick Start
 
+### Basic VEN
 ```bash
 cd volttron-ven
 ./run.sh
 ```
+
+### Enhanced VEN (with Web UI + Shadow + DR Events)
+```bash
+cd volttron-ven
+./run_enhanced.sh
+# Open browser to http://localhost:8080
+```
+
+See [ENHANCED_FEATURES.md](ENHANCED_FEATURES.md) for details on advanced capabilities.
 
 ## Directory Structure
 - `ven_local.py`: Main VEN implementation ⭐
