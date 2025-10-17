@@ -80,9 +80,8 @@ def main():
     print("EVALSTPM34 High-Level Driver Test")
     print("=" * 50)
     
-    # Import the driver (add path if needed)
+    # Import the driver (local import from same directory)
     try:
-        sys.path.append('volttron-ven/hardware_interfaces')
         from evalstpm34_meter import EVALSTPM34Meter, MeterConfig
                 
     except ImportError as e:

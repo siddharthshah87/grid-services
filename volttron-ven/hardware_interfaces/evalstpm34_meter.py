@@ -198,6 +198,28 @@ class EVALSTPM34Meter:
     ASIC via UART and retrieve power measurements.
     """
     
+    @classmethod
+    def create_simple(cls, uart_port: str, meter_id: str, baud_rate: int = 9600):
+        """
+        Factory method to create a meter with simple configuration.
+        
+        Args:
+            uart_port: UART port path (e.g., "/dev/ttyUSB0")
+            meter_id: Unique identifier for the meter
+            baud_rate: UART baud rate (default 9600)
+            
+        Returns:
+            EVALSTPM34Meter instance
+        """
+        config = MeterConfig(
+            meter_id=meter_id,
+            uart_port=uart_port,
+            baud_rate=baud_rate,
+            name=f"EVALSTPM34 {meter_id}",
+            description=f"Energy meter on {uart_port}"
+        )
+        return cls(config)
+    
     def __init__(self, config: MeterConfig):
         """
         Initialize the EVALSTPM34 meter interface.
@@ -232,42 +254,57 @@ class EVALSTPM34Meter:
         Returns:
             True if connection successful, False otherwise
         """
-        try:
-            self.serial_port = serial.Serial(
-                port=self.config.uart_port,
-                baudrate=self.config.baud_rate,
-                bytesize=serial.EIGHTBITS,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                timeout=self.config.timeout,
-                xonxoff=False,
-                rtscts=False,
-                dsrdtr=False
-            )
-            
-            # Clear any pending data
-            self.serial_port.reset_input_buffer()
-            self.serial_port.reset_output_buffer()
-            
-            # Test communication with status read
-            status = self._read_status()
-            if status is not None:
-                logger.info(f"Successfully connected to EVALSTPM34 on {self.config.uart_port}")
+        max_retries = 3
+        retry_delay = 1.0
+        
+        for attempt in range(max_retries):
+            try:
+                self.serial_port = serial.Serial(
+                    port=self.config.uart_port,
+                    baudrate=self.config.baud_rate,
+                    bytesize=serial.EIGHTBITS,
+                    parity=serial.PARITY_NONE,
+                    stopbits=serial.STOPBITS_ONE,
+                    timeout=self.config.timeout,
+                    xonxoff=False,
+                    rtscts=False,
+                    dsrdtr=False
+                )
                 
-                # Initialize measurement mode by enabling channels
-                self._enable_measurement_channels()
-                self._is_measuring = True
+                # Clear any pending data
+                self.serial_port.reset_input_buffer()
+                self.serial_port.reset_output_buffer()
                 
-                return True
-            else:
-                logger.error("Failed to communicate with EVALSTPM34 after connection")
-                self.disconnect()
-                return False
+                # Test communication with status read
+                status = self._read_status()
+                if status is not None:
+                    logger.info(f"Successfully connected to EVALSTPM34 on {self.config.uart_port}")
+                    
+                    # Initialize measurement mode by enabling channels
+                    self._enable_measurement_channels()
+                    self._is_measuring = True
+                    
+                    return True
+                else:
+                    logger.warning(f"Failed to communicate with EVALSTPM34 after connection (attempt {attempt + 1}/{max_retries})")
+                    self.disconnect()
+                    
+            except Exception as e:
+                logger.warning(f"Connection attempt {attempt + 1}/{max_retries} failed: {e}")
+                self._last_error = str(e)
+                if self.serial_port:
+                    try:
+                        self.serial_port.close()
+                    except:
+                        pass
+                    self.serial_port = None
                 
-        except Exception as e:
-            logger.error(f"Failed to connect to EVALSTPM34: {e}")
-            self._last_error = str(e)
-            return False
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+        
+        logger.error(f"Failed to connect to EVALSTPM34 on {self.config.uart_port} after {max_retries} attempts")
+        logger.error("Check: UART port, baud rate, device power, USB connection")
+        return False
 
     def disconnect(self):
         """Close UART connection"""

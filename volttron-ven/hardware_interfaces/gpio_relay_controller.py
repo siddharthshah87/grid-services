@@ -72,6 +72,29 @@ class GPIORelayController:
     - HIGH signal = relay open = current blocked
     """
     
+    @classmethod
+    def create_simple(cls, gpio_pins: List[int], name_prefix: str = "relay"):
+        """
+        Factory method to create a controller with simple pin configuration.
+        
+        Args:
+            gpio_pins: List of GPIO pin numbers
+            name_prefix: Prefix for relay names (default "relay")
+            
+        Returns:
+            GPIORelayController instance
+        """
+        relays = []
+        for i, pin in enumerate(gpio_pins):
+            relay_config = RelayConfig(
+                relay_id=f"{name_prefix}_{i+1}",
+                gpio_pin=pin,
+                name=f"{name_prefix.title()} {i+1}",
+                description=f"GPIO pin {pin}"
+            )
+            relays.append(relay_config)
+        return cls(relays)
+    
     def __init__(self, relays: List[RelayConfig]):
         """
         Initialize the GPIO relay controller.
@@ -88,6 +111,13 @@ class GPIORelayController:
     def _initialize_gpio(self):
         """Initialize GPIO pins and set initial states."""
         try:
+            # Validate GPIO pins are available on Raspberry Pi
+            valid_pins = [2, 3, 4, 14, 15, 17, 18, 27, 22, 23, 24, 10, 9, 25, 11, 8, 7, 5, 6, 12, 13, 19, 16, 26, 20, 21]
+            
+            for relay_id, relay in self.relays.items():
+                if relay.gpio_pin not in valid_pins:
+                    raise GPIOInitializationError(f"GPIO pin {relay.gpio_pin} for relay {relay_id} is not valid for Raspberry Pi")
+            
             GPIO.setmode(GPIO.BCM)
             GPIO.setwarnings(False)
             
