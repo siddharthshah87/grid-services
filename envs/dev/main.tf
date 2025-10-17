@@ -108,36 +108,40 @@ module "ecs_task_roles" {
 #   ]
 # }
 
-module "ecs_service_volttron" {
-  source                 = "../../modules/ecs-service-volttron"
-  name                   = "volttron-ven"
-  cluster_id             = module.ecs_cluster.id
-  subnet_ids             = data.aws_subnets.private.ids
-  assign_public_ip       = false
-  security_group_id      = module.ecs_security_group.id
-  execution_role_arn     = module.ecs_task_roles.execution
-  task_role_arn          = module.ecs_task_roles.iot_mqtt
-  image                  = "${module.ecr_volttron.repository_url}:latest"
-  mqtt_topic_events      = "oadr/event/ven1"
-  mqtt_topic_responses   = "oadr/response/ven1"
-  mqtt_topic_metering    = "volttron/metering"
-  mqtt_topic_status      = "ven/status/ven1"
-  iot_endpoint           = module.iot_core.endpoint
-  iot_connect_host       = data.aws_vpc_endpoint.iot_data.dns_entry[0].dns_name
-  iot_tls_server_name    = module.iot_core.endpoint
-  iot_thing_name         = module.iot_core.thing_name
-  ca_cert_secret_arn     = "${aws_secretsmanager_secret.volttron_tls.arn}:ca_cert::"
-  client_cert_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:client_cert::"
-  private_key_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:private_key::"
-  container_port         = 8000
-  target_group_arn       = module.volttron_alb.target_group_arn
-
-  # Wait for the ALB listener and target group before creating the service.
-  depends_on = [
-    module.volttron_alb.listener,
-    module.volttron_alb.target_group
-  ]
-}
+# VEN now runs locally - no cloud infrastructure needed
+# This saves costs and eliminates rc=7 MQTT disconnects from rolling deployments
+# See volttron-ven/LOCAL_VEN.md for local setup instructions
+#
+# module "ecs_service_volttron" {
+#   source                 = "../../modules/ecs-service-volttron"
+#   name                   = "volttron-ven"
+#   cluster_id             = module.ecs_cluster.id
+#   subnet_ids             = data.aws_subnets.private.ids
+#   assign_public_ip       = false
+#   security_group_id      = module.ecs_security_group.id
+#   execution_role_arn     = module.ecs_task_roles.execution
+#   task_role_arn          = module.ecs_task_roles.iot_mqtt
+#   image                  = "${module.ecr_volttron.repository_url}:latest"
+#   mqtt_topic_events      = "oadr/event/ven1"
+#   mqtt_topic_responses   = "oadr/response/ven1"
+#   mqtt_topic_metering    = "volttron/metering"
+#   mqtt_topic_status      = "ven/status/ven1"
+#   iot_endpoint           = module.iot_core.endpoint
+#   iot_connect_host       = data.aws_vpc_endpoint.iot_data.dns_entry[0].dns_name
+#   iot_tls_server_name    = module.iot_core.endpoint
+#   iot_thing_name         = module.iot_core.thing_name
+#   ca_cert_secret_arn     = "${aws_secretsmanager_secret.volttron_tls.arn}:ca_cert::"
+#   client_cert_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:client_cert::"
+#   private_key_secret_arn = "${aws_secretsmanager_secret.volttron_tls.arn}:private_key::"
+#   container_port         = 8000
+#   target_group_arn       = module.volttron_alb.target_group_arn
+#
+#   # Wait for the ALB listener and target group before creating the service.
+#   depends_on = [
+#     module.volttron_alb.listener,
+#     module.volttron_alb.target_group
+#   ]
+# }
 
 module "aurora_postgresql" {
   source             = "../../modules/rds-postgresql"
@@ -164,21 +168,22 @@ module "backend_alb" {
   health_check_path = "/health"
 }
 
-module "volttron_alb" {
-  source         = "../../modules/alb"
-  name           = "volttron-alb"
-  vpc_id         = data.aws_vpc.existing.id
-  public_subnets = data.aws_subnets.public.ids
-  # Expose the Volttron service publicly for easier debugging
-  # by placing the ALB in the public subnets and making it
-  # internet-facing. The default `internal` value is false
-  # and `allowed_cidrs` defaults to ["0.0.0.0/0"].
-  listener_port     = 80
-  target_port       = 8000
-  health_check_path = "/health"
-  enable_https      = true
-  acm_cert_arn      = data.aws_acm_certificate.ven_validated.arn
-}
+# VEN ALB no longer needed - VEN runs locally
+# module "volttron_alb" {
+#   source         = "../../modules/alb"
+#   name           = "volttron-alb"
+#   vpc_id         = data.aws_vpc.existing.id
+#   public_subnets = data.aws_subnets.public.ids
+#   # Expose the Volttron service publicly for easier debugging
+#   # by placing the ALB in the public subnets and making it
+#   # internet-facing. The default `internal` value is false
+#   # and `allowed_cidrs` defaults to ["0.0.0.0/0"].
+#   listener_port     = 80
+#   target_port       = 8000
+#   health_check_path = "/health"
+#   enable_https      = true
+#   acm_cert_arn      = data.aws_acm_certificate.ven_validated.arn
+# }
 
 # Ingress rules allowing traffic from the ALBs to the ECS tasks
 resource "aws_security_group_rule" "ecs_from_backend_alb" {
@@ -200,15 +205,16 @@ resource "aws_security_group_rule" "ecs_from_backend_alb" {
 #   source_security_group_id = module.grid_event_gateway_alb.security_group_id
 # }
 
-resource "aws_security_group_rule" "ecs_from_volttron_alb" {
-  count                    = var.enable_volttron_alb_rule ? 1 : 0
-  type                     = "ingress"
-  from_port                = var.volttron_port
-  to_port                  = var.volttron_port
-  protocol                 = "tcp"
-  security_group_id        = module.ecs_security_group.id
-  source_security_group_id = module.volttron_alb.security_group_id
-}
+# VEN security group rule no longer needed
+# resource "aws_security_group_rule" "ecs_from_volttron_alb" {
+#   count                    = var.enable_volttron_alb_rule ? 1 : 0
+#   type                     = "ingress"
+#   from_port                = var.volttron_port
+#   to_port                  = var.volttron_port
+#   protocol                 = "tcp"
+#   security_group_id        = module.ecs_security_group.id
+#   source_security_group_id = module.volttron_alb.security_group_id
+# }
 
 resource "aws_security_group_rule" "ecs_postgresql" {
   type                     = "ingress"
