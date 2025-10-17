@@ -41,9 +41,10 @@ See [ENHANCED_FEATURES.md](docs/ENHANCED_FEATURES.md) for details on advanced ca
   - `ENHANCED_FEATURES.md`: Enhanced VEN feature details
   - `QUICK_START.md`: Quick reference guide
   - `CHANGES.md`: Migration history and rationale
-- `requirements.txt`: Python dependencies (paho-mqtt, boto3)
+- `requirements.txt`: Python dependencies (paho-mqtt, boto3, Flask)
 - `device_simulator.py`: Device simulation logic (for future use)
 - `certs/`: TLS certificates (auto-fetched, gitignored)
+- `hardware_interfaces/`: Hardware interface modules for GPIO relays and power meters
 
 
 ## Prerequisites
@@ -143,6 +144,7 @@ See [LOCAL_VEN.md](docs/LOCAL_VEN.md) for detailed troubleshooting, including:
 ## Contributing
 - Add docstrings and comments to new code
 - Update documentation for new features
-- Run `./test.sh` to verify functionality before committing
+- Run `./test.sh` to verify VEN functionality before committing
+- Run `pytest` from project root to verify all tests pass
 - Update docs/LOCAL_VEN.md for operational changes
 
