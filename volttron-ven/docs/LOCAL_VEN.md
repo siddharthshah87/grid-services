@@ -19,16 +19,27 @@ The VEN (Virtual End Node) is now designed to run locally instead of in the clou
 
 ## Quick Start
 
-### Running the Local VEN
+### Choose Your VEN Version
 
-The local VEN is a lightweight implementation that focuses on core MQTT functionality:
+We have two VEN implementations:
 
+**Basic VEN** (`ven_local.py`) - Lightweight, core functionality:
 ```bash
 cd /workspaces/grid-services/volttron-ven
 ./run.sh
 ```
 
-This will:
+**Enhanced VEN** (`ven_local_enhanced.py`) - Full featured with Web UI:
+```bash
+cd /workspaces/grid-services/volttron-ven
+./run_enhanced.sh
+```
+
+See [QUICK_START.md](QUICK_START.md) for a comparison and [ENHANCED_FEATURES.md](ENHANCED_FEATURES.md) for enhanced features.
+
+### What Happens on Startup
+
+Both versions will:
 1. Fetch TLS certificates from AWS Secrets Manager (if not already cached)
 2. Generate a unique client ID using timestamp (`volttron_local_<timestamp>`)
 3. Connect to AWS IoT Core
@@ -121,8 +132,8 @@ The local VEN currently supports:
 If you see `MQTT disconnected: unexpected (code 7)`:
 - This indicates a duplicate client ID
 - Ensure no other VEN is running with the same client ID
-- The local VEN uses timestamp-based unique IDs to avoid this
-- Check: `ps aux | grep ven_local` to see running instances
+- Both VEN versions use timestamp-based unique IDs to avoid this
+- Check running instances: `ps aux | grep ven_local`
 
 ### Connection Timeout
 
@@ -145,10 +156,19 @@ The cloud VEN infrastructure has been removed to save costs and simplify operati
 - ~~ALB: `volttron-alb`~~
 - ~~Health checks~~
 
-The local VEN connects directly to AWS IoT Core using mutual TLS authentication.
+Both VEN versions connect directly to AWS IoT Core using mutual TLS authentication.
 
-## Next Steps
+## Which VEN Should I Use?
 
-1. ✅ Test command reception with ping (completed)
-2. 🔄 Add DR event handling to local VEN
-3. 🔄 Test full DR event flow (event → load shed → telemetry → backend logging)
+**Use Basic VEN** (`run.sh`) if you:
+- Want minimal resource usage (~173 lines of code)
+- Only need telemetry and basic commands
+- Don't need a UI or DR event handling
+
+**Use Enhanced VEN** (`run_enhanced.sh`) if you:
+- Need DR event handling with load curtailment
+- Want a web UI for monitoring and control
+- Need AWS IoT Device Shadow integration
+- Want circuit-level control
+
+See [ENHANCED_FEATURES.md](ENHANCED_FEATURES.md) for full comparison.

@@ -3,7 +3,7 @@
 ## Overview
 This is a **local-first** Virtual End Node (VEN) for Demand Response (DR) event communication via MQTT. It connects to AWS IoT Core for command/control and telemetry publishing.
 
-**💡 Quick Start:** See [LOCAL_VEN.md](LOCAL_VEN.md) for detailed setup instructions.
+**💡 Quick Start:** See [LOCAL_VEN.md](docs/LOCAL_VEN.md) for detailed setup instructions.
 
 ## Features
 - ✅ Stable MQTT connectivity with AWS IoT Core (zero rc=7 disconnects)
@@ -28,15 +28,15 @@ cd volttron-ven
 # Open browser to http://localhost:8080
 ```
 
-See [ENHANCED_FEATURES.md](ENHANCED_FEATURES.md) for details on advanced capabilities.
+See [ENHANCED_FEATURES.md](docs/ENHANCED_FEATURES.md) for details on advanced capabilities.
 
 ## Directory Structure
 - `ven_local.py`: Main VEN implementation ⭐
 - `run.sh`: Runner script with cert setup
 - `test.sh`: Automated test script
-- `LOCAL_VEN.md`: **Comprehensive setup & troubleshooting guide**
+- `docs/LOCAL_VEN.md`: **Comprehensive setup & troubleshooting guide**
 - `README.md`: This file
-- `CHANGES.md`: Migration history and rationale
+- `docs/CHANGES.md`: Migration history and rationale
 - `requirements.txt`: Python dependencies (paho-mqtt, boto3)
 - `device_simulator.py`: Device simulation logic (for future use)
 - `certs/`: TLS certificates (auto-fetched, gitignored)
@@ -135,7 +135,7 @@ VEN → ven/telemetry/{venId} → Backend receives telemetry (every 5s)
 
 ## Troubleshooting
 
-See [LOCAL_VEN.md](LOCAL_VEN.md) for detailed troubleshooting, including:
+See [LOCAL_VEN.md](docs/LOCAL_VEN.md) for detailed troubleshooting, including:
 - RC=7 disconnect issues
 - Connection timeouts  
 - Certificate problems
@@ -145,5 +145,5 @@ See [LOCAL_VEN.md](LOCAL_VEN.md) for detailed troubleshooting, including:
 - Add docstrings and comments to new code
 - Update documentation for new features
 - Run tests before committing: `pytest tests/`
-- Update LOCAL_VEN.md for operational changes
+- Update docs/LOCAL_VEN.md for operational changes
 

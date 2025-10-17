@@ -312,18 +312,20 @@ python3 ../scripts/ven_cmd_publish.py \
 
 ## Comparison: Basic vs Enhanced
 
-| Feature | Basic VEN | Enhanced VEN |
+| Feature | Basic VEN<br/>(`ven_local.py`) | Enhanced VEN<br/>(`ven_local_enhanced.py`) |
 |---------|-----------|--------------|
-| MQTT Connection | ✅ | ✅ |
-| Telemetry Publishing | ✅ | ✅ |
-| Ping Command | ✅ | ✅ |
-| Device Shadow | ❌ | ✅ |
-| Web UI | ❌ | ✅ |
-| DR Event Handling | ❌ | ✅ |
-| Load Curtailment | ❌ | ✅ |
-| Circuit Control | ❌ | ✅ |
-| Remote Control | ❌ | ✅ |
-| File Size | 173 lines | ~900 lines |
+| **MQTT Connection** | ✅ | ✅ |
+| **Telemetry Publishing** | ✅ | ✅ |
+| **Ping Command** | ✅ | ✅ |
+| **Device Shadow** | ❌ | ✅ |
+| **Web UI** | ❌ | ✅ |
+| **DR Event Handling** | ❌ | ✅ |
+| **Load Curtailment** | ❌ | ✅ |
+| **Circuit Control** | ❌ | ✅ |
+| **Remote Control** | ❌ | ✅ |
+| **File Size** | ~173 lines | ~900 lines |
+| **Dependencies** | paho-mqtt, boto3 | + Flask |
+| **Best For** | Simple telemetry | Full DR testing |
 
 ## Troubleshooting
 
@@ -368,11 +370,25 @@ Check:
 3. Check VEN logs for error messages
 4. Verify MQTT client has permission to subscribe
 
-## Next Steps
+## When to Use Each Version
 
-1. ✅ Test enhanced VEN locally
-2. ✅ Verify shadow updates
-3. ✅ Test DR events via UI and MQTT
-4. 🔄 Integrate with backend API
-5. 🔄 Add event scheduling
-6. 🔄 Add historical data visualization
+### Use Basic VEN (`./run.sh`) When:
+- Testing basic MQTT connectivity
+- You only need telemetry data
+- Minimal resource usage is important
+- Running on resource-constrained devices
+- You don't need DR event simulation
+
+### Use Enhanced VEN (`./run_enhanced.sh`) When:
+- Testing full DR event flows
+- You want visual monitoring (Web UI)
+- Demonstrating load curtailment to stakeholders
+- Testing Device Shadow integration
+- Developing/debugging circuit control logic
+- Need remote control capabilities
+
+## Related Documentation
+
+- [QUICK_START.md](QUICK_START.md) - Quick reference for both versions
+- [LOCAL_VEN.md](LOCAL_VEN.md) - Detailed setup and troubleshooting
+- [../README.md](../README.md) - Project overview

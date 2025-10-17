@@ -16,11 +16,13 @@ Migrated VEN from cloud-based ECS deployment to local-first architecture, achiev
 - ✅ ECS service and ALB in Terraform (commented out in `envs/dev/main.tf`)
 
 ### Added (Local Infrastructure)
-- ✅ Local VEN (`ven_local.py` - 173 lines, formerly ven_minimal.py)
-- ✅ Runner script (`run.sh`, formerly run_minimal.sh)
+- ✅ Basic Local VEN (`ven_local.py` - ~173 lines, formerly ven_minimal.py)
+- ✅ Enhanced Local VEN (`ven_local_enhanced.py` - ~900 lines, added later)
+- ✅ Basic runner script (`run.sh`, formerly run_minimal.sh)
+- ✅ Enhanced runner script (`run_enhanced.sh`)
 - ✅ Test script (`test.sh`, formerly test_minimal.sh)
 - ✅ Telemetry monitoring tool (`scripts/ven_telemetry_listen.py`)
-- ✅ Comprehensive documentation (`LOCAL_VEN.md`)
+- ✅ Comprehensive documentation (`LOCAL_VEN.md`, `ENHANCED_FEATURES.md`, `QUICK_START.md`)
 - ✅ `.gitignore` for proper exclusions
 
 ### Kept
@@ -63,8 +65,30 @@ The VEN has been renamed from "minimal" to "local" to better reflect its purpose
 - `test_minimal.sh` → `test.sh`
 - Client ID prefix: `volttron_minimal_*` → `volttron_local_*`
 
+## Current Architecture (October 2025)
+
+We now maintain two VEN implementations:
+
+### Basic VEN (`ven_local.py`)
+- Lightweight core functionality (~173 lines)
+- MQTT connectivity, telemetry, ping commands
+- Minimal dependencies (paho-mqtt, boto3)
+- Best for: Simple telemetry and monitoring
+
+### Enhanced VEN (`ven_local_enhanced.py`)
+- Full-featured implementation (~900 lines)
+- All basic features PLUS:
+  - Web UI on port 8080
+  - AWS IoT Device Shadow integration
+  - DR event handling with intelligent load curtailment
+  - Circuit-level control (HVAC, EV, lights, etc.)
+- Additional dependency: Flask
+- Best for: Full DR event testing and demonstrations
+
 ## Documentation
 
-- **Quick Start**: See `README.md`
-- **Detailed Setup**: See `LOCAL_VEN.md`
-- **Troubleshooting**: See `LOCAL_VEN.md` (includes rc=7, connection issues, etc.)
+- **Project Overview**: See `README.md`
+- **Quick Reference**: See `docs/QUICK_START.md`
+- **Detailed Setup**: See `docs/LOCAL_VEN.md`
+- **Enhanced Features**: See `docs/ENHANCED_FEATURES.md`
+- **Troubleshooting**: See `docs/LOCAL_VEN.md` (includes rc=7, connection issues, etc.)
