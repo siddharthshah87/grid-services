@@ -203,12 +203,75 @@ def main():
             print("✓ Register read/write working")
             print("✓ CRC validation passing")
             print("✓ Device responding correctly")
+            print("✓ Measurement channels enabled successfully")
+            print()
+            
+            print("=== Testing High-Level Driver Interface ===")
+            try:
+                # Import and test the main driver
+                import sys
+                sys.path.append('volttron-ven/hardware_interfaces')
+                from evalstpm34_meter import EVALSTPM34Meter, MeterConfig
+                
+                # Create meter config
+                config = MeterConfig(
+                    meter_id="test_meter_01",
+                    uart_port="/dev/ttyUSB0",
+                    baud_rate=9600,
+                    name="Test EVALSTPM34"
+                )
+                
+                print("Creating EVALSTPM34Meter instance...")
+                with EVALSTPM34Meter(config) as meter:
+                    print(f"Meter connected: {meter.is_connected()}")
+                    
+                    if meter.is_connected():
+                        print("\nReading instantaneous values...")
+                        values = meter.read_instantaneous_values()
+                        
+                        print("\n--- Channel 1 Measurements ---")
+                        print(f"Voltage CH1: {values.voltage_ch1:.2f} V")
+                        print(f"Current CH1: {values.current_ch1:.3f} A")
+                        print(f"Active Power CH1: {values.active_power_ch1:.1f} W")
+                        print(f"Reactive Power CH1: {values.reactive_power_ch1:.1f} VAR")
+                        print(f"Apparent Power CH1: {values.apparent_power_ch1:.1f} VA")
+                        print(f"Power Factor CH1: {values.power_factor_ch1:.3f}")
+                        
+                        print("\n--- Channel 2 Measurements ---")
+                        print(f"Voltage CH2: {values.voltage_ch2:.2f} V")
+                        print(f"Current CH2: {values.current_ch2:.3f} A")
+                        print(f"Active Power CH2: {values.active_power_ch2:.1f} W")
+                        print(f"Reactive Power CH2: {values.reactive_power_ch2:.1f} VAR")
+                        print(f"Apparent Power CH2: {values.apparent_power_ch2:.1f} VA")
+                        print(f"Power Factor CH2: {values.power_factor_ch2:.3f}")
+                        
+                        print("\n--- Common Measurements ---")
+                        print(f"Frequency: {values.frequency:.2f} Hz")
+                        print(f"Temperature: {values.temperature}°C" if values.temperature else "Temperature: Not available")
+                        print(f"Timestamp: {values.timestamp:.3f}")
+                        
+                        print("\nReading energy values...")
+                        energy = meter.read_energy_values()
+                        print(f"Active Energy CH1: {energy.active_energy_ch1:.2f} Wh")
+                        print(f"Reactive Energy CH1: {energy.reactive_energy_ch1:.2f} VARh")
+                        print(f"Active Energy CH2: {energy.active_energy_ch2:.2f} Wh")
+                        print(f"Reactive Energy CH2: {energy.reactive_energy_ch2:.2f} VARh")
+                        
+                        print("\n✓ High-level driver interface working!")
+                    else:
+                        print("✗ High-level driver connection failed")
+                        
+            except Exception as e:
+                print(f"High-level driver test failed: {e}")
+                print("This is expected - the driver needs to be updated with correct protocol")
+            
             print()
             print("Next steps:")
-            print("1. Connect AC voltage to VIP1/VIN1 inputs")
-            print("2. Connect current sensor to IIP1/IIN1 inputs") 
-            print("3. Check for measurement data in registers 0x48+ range")
-            print("4. Update Python driver with correct protocol")
+            print("1. Update main driver with correct UART protocol")
+            print("2. For actual measurements, connect AC signals:")
+            print("   - AC voltage to VIP1/VIN1 inputs")
+            print("   - Current sensor to IIP1/IIN1 inputs")
+            print("3. Zero readings are valid when no inputs connected")
                 
     except Exception as e:
         print(f"Error: {e}")

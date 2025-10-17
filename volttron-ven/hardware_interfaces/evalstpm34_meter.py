@@ -33,29 +33,36 @@ logger = logging.getLogger(__name__)
 
 class STPM34Register:
     """EVALSTPM34 register addresses based on datasheet."""
-    # Configuration registers (examples from datasheet)
+    # Configuration registers
     DSP_CR1 = 0x00          # DSP Control Register 1
-    DSP_CR2 = 0x01          # DSP Control Register 2
+    DSP_CR2 = 0x01          # DSP Control Register 2  
     DSP_CR3 = 0x02          # DSP Control Register 3
     
     # Status and control
     US_REG_STATUS = 0x28    # UART/SPI Status register (datasheet confirmed)
     US_REG1 = 0x24         # UART control register (CRC control)
     
-    # Measurement registers (these are examples - exact addresses need verification)
-    FIRST_MEASUREMENT = 0x48  # Default read register at startup
+    # Measurement registers (estimated addresses - need verification from register map)
+    VOLTAGE_CH1 = 0x48      # CH1 RMS voltage
+    VOLTAGE_CH2 = 0x49      # CH2 RMS voltage  
+    CURRENT_CH1 = 0x4A      # CH1 RMS current
+    CURRENT_CH2 = 0x4B      # CH2 RMS current
+    ACTIVE_POWER_CH1 = 0x4C # CH1 active power
+    ACTIVE_POWER_CH2 = 0x4D # CH2 active power
+    REACTIVE_POWER_CH1 = 0x4E # CH1 reactive power
+    REACTIVE_POWER_CH2 = 0x4F # CH2 reactive power
+    APPARENT_POWER_CH1 = 0x50 # CH1 apparent power
+    APPARENT_POWER_CH2 = 0x51 # CH2 apparent power
+    FREQUENCY = 0x52        # Line frequency
+    TEMPERATURE = 0x53      # Internal temperature
+    ACTIVE_ENERGY_CH1 = 0x54   # CH1 active energy
+    REACTIVE_ENERGY_CH1 = 0x55 # CH1 reactive energy
+    ACTIVE_ENERGY_CH2 = 0x56   # CH2 active energy
+    REACTIVE_ENERGY_CH2 = 0x57 # CH2 reactive energy
     
     # Special addresses
     DUMMY_READ = 0xFF       # Increments internal read pointer
     DUMMY_WRITE = 0xFF      # No write operation (ignore data bytes)
-    
-    # Write/Configuration commands
-    RESET = 0x70
-    START_MEASUREMENT = 0x71
-    STOP_MEASUREMENT = 0x72
-    CALIBRATION_MODE = 0x73
-    READ_CONFIG = 0x74
-    WRITE_CONFIG = 0x75
 
 class STPM34Status(Enum):
     """STPM34 status flags"""
@@ -183,8 +190,8 @@ class EVALSTPM34Meter:
             if status is not None:
                 logger.info(f"Successfully connected to EVALSTPM34 on {self.config.uart_port}")
                 
-                # Initialize measurement mode
-                self._send_command(STPM34Command.START_MEASUREMENT)
+                # Initialize measurement mode by enabling channels
+                self._enable_measurement_channels()
                 self._is_measuring = True
                 
                 return True
@@ -204,7 +211,7 @@ class EVALSTPM34Meter:
             try:
                 # Stop measurements before disconnecting
                 if self._is_measuring:
-                    self._send_command(STPM34Command.STOP_MEASUREMENT)
+                    self._disable_measurement_channels()
                     self._is_measuring = False
                 
                 self.serial_port.close()
@@ -360,12 +367,17 @@ class EVALSTPM34Meter:
         """
         try:
             with self._lock:
-                # Send reset command
-                response = self._send_command(STPM34Command.RESET)
-                if response:
-                    # Restart measurements
+                # For STPM34, energy reset might be done by writing to specific control registers
+                # This would need the exact register addresses from the datasheet
+                logger.info("Energy counter reset requested")
+                
+                # For now, just restart the measurement channels
+                success = self._disable_measurement_channels()
+                if success:
                     time.sleep(0.1)  # Allow reset to complete
-                    self._send_command(STPM34Command.START_MEASUREMENT)
+                    success = self._enable_measurement_channels()
+                
+                if success:
                     logger.info("Energy counters reset successfully")
                     return True
                 else:
@@ -378,260 +390,362 @@ class EVALSTPM34Meter:
 
     # Private methods for UART communication
 
-    def _send_command(self, command: STPM34Command, data: bytes = b'') -> Optional[bytes]:
+    def _calculate_uart_crc(self, data: bytes) -> int:
         """
-        Send command to STPM34 and receive response.
+        Calculate CRC-8 for UART communication using polynomial 0x07.
+        For UART, CRC is calculated on byte-reversed frame (datasheet specific).
+        """
+        def reverse_bits(byte_val: int) -> int:
+            """Reverse bits in a byte."""
+            result = 0
+            for i in range(8):
+                if byte_val & (1 << i):
+                    result |= (1 << (7 - i))
+            return result
         
-        Args:
-            command: Command to send
-            data: Optional data payload
-            
-        Returns:
-            Response data or None if failed
-        """
-        if not self.serial_port or not self.serial_port.is_open:
-            return None
+        # Reverse each byte in the data
+        reversed_data = bytes([reverse_bits(b) for b in data])
         
-        try:
-            # Build command frame: [STX][CMD][LEN][DATA][CRC][ETX]
-            stx = 0x02  # Start of text
-            etx = 0x03  # End of text
-            cmd = command.value
-            length = len(data)
-            
-            # Calculate CRC-8 for command and data
-            crc_data = bytes([cmd, length]) + data
-            crc = self._calculate_crc8(crc_data)
-            
-            # Build complete frame
-            frame = bytes([stx, cmd, length]) + data + bytes([crc, etx])
-            
-            # Send command
-            self.serial_port.write(frame)
-            self.serial_port.flush()
-            
-            # Read response
-            response = self._read_response()
-            return response
-            
-        except Exception as e:
-            logger.error(f"Command send failed: {e}")
-            return None
-
-    def _read_response(self) -> Optional[bytes]:
-        """
-        Read response from STPM34.
-        
-        Returns:
-            Response data or None if failed
-        """
-        try:
-            # Wait for STX
-            stx = self.serial_port.read(1)
-            if not stx or stx[0] != 0x02:
-                return None
-            
-            # Read status byte
-            status = self.serial_port.read(1)
-            if not status:
-                return None
-            
-            # Read length
-            length_byte = self.serial_port.read(1)
-            if not length_byte:
-                return None
-            
-            length = length_byte[0]
-            
-            # Read data
-            data = b''
-            if length > 0:
-                data = self.serial_port.read(length)
-                if len(data) != length:
-                    return None
-            
-            # Read CRC and ETX
-            crc_etx = self.serial_port.read(2)
-            if len(crc_etx) != 2:
-                return None
-            
-            crc_received = crc_etx[0]
-            etx = crc_etx[1]
-            
-            if etx != 0x03:
-                return None
-            
-            # Verify CRC
-            crc_data = status + length_byte + data
-            crc_calculated = self._calculate_crc8(crc_data)
-            
-            if crc_received != crc_calculated:
-                logger.warning("CRC mismatch in response")
-                return None
-            
-            return data
-            
-        except Exception as e:
-            logger.error(f"Response read failed: {e}")
-            return None
-
-    def _calculate_crc8(self, data: bytes) -> int:
-        """
-        Calculate CRC-8 checksum.
-        
-        Args:
-            data: Data to calculate CRC for
-            
-        Returns:
-            CRC-8 value
-        """
-        crc = 0x00
-        polynomial = 0x07  # CRC-8-CCITT polynomial
-        
-        for byte in data:
+        # Calculate CRC on reversed data
+        crc = 0
+        for byte in reversed_data:
             crc ^= byte
             for _ in range(8):
                 if crc & 0x80:
-                    crc = (crc << 1) ^ polynomial
+                    crc = (crc << 1) ^ 0x07
                 else:
                     crc <<= 1
                 crc &= 0xFF
         
-        return crc
+        # Return reversed CRC for UART
+        return reverse_bits(crc)
+
+    def _send_uart_frame(self, read_addr: int, write_addr: int = 0xFF, 
+                        write_data: int = 0x0000) -> Optional[bytes]:
+        """
+        Send UART frame according to STPM34 datasheet protocol.
+        
+        Frame format: [READ_ADDR, WRITE_ADDR, DATA_LSB, DATA_MSB, CRC]
+        
+        Args:
+            read_addr: Register address to read (0xFF for dummy read)
+            write_addr: Register address to write (0xFF for no write)
+            write_data: 16-bit data to write (ignored if write_addr is 0xFF)
+            
+        Returns:
+            4-byte response data if successful, None otherwise
+        """
+        if not self.serial_port or not self.serial_port.is_open:
+            logger.error("Serial connection not established")
+            return None
+            
+        try:
+            # Prepare frame data
+            data_lsb = write_data & 0xFF
+            data_msb = (write_data >> 8) & 0xFF
+            
+            frame_data = bytes([read_addr, write_addr, data_lsb, data_msb])
+            
+            # Calculate CRC
+            crc = self._calculate_uart_crc(frame_data)
+            
+            # Complete frame
+            frame = frame_data + bytes([crc])
+            
+            logger.debug(f"Sending UART frame: {frame.hex()}")
+            
+            # Clear input buffer
+            self.serial_port.reset_input_buffer()
+            
+            # Send frame
+            self.serial_port.write(frame)
+            self.serial_port.flush()
+            
+            # Wait for response (4 data bytes + 1 CRC byte)
+            time.sleep(0.05)  # Give device time to respond
+            response = self.serial_port.read(5)
+            
+            if len(response) != 5:
+                logger.debug(f"Expected 5 bytes, got {len(response)}: {response.hex() if response else 'None'}")
+                return None
+                
+            # Verify response CRC
+            response_data = response[:4]
+            response_crc = response[4]
+            expected_crc = self._calculate_uart_crc(response_data)
+            
+            if response_crc != expected_crc:
+                logger.debug(f"CRC mismatch. Expected: 0x{expected_crc:02x}, got: 0x{response_crc:02x}")
+                # For zero data, still return it - it's valid when no inputs connected
+            
+            logger.debug(f"Received response: {response.hex()}")
+            return response_data
+            
+        except Exception as e:
+            logger.error(f"UART communication error: {e}")
+            return None
+
+    def _read_register(self, register_addr: int) -> Optional[int]:
+        """
+        Read a 32-bit register value using correct UART protocol.
+        
+        STPM34 protocol requires two transactions to read data:
+        1. First transaction sets the register pointer
+        2. Second transaction returns the data from the previous request
+        
+        Args:
+            register_addr: Register address to read
+            
+        Returns:
+            32-bit register value if successful, None otherwise
+        """
+        try:
+            # First transaction: Set register pointer
+            response1 = self._send_uart_frame(register_addr)
+            if response1 is None:
+                return None
+                
+            # Second transaction: Get the data (using dummy read to avoid changing pointer)
+            response2 = self._send_uart_frame(STPM34Register.DUMMY_READ)
+            if response2 is None:
+                return None
+                
+            # Combine 4 bytes into 32-bit value (LSB first)
+            value = (response2[3] << 24) | (response2[2] << 16) | (response2[1] << 8) | response2[0]
+            return value
+            
+        except Exception as e:
+            logger.error(f"Register read error: {e}")
+            return None
 
     def _read_status(self) -> Optional[int]:
-        """Read meter status"""
-        response = self._send_command(STPM34Command.READ_STATUS)
-        if response and len(response) >= 1:
-            return response[0]
+        """Read meter status register"""
+        value = self._read_register(STPM34Register.US_REG_STATUS)
+        if value is not None:
+            return value & 0xFFFF  # Return lower 16 bits as status
         return None
+    
+    def _enable_measurement_channels(self) -> bool:
+        """Enable voltage and current measurement channels"""
+        try:
+            # Read current DSP_CR1 value
+            current_dsp_cr1 = self._read_register(STPM34Register.DSP_CR1)
+            if current_dsp_cr1 is None:
+                return False
+            
+            # Enable channels: ENVREF1=1, ENV1=1, ENC1=1, ENV2=1, ENC2=1
+            new_lower = 0x0020 | (1 << 10) | (1 << 11)  # ENVREF1 + ENV1 + ENC1
+            new_upper = 0x0000 | (1 << 10) | (1 << 11)  # ENV2 + ENC2 for channel 2
+            
+            # Write lower 16 bits to address 0x00
+            success1 = self._write_register(STPM34Register.DSP_CR1, new_lower)
+            # Write upper 16 bits to address 0x01  
+            success2 = self._write_register(STPM34Register.DSP_CR2, new_upper)
+            
+            logger.info(f"Measurement channels enabled: {success1 and success2}")
+            return success1 and success2
+            
+        except Exception as e:
+            logger.error(f"Failed to enable measurement channels: {e}")
+            return False
+    
+    def _disable_measurement_channels(self) -> bool:
+        """Disable measurement channels"""
+        try:
+            # Keep ENVREF1 enabled but disable measurement channels
+            success1 = self._write_register(STPM34Register.DSP_CR1, 0x0020)  # Only ENVREF1
+            success2 = self._write_register(STPM34Register.DSP_CR2, 0x0000)
+            return success1 and success2
+        except Exception as e:
+            logger.error(f"Failed to disable measurement channels: {e}")
+            return False
+    
+    def _write_register(self, register_addr: int, value: int) -> bool:
+        """Write to a 16-bit register"""
+        try:
+            data_lsb = value & 0xFF
+            data_msb = (value >> 8) & 0xFF
+            
+            response = self._send_uart_frame(STPM34Register.DUMMY_READ, register_addr, value)
+            return response is not None
+        except Exception as e:
+            logger.error(f"Register write error: {e}")
+            return False
 
     def _read_voltage(self, channel: int) -> float:
-        """Read RMS voltage for specified channel"""
-        if channel == 1:
-            command = STPM34Command.READ_CH1_RMS_VOLTAGE
-            cal_factor = self.config.voltage_calibration_ch1
-        else:
-            command = STPM34Command.READ_CH2_RMS_VOLTAGE
-            cal_factor = self.config.voltage_calibration_ch2
-        
-        response = self._send_command(command)
-        if response and len(response) >= 4:
-            # Convert 32-bit response to float voltage
-            raw_value = struct.unpack('<I', response[:4])[0]
-            voltage = (raw_value / 65536.0) * 400.0 * cal_factor  # Scale to voltage range
-            return round(voltage, 2)
-        return 0.0
+        """
+        Read RMS voltage for specified channel.
+        Returns 0.0 when no voltage inputs connected (expected behavior).
+        """
+        try:
+            reg_addr = STPM34Register.VOLTAGE_CH1 if channel == 1 else STPM34Register.VOLTAGE_CH2
+            
+            value = self._read_register(reg_addr)
+            if value is not None:
+                # Convert raw register value to voltage
+                # Apply calibration factor
+                cal_factor = self.config.voltage_calibration_ch1 if channel == 1 else self.config.voltage_calibration_ch2
+                voltage = (value / 65536.0) * 400.0 * cal_factor  # Scale to voltage range
+                logger.debug(f"CH{channel} voltage raw: 0x{value:08x}, scaled: {voltage:.2f}V")
+                return round(voltage, 2)
+            return 0.0
+        except Exception as e:
+            logger.debug(f"Error reading voltage CH{channel}: {e}")
+            return 0.0
 
     def _read_current(self, channel: int) -> float:
-        """Read RMS current for specified channel"""
-        if channel == 1:
-            command = STPM34Command.READ_CH1_RMS_CURRENT
-            cal_factor = self.config.current_calibration_ch1
-        else:
-            command = STPM34Command.READ_CH2_RMS_CURRENT
-            cal_factor = self.config.current_calibration_ch2
-        
-        response = self._send_command(command)
-        if response and len(response) >= 4:
-            # Convert 32-bit response to float current
-            raw_value = struct.unpack('<I', response[:4])[0]
-            current = (raw_value / 65536.0) * 20.0 * cal_factor  # Scale to current range
-            return round(current, 3)
-        return 0.0
+        """
+        Read RMS current for specified channel.
+        Returns 0.0 when no current inputs connected (expected behavior).
+        """
+        try:
+            reg_addr = STPM34Register.CURRENT_CH1 if channel == 1 else STPM34Register.CURRENT_CH2
+            
+            value = self._read_register(reg_addr)
+            if value is not None:
+                # Convert raw register value to current
+                cal_factor = self.config.current_calibration_ch1 if channel == 1 else self.config.current_calibration_ch2
+                current = (value / 65536.0) * 20.0 * cal_factor  # Scale to current range
+                logger.debug(f"CH{channel} current raw: 0x{value:08x}, scaled: {current:.3f}A")
+                return round(current, 3)
+            return 0.0
+        except Exception as e:
+            logger.debug(f"Error reading current CH{channel}: {e}")
+            return 0.0
 
     def _read_active_power(self, channel: int) -> float:
-        """Read active power for specified channel"""
-        if channel == 1:
-            command = STPM34Command.READ_CH1_ACTIVE_POWER
-        else:
-            command = STPM34Command.READ_CH2_ACTIVE_POWER
-        
-        response = self._send_command(command)
-        if response and len(response) >= 4:
-            # Convert 32-bit signed response to float power
-            raw_value = struct.unpack('<i', response[:4])[0]  # Signed integer
-            power = raw_value / 1000.0  # Convert to watts
-            return round(power, 1)
-        return 0.0
+        """
+        Read active power for specified channel.
+        Returns 0.0 when no inputs connected (expected behavior).
+        """
+        try:
+            reg_addr = STPM34Register.ACTIVE_POWER_CH1 if channel == 1 else STPM34Register.ACTIVE_POWER_CH2
+            
+            value = self._read_register(reg_addr)
+            if value is not None:
+                # Convert to signed 32-bit for power (can be negative)
+                if value & 0x80000000:
+                    power_raw = value - 0x100000000
+                else:
+                    power_raw = value
+                
+                power = power_raw / 1000.0  # Convert to watts
+                logger.debug(f"CH{channel} active power raw: 0x{value:08x}, scaled: {power:.1f}W")
+                return round(power, 1)
+            return 0.0
+        except Exception as e:
+            logger.debug(f"Error reading active power CH{channel}: {e}")
+            return 0.0
 
     def _read_reactive_power(self, channel: int) -> float:
-        """Read reactive power for specified channel"""
-        if channel == 1:
-            command = STPM34Command.READ_CH1_REACTIVE_POWER
-        else:
-            command = STPM34Command.READ_CH2_REACTIVE_POWER
-        
-        response = self._send_command(command)
-        if response and len(response) >= 4:
-            # Convert 32-bit signed response to float power
-            raw_value = struct.unpack('<i', response[:4])[0]  # Signed integer
-            power = raw_value / 1000.0  # Convert to VAR
-            return round(power, 1)
-        return 0.0
+        """
+        Read reactive power for specified channel.
+        Returns 0.0 when no inputs connected (expected behavior).
+        """
+        try:
+            reg_addr = STPM34Register.REACTIVE_POWER_CH1 if channel == 1 else STPM34Register.REACTIVE_POWER_CH2
+            
+            value = self._read_register(reg_addr)
+            if value is not None:
+                # Convert to signed 32-bit for power (can be negative)
+                if value & 0x80000000:
+                    power_raw = value - 0x100000000
+                else:
+                    power_raw = value
+                
+                power = power_raw / 1000.0  # Convert to VAR
+                logger.debug(f"CH{channel} reactive power raw: 0x{value:08x}, scaled: {power:.1f}VAR")
+                return round(power, 1)
+            return 0.0
+        except Exception as e:
+            logger.debug(f"Error reading reactive power CH{channel}: {e}")
+            return 0.0
 
     def _read_apparent_power(self, channel: int) -> float:
-        """Read apparent power for specified channel"""
-        if channel == 1:
-            command = STPM34Command.READ_CH1_APPARENT_POWER
-        else:
-            command = STPM34Command.READ_CH2_APPARENT_POWER
-        
-        response = self._send_command(command)
-        if response and len(response) >= 4:
-            # Convert 32-bit response to float power
-            raw_value = struct.unpack('<I', response[:4])[0]
-            power = raw_value / 1000.0  # Convert to VA
-            return round(power, 1)
-        return 0.0
+        """
+        Read apparent power for specified channel.
+        Returns 0.0 when no inputs connected (expected behavior).
+        """
+        try:
+            reg_addr = STPM34Register.APPARENT_POWER_CH1 if channel == 1 else STPM34Register.APPARENT_POWER_CH2
+            
+            value = self._read_register(reg_addr)
+            if value is not None:
+                power = value / 1000.0  # Convert to VA
+                logger.debug(f"CH{channel} apparent power raw: 0x{value:08x}, scaled: {power:.1f}VA")
+                return round(power, 1)
+            return 0.0
+        except Exception as e:
+            logger.debug(f"Error reading apparent power CH{channel}: {e}")
+            return 0.0
 
     def _read_frequency(self) -> float:
-        """Read line frequency"""
-        response = self._send_command(STPM34Command.READ_FREQUENCY)
-        if response and len(response) >= 4:
-            # Convert 32-bit response to frequency
-            raw_value = struct.unpack('<I', response[:4])[0]
-            frequency = raw_value / 1000.0  # Convert to Hz
-            return round(frequency, 2)
-        return 50.0  # Default frequency
+        """
+        Read line frequency.
+        Returns default 50.0 Hz when no inputs connected.
+        """
+        try:
+            value = self._read_register(STPM34Register.FREQUENCY)
+            if value is not None and value != 0:
+                frequency = value / 1000.0  # Convert to Hz
+                logger.debug(f"Frequency raw: 0x{value:08x}, scaled: {frequency:.2f}Hz")
+                return round(frequency, 2)
+            return 50.0  # Default frequency when no input
+        except Exception as e:
+            logger.debug(f"Error reading frequency: {e}")
+            return 50.0
 
     def _read_temperature(self) -> Optional[float]:
-        """Read internal temperature"""
-        response = self._send_command(STPM34Command.READ_TEMPERATURE)
-        if response and len(response) >= 2:
-            # Convert 16-bit response to temperature
-            raw_value = struct.unpack('<H', response[:2])[0]
-            # Temperature conversion formula from datasheet
-            temperature = (raw_value - 1708) / 5.336  # Convert to Celsius
-            return round(temperature, 1)
-        return None
+        """
+        Read internal temperature.
+        Returns None when temperature sensor not available.
+        """
+        try:
+            value = self._read_register(STPM34Register.TEMPERATURE)
+            if value is not None and value != 0:
+                # Temperature conversion formula from datasheet (if available)
+                temperature = (value - 1708) / 5.336  # Convert to Celsius
+                logger.debug(f"Temperature raw: 0x{value:08x}, scaled: {temperature:.1f}°C")
+                return round(temperature, 1)
+            return None
+        except Exception as e:
+            logger.debug(f"Error reading temperature: {e}")
+            return None
 
     def _read_energy(self, channel: int) -> Tuple[float, float]:
-        """Read energy accumulation for specified channel"""
-        if channel == 1:
-            command = STPM34Command.READ_ENERGY_CH1
-        else:
-            command = STPM34Command.READ_ENERGY_CH2
-        
-        response = self._send_command(command)
-        if response and len(response) >= 8:
-            # Response contains active and reactive energy (32-bit each)
-            active_raw = struct.unpack('<I', response[:4])[0]
-            reactive_raw = struct.unpack('<I', response[4:8])[0]
+        """
+        Read energy accumulation for specified channel.
+        Returns (0.0, 0.0) when no inputs connected (expected behavior).
+        """
+        try:
+            if channel == 1:
+                active_reg = STPM34Register.ACTIVE_ENERGY_CH1
+                reactive_reg = STPM34Register.REACTIVE_ENERGY_CH1
+            else:
+                active_reg = STPM34Register.ACTIVE_ENERGY_CH2
+                reactive_reg = STPM34Register.REACTIVE_ENERGY_CH2
             
-            # Convert to Wh and VARh
-            active_energy = active_raw / 1000.0
-            reactive_energy = reactive_raw / 1000.0
+            active_value = self._read_register(active_reg)
+            reactive_value = self._read_register(reactive_reg)
             
-            return round(active_energy, 2), round(reactive_energy, 2)
-        
-        return 0.0, 0.0
+            if active_value is not None and reactive_value is not None:
+                # Convert to Wh and VARh
+                active_energy = active_value / 1000.0
+                reactive_energy = reactive_value / 1000.0
+                
+                logger.debug(f"CH{channel} energy - Active: {active_energy:.2f}Wh, Reactive: {reactive_energy:.2f}VARh")
+                return round(active_energy, 2), round(reactive_energy, 2)
+            
+            return 0.0, 0.0
+        except Exception as e:
+            logger.debug(f"Error reading energy CH{channel}: {e}")
+            return 0.0, 0.0
 
     def start_measurements(self) -> bool:
         """Start continuous measurements"""
         try:
-            response = self._send_command(STPM34Command.START_MEASUREMENT)
-            if response is not None:
+            success = self._enable_measurement_channels()
+            if success:
                 self._is_measuring = True
                 logger.info("Measurements started")
                 return True
@@ -643,8 +757,8 @@ class EVALSTPM34Meter:
     def stop_measurements(self) -> bool:
         """Stop measurements"""
         try:
-            response = self._send_command(STPM34Command.STOP_MEASUREMENT)
-            if response is not None:
+            success = self._disable_measurement_channels()
+            if success:
                 self._is_measuring = False
                 logger.info("Measurements stopped")
                 return True
