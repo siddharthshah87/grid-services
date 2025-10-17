@@ -437,7 +437,8 @@ except Exception:
     pass
 
 connected = False
-_subscribed = False  # Track if we've already subscribed to MQTT topics
+_connecting = False  # Track if connection is in progress to prevent race conditions
+_loop_started = False  # Track if MQTT background loop has been started
 _last_connect_time: float | None = None
 _last_disconnect_time: float | None = None
 _last_publish_time: float | None = None
@@ -680,16 +681,23 @@ def _ven_disable() -> None:
 
 def _ven_enable() -> None:
     """Enable VEN agent and connect MQTT client."""
-    global _ven_enabled
-    if _ven_enabled and connected:
-        # Already enabled and connected
+    global _ven_enabled, _connecting, _loop_started
+    if _ven_enabled and (connected or _connecting):
+        # Already enabled and connected/connecting
+        print(f"[DEBUG] VEN already enabled (connected={connected}, connecting={_connecting})")
         return
     _ven_enabled = True
+    _connecting = True  # Mark that connection is in progress
+    print(f"[DEBUG] Enabling VEN - attempting MQTT connection to {MQTT_CONNECT_HOST}:{MQTT_PORT}")
     # Try to connect and start loop, then resubscribe
     for attempt in range(1, MQTT_MAX_CONNECT_ATTEMPTS + 1):
         try:
             if not client.is_connected():
+                print(f"[DEBUG] Connecting to MQTT (attempt {attempt}/{MQTT_MAX_CONNECT_ATTEMPTS})...")
                 client.connect(MQTT_CONNECT_HOST, MQTT_PORT, 60)
+                print("[DEBUG] MQTT connect() call succeeded")
+            else:
+                print("[DEBUG] MQTT client already connected")
             break
         except Exception as e:
             print(
@@ -697,8 +705,17 @@ def _ven_enable() -> None:
                 file=sys.stderr,
             )
             time.sleep(min(2 ** attempt, 30))
-    client.loop_start()
+    # Only call loop_start() once - it starts a background thread
+    if not _loop_started:
+        print("[DEBUG] Starting MQTT loop_start()")
+        client.loop_start()
+        _loop_started = True
+    else:
+        print("[DEBUG] MQTT loop already started, skipping loop_start()")
+    print("[DEBUG] Calling _subscribe_topics()")
     _subscribe_topics()
+    print("[DEBUG] _ven_enable() completed")
+    _connecting = False  # Connection attempt finished
 
 
 def _shadow_request_sync() -> None:
