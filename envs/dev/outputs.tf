@@ -54,17 +54,17 @@ output "frontend_alb_dns_name" {
   value       = module.frontend_alb.dns_name
 }
 
-# ALB Outputs - Volttron
-output "volttron_alb_dns_name" {
-  description = "DNS name of the volttron load balancer"
-  value       = module.volttron_alb.dns_name
-}
+# VEN runs locally now - no cloud ALB needed
+# output "volttron_alb_dns_name" {
+#   description = "DNS name of the volttron load balancer"
+#   value       = module.volttron_alb.dns_name
+# }
 
-# Service Outputs
-output "volttron_service_name" {
-  description = "Name of the volttron ECS service"
-  value       = module.ecs_service_volttron.name
-}
+# VEN runs locally now - no cloud service needed
+# output "volttron_service_name" {
+#   description = "Name of the volttron ECS service"
+#   value       = module.ecs_service_volttron.name
+# }
 
 # ECR Repository Outputs
 output "ecr_backend_repository_url" {

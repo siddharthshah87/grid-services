@@ -35,13 +35,14 @@ export IOT_ENDPOINT="$IOT_ENDPOINT"
 export MQTT_CONNECT_HOST="$IOT_ENDPOINT"
 export MQTT_TLS_SERVER_NAME="$IOT_ENDPOINT"
 export MQTT_PORT=8883
-export IOT_THING_NAME="volttron_thing"
+export IOT_THING_NAME="volttron_thing_local"  # Use different thing name for local dev
 export AWS_REGION="us-west-2"
 export HEALTH_PORT=8000
-export VEN_ID="volttron_thing"
-export BACKEND_CMD_TOPIC="ven/cmd/volttron_thing"
-export BACKEND_ACK_TOPIC="ven/ack/volttron_thing"
-export BACKEND_TELEMETRY_TOPIC="ven/telemetry/volttron_thing"
+export VEN_ID="volttron_thing_local"
+export CLIENT_ID="volttron_thing_local"  # Unique client ID to avoid conflicts
+export BACKEND_CMD_TOPIC="ven/cmd/volttron_thing_local"
+export BACKEND_ACK_TOPIC="ven/ack/volttron_thing_local"
+export BACKEND_TELEMETRY_TOPIC="ven/telemetry/volttron_thing_local"
 
 # Disable TLS secret name so it uses env vars instead
 export TLS_SECRET_NAME=""
