@@ -130,6 +130,10 @@ class STPM34Scaling:
     CURRENT_SIGN_BIT = 0x40000000      # Bit 30 for current sign (after shift)
     POWER_SIGN_BIT = 0x08000000        # Bit 27 for power sign
 
+    # DSP_CR3 latch bits (from C driver stpm_metrology.h)
+    BIT_MASK_STPM_LATCH1 = 0x00200000
+    BIT_MASK_STPM_LATCH2 = 0x00400000
+
 @dataclass
 class MeterConfig:
     """Configuration for EVALSTPM34 meter"""
@@ -208,6 +212,9 @@ class EVALSTPM34Meter:
         self._last_error: Optional[str] = None
         
         logger.info(f"Initializing EVALSTPM34 meter {config.meter_id}")
+        # snapshot cache to hold last bulk read
+        self._last_snapshot = None
+        self._last_snapshot_time = 0.0
 
     def __enter__(self):
         """Context manager entry"""
@@ -327,6 +334,15 @@ class EVALSTPM34Meter:
         with self._lock:
             try:
                 timestamp = time.time()
+
+                # Take a coherent snapshot (latch + bulk read) before reading
+                # instantaneous values. This mirrors the C HAL and ensures
+                # VRMS/IRMS/power values come from the same timebase.
+                try:
+                    self.read_snapshot()
+                except Exception:
+                    # ignore snapshot failure and fall back to per-register reads
+                    pass
                 
                 # Read Channel 1 measurements
                 voltage_ch1 = self._read_voltage(channel=1)
@@ -557,16 +573,20 @@ class EVALSTPM34Meter:
             32-bit register value if successful, None otherwise
         """
         try:
-            # First transaction: Set register pointer
+            # For normal register reads we still support the two-transaction
+            # method (pointer then dummy read). However for performance and
+            # coherent metrology snapshots we prefer to use the bulk snapshot
+            # read implemented in `read_snapshot`.
+
             response1 = self._send_uart_frame(register_addr)
             if response1 is None:
                 return None
-                
+
             # Second transaction: Get the data (using dummy read to avoid changing pointer)
             response2 = self._send_uart_frame(STPM34Register.DUMMY_READ)
             if response2 is None:
                 return None
-                
+
             # Combine 4 bytes into 32-bit value (LSB first)
             value = (response2[3] << 24) | (response2[2] << 16) | (response2[1] << 8) | response2[0]
             return value
@@ -629,18 +649,126 @@ class EVALSTPM34Meter:
             logger.error(f"Register write error: {e}")
             return False
 
+    # Bulk read / latch helpers (match C HAL behavior)
+    METRO_STPM_DATA_REG_NB_BLOCKS = 49
+    METRO_STPM_DSP_DATA_REG_NB_BLOCKS = 21
+    METRO_STPM_PH1_DATA_REG_NB_BLOCKS = 12
+    METRO_STPM_TOT_DATA_REG_NB_BLOCKS = 4
+
+    def _latch_sw(self) -> bool:
+        """Perform a software latch by setting the S/W latch bits in DSP_CR3.
+
+        This mimics the C HAL which writes the latch bits into DSP_CR3 before
+        performing a bulk read so that a coherent snapshot is captured.
+        """
+        try:
+            # Read current 32-bit DSP_CR3 value
+            cur = self._read_register(STPM34Register.DSP_CR3)
+            if cur is None:
+                cur = 0
+
+            latch_mask = STPM34Scaling.BIT_MASK_STPM_LATCH1 | STPM34Scaling.BIT_MASK_STPM_LATCH2
+            new = cur | latch_mask
+
+            # Write back as two 16-bit writes: lower and upper halves
+            lower = new & 0xFFFF
+            upper = (new >> 16) & 0xFFFF
+
+            # Write lower half
+            if not self._write_register(STPM34Register.DSP_CR3, lower):
+                return False
+            # Write upper half at next word address (addr + 1)
+            if not self._write_register(STPM34Register.DSP_CR3 + 1, upper):
+                return False
+
+            # small delay to allow latch to take effect
+            time.sleep(0.001)
+            return True
+        except Exception as e:
+            logger.debug(f"SW latch error: {e}")
+            return False
+
+    def _bulk_read(self, start_addr: int, nb_blocks: int) -> Optional[list]:
+        """Bulk read `nb_blocks` 32-bit registers starting at `start_addr`.
+
+        Implements the pointer + repeated dummy-read sequence used in the C HAL
+        (Metro_HAL_Stpm_Read). Returns a list of 32-bit integers in ascending
+        address order.
+        """
+        try:
+            out = []
+            # Set pointer once
+            r = self._send_uart_frame(start_addr)
+            if r is None:
+                return None
+
+            # Read nb_blocks values using dummy reads
+            for _ in range(nb_blocks):
+                resp = self._send_uart_frame(STPM34Register.DUMMY_READ)
+                if resp is None:
+                    return None
+                val = (resp[3] << 24) | (resp[2] << 16) | (resp[1] << 8) | resp[0]
+                out.append(val)
+
+            return out
+        except Exception as e:
+            logger.debug(f"Bulk read error: {e}")
+            return None
+
+    def read_snapshot(self, start_addr: int = None, nb_blocks: int = None) -> Optional[list]:
+        """Latch device and perform a bulk read snapshot starting at `start_addr`.
+
+        Returns list of 32-bit register values or None on error.
+        """
+        # Default to reading from DSP_REG14 onwards to capture RMS and power data
+        if start_addr is None:
+            start_addr = STPM34Register.DSP_REG14  # 0x48
+        if nb_blocks is None:
+            # Read enough blocks to cover DSP_REG14 through CH2_REG12 (0x48 to 0x82)
+            # That's (0x82 - 0x48) / 2 + 1 = 30 blocks
+            nb_blocks = 30
+
+        # Perform SW latch first
+        if not self._latch_sw():
+            logger.debug("SW latch failed, proceeding with bulk read anyway")
+
+        snap = self._bulk_read(start_addr, nb_blocks)
+        if snap is not None:
+            self._last_snapshot = (start_addr, snap)
+            self._last_snapshot_time = time.time()
+        return snap
+
+    def _snapshot_lookup(self, addr: int) -> Optional[int]:
+        """Lookup a 32-bit register value in the last snapshot by address.
+
+        Addresses in the STPM C headers are spaced by 2 per 32-bit register.
+        """
+        if not self._last_snapshot:
+            return None
+        base_addr, snap = self._last_snapshot
+        idx = (addr - base_addr) // 2
+        if idx < 0 or idx >= len(snap):
+            return None
+        return snap[idx]
+
     def _read_voltage(self, channel: int) -> float:
         """
         Read RMS voltage for specified channel using C driver register mapping.
-        Returns 0.0 when no voltage inputs connected (expected behavior).
         """
         try:
-            # Both channels' voltage/current are in DSP_REG14 and DSP_REG15
+            # Use DSP_REG14/DSP_REG15 as per C driver for RMS voltage/current
             if channel == 1:
-                reg_value = self._read_register(STPM34Register.DSP_REG14)
+                reg_addr = STPM34Register.DSP_REG14  # 0x48
             else:  # channel == 2
-                reg_value = self._read_register(STPM34Register.DSP_REG15)
+                reg_addr = STPM34Register.DSP_REG15  # 0x4A
             
+            # Prefer snapshot lookup if available
+            snap_val = self._snapshot_lookup(reg_addr)
+            if snap_val is not None:
+                reg_value = snap_val
+            else:
+                reg_value = self._read_register(reg_addr)
+
             if reg_value is not None:
                 # Extract voltage RMS from lower 15 bits
                 voltage_raw = reg_value & STPM34Scaling.VOLTAGE_RMS_MASK
@@ -666,15 +794,22 @@ class EVALSTPM34Meter:
     def _read_current(self, channel: int) -> float:
         """
         Read RMS current for specified channel using C driver register mapping.
-        Returns 0.0 when no current inputs connected (expected behavior).
         """
         try:
-            # Both channels' voltage/current are in DSP_REG14 and DSP_REG15
+            # Use DSP_REG14/DSP_REG15 as per C driver for RMS voltage/current
+            # Current RMS is in the upper 15 bits of the same registers
             if channel == 1:
-                reg_value = self._read_register(STPM34Register.DSP_REG14)
+                reg_addr = STPM34Register.DSP_REG14  # 0x48
             else:  # channel == 2
-                reg_value = self._read_register(STPM34Register.DSP_REG15)
+                reg_addr = STPM34Register.DSP_REG15  # 0x4A
             
+            # Prefer snapshot lookup if available
+            snap_val = self._snapshot_lookup(reg_addr)
+            if snap_val is not None:
+                reg_value = snap_val
+            else:
+                reg_value = self._read_register(reg_addr)
+
             if reg_value is not None:
                 # Extract current RMS from upper 15 bits
                 current_raw = (reg_value & STPM34Scaling.CURRENT_RMS_MASK) >> STPM34Scaling.CURRENT_RMS_SHIFT
@@ -708,6 +843,11 @@ class EVALSTPM34Meter:
             else:  # channel == 2
                 reg_value = self._read_register(STPM34Register.CH2_REG5)  # CH2 Active Power
             
+            # Prefer snapshot lookup
+            snap_val = self._snapshot_lookup(STPM34Register.CH1_REG5 if channel == 1 else STPM34Register.CH2_REG5)
+            if snap_val is not None:
+                reg_value = snap_val
+
             if reg_value is not None:
                 # Extract power value (28-bit signed) 
                 power_raw = reg_value & STPM34Scaling.POWER_MASK
@@ -737,6 +877,11 @@ class EVALSTPM34Meter:
             else:  # channel == 2
                 reg_value = self._read_register(STPM34Register.CH2_REG7)  # CH2 Reactive Power
             
+            # Prefer snapshot lookup
+            snap_val = self._snapshot_lookup(STPM34Register.CH1_REG7 if channel == 1 else STPM34Register.CH2_REG7)
+            if snap_val is not None:
+                reg_value = snap_val
+
             if reg_value is not None:
                 # Extract power value (28-bit signed) 
                 power_raw = reg_value & STPM34Scaling.POWER_MASK

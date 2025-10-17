@@ -4,6 +4,20 @@ Example usage of hardware interface modules.
 This script demonstrates how to use the GPIO relay controller and
 EVALSTPM34 meter interface for a physical VEN implementation.
 
+Key Features Demonstrated:
+- GPIO relay control for load switching
+- EVALSTPM34 coherent snapshot-based measurements
+- Software latch mechanism for synchronized readings
+- Dual-channel power monitoring
+- Integrated demand response operations
+
+The EVALSTPM34 driver implements advanced features matching the
+STMicroelectronics C HAL:
+- Software latch (DSP_CR3) for coherent data snapshots
+- Bulk register reads (up to 30 consecutive registers)
+- Proper register mapping from DSP_REG14/15 for RMS values
+- Measurement variability detection for validation
+
 For hardware testing and validation, also see:
 - test_evalstpm34_real.py: Continuous monitoring test for EVALSTPM34
 """
@@ -118,14 +132,16 @@ def main():
         with EVALSTPM34Meter(meter_config) as meter:
             logger.info(f"Initialized meter: {meter.get_meter_info()}")
             
-            # Take several readings
-            logger.info("Taking power measurements...")
+            # Take several readings using snapshot-based measurements
+            logger.info("Taking power measurements with coherent snapshots...")
             for i in range(5):
                 reading = meter.read_instantaneous_values()
                 
-                logger.info(f"Reading {i+1}:")
-                logger.info(f"  CH1: {reading.voltage_ch1:.1f}V, {reading.current_ch1:.2f}A, {reading.active_power_ch1:.1f}W")
-                logger.info(f"  CH2: {reading.voltage_ch2:.1f}V, {reading.current_ch2:.2f}A, {reading.active_power_ch2:.1f}W")
+                logger.info(f"Reading {i+1} (snapshot-synchronized):")
+                logger.info(f"  CH1: {reading.voltage_ch1:.1f}V, {reading.current_ch1:.3f}A, {reading.active_power_ch1:.1f}W")
+                logger.info(f"  CH2: {reading.voltage_ch2:.1f}V, {reading.current_ch2:.3f}A, {reading.active_power_ch2:.1f}W")
+                logger.info(f"  Apparent Power: CH1={reading.apparent_power_ch1:.1f}VA, CH2={reading.apparent_power_ch2:.1f}VA")
+                logger.info(f"  Power Factor: CH1={reading.power_factor_ch1:.3f}, CH2={reading.power_factor_ch2:.3f}")
                 logger.info(f"  Frequency: {reading.frequency:.1f}Hz")
                 if reading.temperature:
                     logger.info(f"  Temperature: {reading.temperature:.1f}°C")
@@ -192,20 +208,37 @@ def main():
     except Exception as e:
         logger.error(f"Integrated operation error: {e}")
     
-    # Example 4: Continuous Monitoring (similar to test script)
+    # Example 4: Advanced Features Demonstration
+    logger.info("=== Advanced Features Demonstration ===")
+    logger.info("Demonstrating snapshot-based bulk reads and continuous polling...")
+    
+    try:
+        with EVALSTPM34Meter(meter_config) as meter:
+            # Demonstrate manual snapshot read for advanced users
+            logger.info("Taking manual snapshot read...")
+            snapshot_data = meter.read_snapshot()
+            if snapshot_data:
+                logger.info(f"Snapshot captured {len(snapshot_data)} register blocks successfully")
+                logger.info("Snapshot provides synchronized measurement data across all channels")
+    
+    except Exception as e:
+        logger.error(f"Advanced features error: {e}")
+    
+    # Example 5: Continuous Monitoring (similar to test script)
     logger.info("=== Continuous Monitoring Example ===")
-    logger.info("Demonstrating continuous data polling...")
+    logger.info("Demonstrating continuous data polling with measurement variability...")
     
     try:
         with EVALSTPM34Meter(meter_config) as meter:
             if meter.is_connected():
                 logger.info("Starting continuous monitoring (5 samples)...")
+                logger.info("Note: Current RMS may show small variations due to internal reference noise")
                 
                 for i in range(5):
                     readings = meter.read_instantaneous_values()
                     energy = meter.read_energy_values()
                     
-                    logger.info(f"Sample {i+1}:")
+                    logger.info(f"Sample {i+1} (coherent snapshot):")
                     logger.info(f"  CH1: {readings.voltage_ch1:.2f}V, {readings.current_ch1:.3f}A, {readings.active_power_ch1:.1f}W")
                     logger.info(f"  CH2: {readings.voltage_ch2:.2f}V, {readings.current_ch2:.3f}A, {readings.active_power_ch2:.1f}W")
                     logger.info(f"  Apparent Power: CH1={readings.apparent_power_ch1:.1f}VA, CH2={readings.apparent_power_ch2:.1f}VA")

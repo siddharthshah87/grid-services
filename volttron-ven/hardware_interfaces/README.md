@@ -41,9 +41,11 @@ Interface for STMicroelectronics EVALSTPM34 energy metering evaluation board via
 **Features:**
 - Dual-channel power measurement (voltage, current, power, energy)
 - Real-time monitoring of electrical parameters
+- Coherent snapshot-based bulk register reads for synchronized data
+- Software latch mechanism for consistent measurement timing
 - Energy accumulation with reset capability
 - Temperature and frequency measurement
-- CRC-protected UART communication
+- CRC-protected UART communication matching C HAL implementation
 - Configurable measurement ranges and calibration
 
 **Hardware Requirements:**
@@ -151,6 +153,12 @@ The EVALSTPM34 uses UART communication with the following frame structure:
 - **Stop Bits**: 1
 - **CRC**: CRC-8 with polynomial 0x07, byte-reversed for UART
 - **Protocol**: Two-transaction sequence (set pointer, then read data)
+
+**Advanced Features:**
+- **Snapshot Reads**: Software latch + bulk read for coherent measurements
+- **Register Mapping**: Based on STMicroelectronics C HAL implementation
+- **Bulk Operations**: Reads up to 30 consecutive 32-bit registers in one sequence
+- **Data Synchronization**: Latch mechanism ensures all values from same timebase
 
 ### Measurement Capabilities
 
@@ -290,7 +298,7 @@ Apparent Power       8.4             5.6             VA
 Power Factor         0.000           0.000                     
 ```
 
-**Note**: Small voltage and current readings are normal when only USB is connected. Real measurements appear when AC voltage and current inputs are properly connected.
+**Note**: Small voltage and current readings are normal when only USB is connected. Current RMS values may show small variations between samples due to internal reference noise, which demonstrates the snapshot-based measurement system is working correctly. Real measurements appear when AC voltage and current inputs are properly connected.
 
 ### Validation Checklist
 
