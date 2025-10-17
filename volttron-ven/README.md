@@ -17,16 +17,18 @@ This is a **local-first** Virtual End Node (VEN) for Demand Response (DR) event 
 
 ```bash
 cd volttron-ven
-./run_minimal.sh
+./run.sh
 ```
 
 ## Directory Structure
-- `ven_minimal.py`: Main VEN implementation ⭐
-- `run_minimal.sh`: Runner script with cert setup
-- `test_minimal.sh`: Automated test script
+- `ven_local.py`: Main VEN implementation ⭐
+- `run.sh`: Runner script with cert setup
+- `test.sh`: Automated test script
 - `LOCAL_VEN.md`: **Comprehensive setup & troubleshooting guide**
+- `README.md`: This file
+- `CHANGES.md`: Migration history and rationale
 - `requirements.txt`: Python dependencies (paho-mqtt, boto3)
-- `device_simulator.py`: Device simulation logic
+- `device_simulator.py`: Device simulation logic (for future use)
 - `certs/`: TLS certificates (auto-fetched, gitignored)
 - `tests/`: Unit tests
 
@@ -40,7 +42,7 @@ cd volttron-ven
 
 No installation needed! Just run the script:
 ```bash
-./run_minimal.sh
+./run.sh
 ```
 
 The script will:
@@ -63,7 +65,7 @@ docker run --rm volttron-ven
 
 
 - `IOT_ENDPOINT`: AWS IoT Core endpoint (e.g., `a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com`)
-- `CLIENT_ID`: Unique MQTT client ID (auto-generated with timestamp in run_minimal.sh)
+- `CLIENT_ID`: Unique MQTT client ID (auto-generated with timestamp in run.sh)
 - Certificate paths are auto-configured (fetched from AWS Secrets Manager)
 
 ## MQTT Topics
@@ -77,8 +79,8 @@ docker run --rm volttron-ven
 ### Verify VEN Operation
 
 ```bash
-# 1. Run minimal VEN
-./run_minimal.sh
+# 1. Run local VEN
+./run.sh
 
 # 2. In another terminal, monitor telemetry
 python3 ../scripts/ven_telemetry_listen.py \

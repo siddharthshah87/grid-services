@@ -16,8 +16,9 @@ Migrated VEN from cloud-based ECS deployment to local-first architecture, achiev
 - ✅ ECS service and ALB in Terraform (commented out in `envs/dev/main.tf`)
 
 ### Added (Local Infrastructure)
-- ✅ Minimal VEN (`ven_minimal.py` - 173 lines)
-- ✅ Local runner scripts (`run_minimal.sh`, `test_minimal.sh`)
+- ✅ Local VEN (`ven_local.py` - 173 lines, formerly ven_minimal.py)
+- ✅ Runner script (`run.sh`, formerly run_minimal.sh)
+- ✅ Test script (`test.sh`, formerly test_minimal.sh)
 - ✅ Telemetry monitoring tool (`scripts/ven_telemetry_listen.py`)
 - ✅ Comprehensive documentation (`LOCAL_VEN.md`)
 - ✅ `.gitignore` for proper exclusions
@@ -50,9 +51,17 @@ Migrated VEN from cloud-based ECS deployment to local-first architecture, achiev
 
 If cloud deployment is needed in the future:
 1. Uncomment VEN resources in `envs/dev/main.tf`
-2. Recreate `Dockerfile` based on minimal VEN
+2. Create `Dockerfile` based on `ven_local.py`
 3. Add `build_and_push.sh` script
 4. Apply Terraform changes
+
+## File Naming
+
+The VEN has been renamed from "minimal" to "local" to better reflect its purpose:
+- `ven_minimal.py` → `ven_local.py`
+- `run_minimal.sh` → `run.sh`
+- `test_minimal.sh` → `test.sh`
+- Client ID prefix: `volttron_minimal_*` → `volttron_local_*`
 
 ## Documentation
 

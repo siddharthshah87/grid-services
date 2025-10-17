@@ -19,39 +19,34 @@ The VEN (Virtual End Node) is now designed to run locally instead of in the clou
 
 ## Quick Start
 
-### Minimal VEN (Recommended for Testing)
+### Running the Local VEN
 
-The minimal VEN (`ven_minimal.py`) is a stripped-down implementation that focuses on core MQTT functionality:
+The local VEN is a lightweight implementation that focuses on core MQTT functionality:
 
 ```bash
 cd /workspaces/grid-services/volttron-ven
-./run_minimal.sh
+./run.sh
 ```
 
 This will:
 1. Fetch TLS certificates from AWS Secrets Manager (if not already cached)
-2. Generate a unique client ID using timestamp
+2. Generate a unique client ID using timestamp (`volttron_local_<timestamp>`)
 3. Connect to AWS IoT Core
 4. Subscribe to command topic: `ven/cmd/{CLIENT_ID}`
 5. Publish telemetry every 5 seconds to: `ven/telemetry/{CLIENT_ID}`
 
-### Full VEN (Production)
+### Stopping the VEN
 
-The full VEN (`ven_agent.py`) includes additional features like shadow sync and health checks:
-
-```bash
-cd /workspaces/grid-services/volttron-ven
-./run_local.sh
-```
+Press `Ctrl+C` to stop the VEN gracefully.
 
 ## Verifying Operation
 
 ### 1. Check VEN Logs
 
-When running with `run_minimal.sh`, you'll see:
+When running with `run.sh`, you'll see:
 ```
-✅ Connected to AWS IoT Core (client_id=volttron_minimal_1234567890)
-📡 Subscribing to command topic: ven/cmd/volttron_minimal_1234567890
+✅ Connected to AWS IoT Core (client_id=volttron_local_1234567890)
+📡 Subscribing to command topic: ven/cmd/volttron_local_1234567890
 ✅ Connection established!
 📊 Publishing telemetry every 5 seconds...
 ✓ [1] Published: 9.74 kW (connected=True)
@@ -64,14 +59,14 @@ In a separate terminal, subscribe to telemetry messages:
 
 ```bash
 python3 scripts/ven_telemetry_listen.py \
-  --ven-id volttron_minimal_1234567890 \
+  --ven-id volttron_local_1234567890 \
   --endpoint a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com
 ```
 
 Expected output:
 ```json
 {
-  "venId": "volttron_minimal_1234567890",
+  "venId": "volttron_local_1234567890",
   "ts": 1760722235,
   "power_kw": 10.25,
   "shed_kw": 0.0,
@@ -85,14 +80,14 @@ Send a ping command:
 ```bash
 python3 scripts/ven_cmd_publish.py \
   --op ping \
-  --ven-id volttron_minimal_1234567890 \
+  --ven-id volttron_local_1234567890 \
   --corr-id test-001
 ```
 
 Monitor acknowledgments:
 ```bash
 python3 scripts/ven_acks_listen.py \
-  --ven-id volttron_minimal_1234567890 \
+  --ven-id volttron_local_1234567890 \
   --endpoint a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com
 ```
 
@@ -115,15 +110,9 @@ These are automatically fetched from AWS Secrets Manager (`dev-volttron-tls`) on
 
 ### Command Types
 
-The minimal VEN currently supports:
+The local VEN currently supports:
 - `ping` - Health check command
-
-The full VEN additionally supports:
-- `get` - Retrieve device state
-- `set` - Update device state
-- `enable`/`disable` - Enable/disable VEN
-- `shedload` - Immediate load shedding
-- `event` - DR event with duration and shed_kw
+- `event` - DR event (to be implemented)
 
 ## Troubleshooting
 
@@ -132,7 +121,8 @@ The full VEN additionally supports:
 If you see `MQTT disconnected: unexpected (code 7)`:
 - This indicates a duplicate client ID
 - Ensure no other VEN is running with the same client ID
-- The minimal VEN uses timestamp-based unique IDs to avoid this
+- The local VEN uses timestamp-based unique IDs to avoid this
+- Check: `ps aux | grep ven_local` to see running instances
 
 ### Connection Timeout
 
@@ -159,6 +149,6 @@ The local VEN connects directly to AWS IoT Core using mutual TLS authentication.
 
 ## Next Steps
 
-1. Test command reception with ping
-2. Add DR event handling to minimal VEN
-3. Test full DR event flow (event → load shed → telemetry → backend logging)
+1. ✅ Test command reception with ping (completed)
+2. 🔄 Add DR event handling to local VEN
+3. 🔄 Test full DR event flow (event → load shed → telemetry → backend logging)
