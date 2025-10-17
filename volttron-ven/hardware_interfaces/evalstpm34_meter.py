@@ -32,33 +32,58 @@ from contextlib import contextmanager
 logger = logging.getLogger(__name__)
 
 class STPM34Register:
-    """EVALSTPM34 register addresses based on datasheet."""
-    # Configuration registers
+    """EVALSTPM34 register addresses based on C driver analysis."""
+    
+    # Control registers
     DSP_CR1 = 0x00          # DSP Control Register 1
-    DSP_CR2 = 0x01          # DSP Control Register 2  
-    DSP_CR3 = 0x02          # DSP Control Register 3
+    DSP_CR2 = 0x02          # DSP Control Register 2  
+    DSP_CR3 = 0x04          # DSP Control Register 3
     
     # Status and control
-    US_REG_STATUS = 0x28    # UART/SPI Status register (datasheet confirmed)
+    US_REG_STATUS = 0x28    # UART/SPI Status register
     US_REG1 = 0x24         # UART control register (CRC control)
     
-    # Measurement registers (estimated addresses - need verification from register map)
-    VOLTAGE_CH1 = 0x48      # CH1 RMS voltage
-    VOLTAGE_CH2 = 0x49      # CH2 RMS voltage  
-    CURRENT_CH1 = 0x4A      # CH1 RMS current
-    CURRENT_CH2 = 0x4B      # CH2 RMS current
-    ACTIVE_POWER_CH1 = 0x4C # CH1 active power
-    ACTIVE_POWER_CH2 = 0x4D # CH2 active power
-    REACTIVE_POWER_CH1 = 0x4E # CH1 reactive power
-    REACTIVE_POWER_CH2 = 0x4F # CH2 reactive power
-    APPARENT_POWER_CH1 = 0x50 # CH1 apparent power
-    APPARENT_POWER_CH2 = 0x51 # CH2 apparent power
-    FREQUENCY = 0x52        # Line frequency
-    TEMPERATURE = 0x53      # Internal temperature
-    ACTIVE_ENERGY_CH1 = 0x54   # CH1 active energy
-    REACTIVE_ENERGY_CH1 = 0x55 # CH1 reactive energy
-    ACTIVE_ENERGY_CH2 = 0x56   # CH2 active energy
-    REACTIVE_ENERGY_CH2 = 0x57 # CH2 reactive energy
+    # Event and status registers (from C driver)
+    DSPEVENT1 = 0x2A       # DSP Events Register 1
+    DSPEVENT2 = 0x2C       # DSP Events Register 2
+    
+    # DSP data registers (from C driver analysis)
+    DSP_REG14 = 0x48       # RMS Voltage/Current for both channels
+    DSP_REG15 = 0x4A       # RMS Voltage/Current for both channels
+    
+    # Channel 1 measurement registers (from C driver)
+    CH1_REG1 = 0x54        # Channel 1 Register 1
+    CH1_REG2 = 0x56        # Channel 1 Register 2
+    CH1_REG3 = 0x58        # Channel 1 Register 3
+    CH1_REG4 = 0x5A        # Channel 1 Register 4
+    CH1_REG5 = 0x5C        # Channel 1 Active Power
+    CH1_REG6 = 0x5E        # Channel 1 Fundamental Power
+    CH1_REG7 = 0x60        # Channel 1 Reactive Power
+    CH1_REG8 = 0x62        # Channel 1 Register 8
+    CH1_REG9 = 0x64        # Channel 1 Register 9
+    CH1_REG10 = 0x66       # Channel 1 Energy Register 1
+    CH1_REG11 = 0x68       # Channel 1 Energy Register 2
+    CH1_REG12 = 0x6A       # Channel 1 Energy Register 3
+    
+    # Channel 2 measurement registers (from C driver)
+    CH2_REG1 = 0x6C        # Channel 2 Register 1
+    CH2_REG2 = 0x6E        # Channel 2 Register 2
+    CH2_REG3 = 0x70        # Channel 2 Register 3
+    CH2_REG4 = 0x72        # Channel 2 Register 4
+    CH2_REG5 = 0x74        # Channel 2 Active Power
+    CH2_REG6 = 0x76        # Channel 2 Fundamental Power
+    CH2_REG7 = 0x78        # Channel 2 Reactive Power
+    CH2_REG8 = 0x7A        # Channel 2 Register 8
+    CH2_REG9 = 0x7C        # Channel 2 Register 9
+    CH2_REG10 = 0x7E       # Channel 2 Energy Register 1
+    CH2_REG11 = 0x80       # Channel 2 Energy Register 2
+    CH2_REG12 = 0x82       # Channel 2 Energy Register 3
+    
+    # Total measurement registers (from C driver)
+    TOT_REG1 = 0x84        # Total Register 1
+    TOT_REG2 = 0x86        # Total Register 2
+    TOT_REG3 = 0x88        # Total Register 3
+    TOT_REG4 = 0x8A        # Total Register 4
     
     # Special addresses
     DUMMY_READ = 0xFF       # Increments internal read pointer
@@ -72,6 +97,38 @@ class STPM34Status(Enum):
     FREQUENCY_READY = 0x08
     ENERGY_OVERFLOW = 0x10
     COMMUNICATION_ERROR = 0x20
+
+class STPM34Scaling:
+    """Scaling factors and bit masks from C driver analysis.
+    
+    Reference: STMicroelectronics C driver metrology.c
+    STPM34 with current transformer (CT) configuration.
+    """
+    
+    # Scaling factors from C driver (STPM34 with CT)
+    # Reference: metrology.c lines 364-377
+    
+    # For RMS values (DPOW = 2^15 = 32768 for momentary values)
+    VOLTAGE_RMS_FACTOR = 116274.11 / 32768     # V/LSB for RMS voltage
+    CURRENT_RMS_FACTOR = 25934.06 / 32768      # A/LSB for RMS current
+    
+    # For power values (DPOW = 2^28 = 268435456 for power)
+    POWER_FACTOR = 301546.05                   # W/LSB for power (before shift)
+    POWER_SHIFT = 28                           # Shift right by 28 bits for final value
+    
+    # For energy values (derived from power factor)
+    ENERGY_FACTOR = 301546.05 / 858.3          # Wh/LSB for energy
+    
+    # Bit masks for extracting data from registers (from C driver)
+    VOLTAGE_RMS_MASK = 0x00007FFF      # Lower 15 bits for voltage RMS
+    CURRENT_RMS_MASK = 0x7FFF0000      # Upper 15 bits for current RMS
+    CURRENT_RMS_SHIFT = 16             # Shift to get current from upper bits
+    POWER_MASK = 0x0FFFFFFF            # 28 bits for power values
+    
+    # Sign extension masks for signed values
+    VOLTAGE_SIGN_BIT = 0x4000          # Bit 14 for voltage sign
+    CURRENT_SIGN_BIT = 0x40000000      # Bit 30 for current sign (after shift)
+    POWER_SIGN_BIT = 0x08000000        # Bit 27 for power sign
 
 @dataclass
 class MeterConfig:
@@ -574,20 +631,33 @@ class EVALSTPM34Meter:
 
     def _read_voltage(self, channel: int) -> float:
         """
-        Read RMS voltage for specified channel.
+        Read RMS voltage for specified channel using C driver register mapping.
         Returns 0.0 when no voltage inputs connected (expected behavior).
         """
         try:
-            reg_addr = STPM34Register.VOLTAGE_CH1 if channel == 1 else STPM34Register.VOLTAGE_CH2
+            # Both channels' voltage/current are in DSP_REG14 and DSP_REG15
+            if channel == 1:
+                reg_value = self._read_register(STPM34Register.DSP_REG14)
+            else:  # channel == 2
+                reg_value = self._read_register(STPM34Register.DSP_REG15)
             
-            value = self._read_register(reg_addr)
-            if value is not None:
-                # Convert raw register value to voltage
+            if reg_value is not None:
+                # Extract voltage RMS from lower 15 bits
+                voltage_raw = reg_value & STPM34Scaling.VOLTAGE_RMS_MASK
+                
+                # Apply sign extension if needed (15-bit signed)
+                if voltage_raw & STPM34Scaling.VOLTAGE_SIGN_BIT:
+                    voltage_raw -= 0x8000
+                
+                # Apply scaling factor
+                voltage = voltage_raw * STPM34Scaling.VOLTAGE_RMS_FACTOR
+                
                 # Apply calibration factor
                 cal_factor = self.config.voltage_calibration_ch1 if channel == 1 else self.config.voltage_calibration_ch2
-                voltage = (value / 65536.0) * 400.0 * cal_factor  # Scale to voltage range
-                logger.debug(f"CH{channel} voltage raw: 0x{value:08x}, scaled: {voltage:.2f}V")
-                return round(voltage, 2)
+                voltage *= cal_factor
+                
+                logger.debug(f"CH{channel} voltage raw: 0x{reg_value:08x}, voltage_raw: {voltage_raw}, scaled: {voltage:.3f}V")
+                return round(abs(voltage), 3)  # Return absolute value
             return 0.0
         except Exception as e:
             logger.debug(f"Error reading voltage CH{channel}: {e}")
@@ -595,19 +665,33 @@ class EVALSTPM34Meter:
 
     def _read_current(self, channel: int) -> float:
         """
-        Read RMS current for specified channel.
+        Read RMS current for specified channel using C driver register mapping.
         Returns 0.0 when no current inputs connected (expected behavior).
         """
         try:
-            reg_addr = STPM34Register.CURRENT_CH1 if channel == 1 else STPM34Register.CURRENT_CH2
+            # Both channels' voltage/current are in DSP_REG14 and DSP_REG15
+            if channel == 1:
+                reg_value = self._read_register(STPM34Register.DSP_REG14)
+            else:  # channel == 2
+                reg_value = self._read_register(STPM34Register.DSP_REG15)
             
-            value = self._read_register(reg_addr)
-            if value is not None:
-                # Convert raw register value to current
+            if reg_value is not None:
+                # Extract current RMS from upper 15 bits
+                current_raw = (reg_value & STPM34Scaling.CURRENT_RMS_MASK) >> STPM34Scaling.CURRENT_RMS_SHIFT
+                
+                # Apply sign extension if needed (15-bit signed) 
+                if current_raw & 0x4000:  # Bit 14 of the 15-bit value
+                    current_raw -= 0x8000
+                
+                # Apply scaling factor
+                current = current_raw * STPM34Scaling.CURRENT_RMS_FACTOR
+                
+                # Apply calibration factor
                 cal_factor = self.config.current_calibration_ch1 if channel == 1 else self.config.current_calibration_ch2
-                current = (value / 65536.0) * 20.0 * cal_factor  # Scale to current range
-                logger.debug(f"CH{channel} current raw: 0x{value:08x}, scaled: {current:.3f}A")
-                return round(current, 3)
+                current *= cal_factor
+                
+                logger.debug(f"CH{channel} current raw: 0x{reg_value:08x}, current_raw: {current_raw}, scaled: {current:.3f}A")
+                return round(abs(current), 3)  # Return absolute value
             return 0.0
         except Exception as e:
             logger.debug(f"Error reading current CH{channel}: {e}")
@@ -615,22 +699,27 @@ class EVALSTPM34Meter:
 
     def _read_active_power(self, channel: int) -> float:
         """
-        Read active power for specified channel.
+        Read active power for specified channel using C driver register mapping.
         Returns 0.0 when no inputs connected (expected behavior).
         """
         try:
-            reg_addr = STPM34Register.ACTIVE_POWER_CH1 if channel == 1 else STPM34Register.ACTIVE_POWER_CH2
+            if channel == 1:
+                reg_value = self._read_register(STPM34Register.CH1_REG5)  # CH1 Active Power
+            else:  # channel == 2
+                reg_value = self._read_register(STPM34Register.CH2_REG5)  # CH2 Active Power
             
-            value = self._read_register(reg_addr)
-            if value is not None:
-                # Convert to signed 32-bit for power (can be negative)
-                if value & 0x80000000:
-                    power_raw = value - 0x100000000
-                else:
-                    power_raw = value
+            if reg_value is not None:
+                # Extract power value (28-bit signed) 
+                power_raw = reg_value & STPM34Scaling.POWER_MASK
                 
-                power = power_raw / 1000.0  # Convert to watts
-                logger.debug(f"CH{channel} active power raw: 0x{value:08x}, scaled: {power:.1f}W")
+                # Apply sign extension if needed (28-bit signed)
+                if power_raw & STPM34Scaling.POWER_SIGN_BIT:
+                    power_raw -= 0x10000000  # 2^28
+                
+                # Apply scaling factor and shift (C driver divides by 2^28)
+                power = (power_raw * STPM34Scaling.POWER_FACTOR) / (1 << STPM34Scaling.POWER_SHIFT)
+                
+                logger.debug(f"CH{channel} active power raw: 0x{reg_value:08x}, power_raw: {power_raw}, scaled: {power:.1f}W")
                 return round(power, 1)
             return 0.0
         except Exception as e:
@@ -639,22 +728,27 @@ class EVALSTPM34Meter:
 
     def _read_reactive_power(self, channel: int) -> float:
         """
-        Read reactive power for specified channel.
+        Read reactive power for specified channel using C driver register mapping.
         Returns 0.0 when no inputs connected (expected behavior).
         """
         try:
-            reg_addr = STPM34Register.REACTIVE_POWER_CH1 if channel == 1 else STPM34Register.REACTIVE_POWER_CH2
+            if channel == 1:
+                reg_value = self._read_register(STPM34Register.CH1_REG7)  # CH1 Reactive Power
+            else:  # channel == 2
+                reg_value = self._read_register(STPM34Register.CH2_REG7)  # CH2 Reactive Power
             
-            value = self._read_register(reg_addr)
-            if value is not None:
-                # Convert to signed 32-bit for power (can be negative)
-                if value & 0x80000000:
-                    power_raw = value - 0x100000000
-                else:
-                    power_raw = value
+            if reg_value is not None:
+                # Extract power value (28-bit signed) 
+                power_raw = reg_value & STPM34Scaling.POWER_MASK
                 
-                power = power_raw / 1000.0  # Convert to VAR
-                logger.debug(f"CH{channel} reactive power raw: 0x{value:08x}, scaled: {power:.1f}VAR")
+                # Apply sign extension if needed (28-bit signed)
+                if power_raw & STPM34Scaling.POWER_SIGN_BIT:
+                    power_raw -= 0x10000000  # 2^28
+                
+                # Apply scaling factor and shift (C driver divides by 2^28)
+                power = (power_raw * STPM34Scaling.POWER_FACTOR) / (1 << STPM34Scaling.POWER_SHIFT)
+                
+                logger.debug(f"CH{channel} reactive power raw: 0x{reg_value:08x}, power_raw: {power_raw}, scaled: {power:.1f}VAR")
                 return round(power, 1)
             return 0.0
         except Exception as e:
@@ -663,20 +757,20 @@ class EVALSTPM34Meter:
 
     def _read_apparent_power(self, channel: int) -> float:
         """
-        Read apparent power for specified channel.
+        Calculate apparent power for specified channel from voltage and current.
         Returns 0.0 when no inputs connected (expected behavior).
         """
         try:
-            reg_addr = STPM34Register.APPARENT_POWER_CH1 if channel == 1 else STPM34Register.APPARENT_POWER_CH2
+            voltage = self._read_voltage(channel)
+            current = self._read_current(channel)
             
-            value = self._read_register(reg_addr)
-            if value is not None:
-                power = value / 1000.0  # Convert to VA
-                logger.debug(f"CH{channel} apparent power raw: 0x{value:08x}, scaled: {power:.1f}VA")
-                return round(power, 1)
-            return 0.0
+            # Apparent power = V_rms * I_rms
+            apparent_power = voltage * current
+            
+            logger.debug(f"CH{channel} apparent power calculated: V={voltage:.3f}V, I={current:.3f}A, S={apparent_power:.1f}VA")
+            return round(apparent_power, 1)
         except Exception as e:
-            logger.debug(f"Error reading apparent power CH{channel}: {e}")
+            logger.debug(f"Error calculating apparent power CH{channel}: {e}")
             return 0.0
 
     def _read_frequency(self) -> float:

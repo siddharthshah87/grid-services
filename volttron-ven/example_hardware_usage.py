@@ -3,6 +3,9 @@ Example usage of hardware interface modules.
 
 This script demonstrates how to use the GPIO relay controller and
 EVALSTPM34 meter interface for a physical VEN implementation.
+
+For hardware testing and validation, also see:
+- test_evalstpm34_real.py: Continuous monitoring test for EVALSTPM34
 """
 
 import time
@@ -100,7 +103,7 @@ def main():
     meter_config = MeterConfig(
         meter_id="meter_001",
         uart_port="/dev/ttyUSB0",  # Adjust based on actual connection
-        baud_rate=115200,
+        baud_rate=9600,  # STPM34 default baud rate
         name="Main Power Meter",
         description="Primary circuit power measurement",
         voltage_calibration_ch1=1.0,
@@ -188,6 +191,38 @@ def main():
             
     except Exception as e:
         logger.error(f"Integrated operation error: {e}")
+    
+    # Example 4: Continuous Monitoring (similar to test script)
+    logger.info("=== Continuous Monitoring Example ===")
+    logger.info("Demonstrating continuous data polling...")
+    
+    try:
+        with EVALSTPM34Meter(meter_config) as meter:
+            if meter.is_connected():
+                logger.info("Starting continuous monitoring (5 samples)...")
+                
+                for i in range(5):
+                    readings = meter.read_instantaneous_values()
+                    energy = meter.read_energy_values()
+                    
+                    logger.info(f"Sample {i+1}:")
+                    logger.info(f"  CH1: {readings.voltage_ch1:.2f}V, {readings.current_ch1:.3f}A, {readings.active_power_ch1:.1f}W")
+                    logger.info(f"  CH2: {readings.voltage_ch2:.2f}V, {readings.current_ch2:.3f}A, {readings.active_power_ch2:.1f}W")
+                    logger.info(f"  Apparent Power: CH1={readings.apparent_power_ch1:.1f}VA, CH2={readings.apparent_power_ch2:.1f}VA")
+                    logger.info(f"  Power Factor: CH1={readings.power_factor_ch1:.3f}, CH2={readings.power_factor_ch2:.3f}")
+                    logger.info(f"  Frequency: {readings.frequency:.2f}Hz")
+                    logger.info(f"  Energy: CH1={energy.active_energy_ch1:.2f}Wh, CH2={energy.active_energy_ch2:.2f}Wh")
+                    
+                    # Simulate a 2-second polling interval
+                    if i < 4:  # Don't sleep after last iteration
+                        time.sleep(2)
+                
+                logger.info("Continuous monitoring example completed")
+            else:
+                logger.error("Failed to connect to meter for continuous monitoring")
+                
+    except Exception as e:
+        logger.error(f"Continuous monitoring error: {e}")
     
     logger.info("Hardware interface example completed")
 

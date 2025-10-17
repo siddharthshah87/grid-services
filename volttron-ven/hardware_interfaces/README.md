@@ -90,7 +90,7 @@ from hardware_interfaces import EVALSTPM34Meter, MeterConfig
 config = MeterConfig(
     meter_id="main_meter",
     uart_port="/dev/ttyUSB0",
-    baud_rate=115200,
+    baud_rate=9600,  # STPM34 default baud rate
     voltage_range_ch1="230V",
     current_range_ch1="5A"
 )
@@ -144,12 +144,13 @@ with GPIORelayController(relay_config) as relays, \
 ### Communication Protocol
 
 The EVALSTPM34 uses UART communication with the following frame structure:
-- **Frame Format**: `[STX][CMD][LEN][DATA][CRC][ETX]`
-- **Baud Rate**: 115200 (default)
+- **Frame Format**: `[READ_ADDR][WRITE_ADDR][DATA_LSB][DATA_MSB][CRC]`
+- **Baud Rate**: 9600 (default, configurable)
 - **Data Bits**: 8
 - **Parity**: None
 - **Stop Bits**: 1
-- **CRC**: 8-bit CRC-CCITT for data integrity
+- **CRC**: CRC-8 with polynomial 0x07, byte-reversed for UART
+- **Protocol**: Two-transaction sequence (set pointer, then read data)
 
 ### Measurement Capabilities
 
@@ -172,7 +173,7 @@ The EVALSTPM34 uses UART communication with the following frame structure:
 config = MeterConfig(
     meter_id="meter_001",
     uart_port="/dev/ttyUSB0",
-    baud_rate=115200,
+    baud_rate=9600,  # STPM34 default
     timeout=1.0,
     
     # Calibration factors (set during installation)
@@ -255,6 +256,57 @@ class PhysicalVEN:
         reading = self.meter.read_instantaneous_values()
         return reading.active_power_ch1 + reading.active_power_ch2
 ```
+
+## Testing Hardware Interfaces
+
+### Test Scripts
+
+A comprehensive test script is provided for validating EVALSTPM34 meter functionality:
+
+```bash
+# Run the high-level driver test with continuous monitoring
+python3 test_evalstpm34_real.py
+```
+
+**Test Script Features:**
+- High-level driver communication validation
+- Continuous data polling with real-time display  
+- Formatted output showing all measurement parameters
+- Connection status monitoring
+- Graceful shutdown with Ctrl+C
+
+**Expected Output (USB-only connection):**
+```
+EVALSTPM34 Energy Meter - Live Data (Sample #1)
+Timestamp: 2025-10-17 20:15:22
+======================================================================
+Parameter            Channel 1       Channel 2       Unit      
+----------------------------------------------------------------------
+Voltage RMS          3.55            3.55            V         
+Current RMS          2.374           1.583           A         
+Active Power         -0.0            -0.0            W         
+Reactive Power       -0.0            -0.0            VAR       
+Apparent Power       8.4             5.6             VA        
+Power Factor         0.000           0.000                     
+```
+
+**Note**: Small voltage and current readings are normal when only USB is connected. Real measurements appear when AC voltage and current inputs are properly connected.
+
+### Validation Checklist
+
+**EVALSTPM34 Meter**:
+- [ ] UART communication established (✓ connection message)
+- [ ] Consistent measurement readings (non-zero, stable values)
+- [ ] Realistic voltage/current ranges for your setup
+- [ ] Proper scaling and unit conversions
+- [ ] Error-free continuous operation
+
+**GPIO Relay Controller**:
+- [ ] Individual relay control working
+- [ ] Multiple relay operations
+- [ ] Emergency shutdown functions
+- [ ] State reporting accuracy
+- [ ] Thread-safe operations
 
 ## Troubleshooting
 

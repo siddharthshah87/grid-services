@@ -21,8 +21,9 @@ from .evalstpm34_meter import (
     MeterConfig,
     InstantaneousValues,
     EnergyValues,
-    STPM34Command,
-    STPM34Status
+    STPM34Register,
+    STPM34Status,
+    STPM34Scaling
 )
 
 __all__ = [
@@ -38,7 +39,8 @@ __all__ = [
     'MeterConfig',
     'InstantaneousValues',
     'EnergyValues',
-    'STPM34Command',
+    'STPM34Register',
+    'STPM34Scaling',
     'STPM34Status'
 ]
 
