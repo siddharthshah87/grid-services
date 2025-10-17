@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Minimal VEN Test"
+echo "🚀 Starting Local VEN"
 echo ""
 
 # Get IoT endpoint
@@ -32,7 +32,7 @@ fi
 
 # Set environment variables
 export IOT_ENDPOINT="$IOT_ENDPOINT"
-export CLIENT_ID="volttron_minimal_$(date +%s)"
+export CLIENT_ID="volttron_local_$(date +%s)"
 export TELEMETRY_TOPIC="ven/telemetry/$CLIENT_ID"
 export CMD_TOPIC="ven/cmd/$CLIENT_ID"
 export ACK_TOPIC="ven/ack/$CLIENT_ID"
@@ -48,5 +48,5 @@ echo "  Commands: $CMD_TOPIC"
 echo "  Acks: $ACK_TOPIC"
 echo ""
 
-# Run the minimal VEN
-python3 ven_minimal.py
+# Run the local VEN
+python3 ven_local.py
