@@ -15,14 +15,22 @@ from datetime import datetime
 from flask import Flask, render_template_string, jsonify, request
 import paho.mqtt.client as mqtt
 
-# Configuration from environment
-IOT_ENDPOINT = os.getenv("IOT_ENDPOINT")
-CLIENT_ID = os.getenv("CLIENT_ID", "volttron_local")
+# Environment variables
+IOT_ENDPOINT = os.getenv("IOT_ENDPOINT", "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com")
+
+# Use IOT_THING_NAME if provided (for consistent identity), otherwise use CLIENT_ID
+# This ensures VEN has same ID across restarts when IOT_THING_NAME is set
+CLIENT_ID = os.getenv("IOT_THING_NAME") or os.getenv("CLIENT_ID", f"volttron_local_{int(time.time())}")
+
 CA_CERT = os.getenv("CA_CERT", "./certs/ca.pem")
 CLIENT_CERT = os.getenv("CLIENT_CERT", "./certs/client.crt")
 PRIVATE_KEY = os.getenv("PRIVATE_KEY", "./certs/client.key")
-TELEMETRY_TOPIC = os.getenv("TELEMETRY_TOPIC", f"ven/telemetry/{CLIENT_ID}")
-METERING_TOPIC = os.getenv("METERING_TOPIC", f"oadr/meter/{CLIENT_ID}")
+
+# Topic configuration
+# METERING_TOPIC: Backend listens to "volttron/metering" (via IoT Rule)
+# This is the main topic the backend MQTT consumer processes for telemetry
+TELEMETRY_TOPIC = os.getenv("TELEMETRY_TOPIC", f"ven/telemetry/{CLIENT_ID}")  # Legacy, for monitoring
+METERING_TOPIC = os.getenv("METERING_TOPIC", "volttron/metering")  # Backend topic (IoT Rule forwards this)
 CMD_TOPIC = os.getenv("CMD_TOPIC", f"ven/cmd/{CLIENT_ID}")
 ACK_TOPIC = os.getenv("ACK_TOPIC", f"ven/ack/{CLIENT_ID}")
 WEB_PORT = int(os.getenv("WEB_PORT", "8080"))
@@ -745,7 +753,9 @@ def telemetry_loop():
                     "active_event": ven_state["active_event"]["event_id"] if ven_state["active_event"] else None,
                 }
                 
-                # Publish to both telemetry topics
+                # Publish to both telemetry topics:
+                # 1. TELEMETRY_TOPIC (ven/telemetry/{venId}): For monitoring/debugging
+                # 2. METERING_TOPIC (volttron/metering): Backend IoT Rule forwards this to MQTT consumer
                 result1 = mqtt_client.publish(TELEMETRY_TOPIC, json.dumps(telemetry), qos=1)
                 result2 = mqtt_client.publish(METERING_TOPIC, json.dumps(telemetry), qos=1)
                 
