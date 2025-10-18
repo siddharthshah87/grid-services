@@ -22,6 +22,7 @@ CA_CERT = os.getenv("CA_CERT", "./certs/ca.pem")
 CLIENT_CERT = os.getenv("CLIENT_CERT", "./certs/client.crt")
 PRIVATE_KEY = os.getenv("PRIVATE_KEY", "./certs/client.key")
 TELEMETRY_TOPIC = os.getenv("TELEMETRY_TOPIC", f"ven/telemetry/{CLIENT_ID}")
+METERING_TOPIC = os.getenv("METERING_TOPIC", f"oadr/meter/{CLIENT_ID}")
 CMD_TOPIC = os.getenv("CMD_TOPIC", f"ven/cmd/{CLIENT_ID}")
 ACK_TOPIC = os.getenv("ACK_TOPIC", f"ven/ack/{CLIENT_ID}")
 WEB_PORT = int(os.getenv("WEB_PORT", "8080"))
@@ -64,6 +65,10 @@ ven_state = {
     "circuits": circuits,
     "last_shadow_update": None,
 }
+
+# Power history for baseline calculation (last 30 minutes at 5-second intervals = 360 samples)
+from collections import deque
+power_history: deque = deque(maxlen=360)
 
 mqtt_client = None
 
@@ -278,6 +283,17 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"❌ Error processing message: {e}")
 
+def calculate_baseline():
+    """Calculate baseline power from recent history (pre-event average)."""
+    if len(power_history) < 12:  # Need at least 1 minute of history
+        return ven_state["base_power_kw"]
+    
+    # Use average of last 5 minutes before event (60 samples)
+    recent_samples = list(power_history)[-60:]
+    if recent_samples:
+        return round(sum(s[1] for s in recent_samples) / len(recent_samples), 2)
+    return ven_state["base_power_kw"]
+
 def handle_command(client, payload):
     """Handle incoming commands"""
     op = payload.get("op")
@@ -294,11 +310,30 @@ def handle_command(client, payload):
         client.publish(ACK_TOPIC, json.dumps(ack), qos=1)
         print(f"✅ Pong sent")
     
-    elif op == "event":
-        # DR event with load curtailment
-        shed_kw = float(payload.get("shed_kw", 0.0))
-        duration_sec = int(payload.get("duration_sec", 3600))
-        event_id = payload.get("event_id", f"evt-{int(time.time())}")
+    elif op in ["event", "shedPanel"]:
+        # DR event with load curtailment (supports both 'event' and 'shedPanel' ops)
+        # Extract shed amount from various possible fields
+        shed_kw = float(
+            payload.get("shed_kw") or 
+            payload.get("data", {}).get("requestedReductionKw") or 
+            payload.get("requestedReductionKw") or 
+            0.0
+        )
+        
+        # Extract duration
+        duration_sec = int(
+            payload.get("duration_sec") or 
+            payload.get("data", {}).get("duration_s") or 
+            payload.get("duration_s") or 
+            3600
+        )
+        
+        # Extract event ID
+        event_id = (
+            payload.get("event_id") or 
+            payload.get("data", {}).get("event_id") or 
+            f"evt-{int(time.time())}"
+        )
         
         print(f"\n🚨 DR EVENT RECEIVED")
         print(f"   Event ID: {event_id}")
@@ -684,22 +719,40 @@ def telemetry_loop():
                 else:
                     distribute_power_to_circuits(ven_state["base_power_kw"])
                 
+                # Track power history for baseline calculation
+                current_ts = int(time.time())
+                power_history.append((current_ts, ven_state["current_power_kw"]))
+                
+                # Calculate baseline if in event
+                baseline_kw = calculate_baseline() if ven_state["active_event"] else ven_state["base_power_kw"]
+                
                 # Publish telemetry
                 ven_state["message_count"] += 1
                 telemetry = {
                     "venId": CLIENT_ID,
-                    "ts": int(time.time()),
+                    "timestamp": current_ts,
+                    "usedPowerKw": ven_state["current_power_kw"],
+                    "shedPowerKw": ven_state["shed_kw"],
+                    "requestedReductionKw": ven_state["active_event"]["shed_kw"] if ven_state["active_event"] else 0.0,
+                    "eventId": ven_state["active_event"]["event_id"] if ven_state["active_event"] else None,
+                    "baselinePowerKw": baseline_kw,
+                    "message_num": ven_state["message_count"],
+                    # Legacy fields for backward compatibility
                     "power_kw": ven_state["current_power_kw"],
                     "shed_kw": ven_state["shed_kw"],
                     "base_power_kw": ven_state["base_power_kw"],
-                    "message_num": ven_state["message_count"],
-                    "active_event": ven_state["active_event"]["event_id"] if ven_state["active_event"] else None
+                    "ts": current_ts,
+                    "active_event": ven_state["active_event"]["event_id"] if ven_state["active_event"] else None,
                 }
                 
-                result = mqtt_client.publish(TELEMETRY_TOPIC, json.dumps(telemetry), qos=1)
-                if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                # Publish to both telemetry topics
+                result1 = mqtt_client.publish(TELEMETRY_TOPIC, json.dumps(telemetry), qos=1)
+                result2 = mqtt_client.publish(METERING_TOPIC, json.dumps(telemetry), qos=1)
+                
+                if result1.rc == mqtt.MQTT_ERR_SUCCESS and result2.rc == mqtt.MQTT_ERR_SUCCESS:
+                    event_marker = f" [EVENT: {ven_state['active_event']['event_id']}]" if ven_state['active_event'] else ""
                     print(f"✓ [{ven_state['message_count']}] Telemetry: {ven_state['current_power_kw']:.2f} kW "
-                          f"(shed: {ven_state['shed_kw']:.2f} kW)")
+                          f"(shed: {ven_state['shed_kw']:.2f} kW){event_marker}")
                 
                 # Update shadow every 30 seconds
                 if ven_state["message_count"] % 6 == 0:

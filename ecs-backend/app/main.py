@@ -9,7 +9,7 @@ from app.routers import event
 from app.routers import health
 from app.routers import stats as api_stats
 from app.routers import ven
-from app.services import MQTTConsumer
+from app.services import MQTTConsumer, EventCommandService
 from app.core.config import settings
 from app.dependencies import get_session
 
@@ -22,8 +22,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("uvicorn")
 
-# Global MQTT consumer instance
+# Global service instances
 mqtt_consumer = MQTTConsumer(config=settings, session_factory=get_session)
+event_command_service = EventCommandService(config=settings, session_factory=get_session)
 
 
 @asynccontextmanager
@@ -32,8 +33,18 @@ async def lifespan(app: FastAPI):
     logger.info("Starting MQTT consumer...")
     await mqtt_consumer.start()
     logger.info("MQTT consumer started")
+    
+    logger.info("Starting event command service...")
+    await event_command_service.start()
+    logger.info("Event command service started")
+    
     yield
+    
     # Shutdown
+    logger.info("Stopping event command service...")
+    await event_command_service.stop()
+    logger.info("Event command service stopped")
+    
     logger.info("Stopping MQTT consumer...")
     await mqtt_consumer.stop()
     logger.info("MQTT consumer stopped")

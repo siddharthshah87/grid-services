@@ -267,6 +267,37 @@ class PhysicalVEN:
 
 ## Testing Hardware Interfaces
 
+### Running Tests
+
+**⚠️ Note**: Hardware interface tests require Raspberry Pi hardware and are automatically **skipped** during normal pytest runs to prevent import errors on development machines.
+
+### On Development Machines (Non-RPi)
+
+Tests in this folder are excluded by default in `pytest.ini`. Running `pytest` from the project root will skip hardware interface tests:
+
+```bash
+# This automatically skips hardware_interfaces tests
+cd /workspaces/grid-services
+pytest
+```
+
+### On Raspberry Pi
+
+To run hardware interface tests on actual Raspberry Pi hardware:
+
+```bash
+# Option 1: Run tests directly in the hardware_interfaces folder
+cd /workspaces/grid-services/volttron-ven/hardware_interfaces
+pytest test_evalstpm34_real.py -v
+
+# Option 2: Override pytest config to include hardware tests
+cd /workspaces/grid-services
+pytest volttron-ven/hardware_interfaces/ -v
+
+# Option 3: Run specific test markers (if implemented)
+pytest -m rpi -v
+```
+
 ### Test Scripts
 
 A comprehensive test script is provided for validating EVALSTPM34 meter functionality:
