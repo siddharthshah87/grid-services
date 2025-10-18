@@ -31,16 +31,19 @@ cd volttron-ven
 See [ENHANCED_FEATURES.md](docs/ENHANCED_FEATURES.md) for details on advanced capabilities.
 
 ## Directory Structure
-- `ven_local.py`: Main VEN implementation ⭐
-- `run.sh`: Runner script with cert setup
+- `ven_local.py`: Basic VEN implementation (~173 lines) ⭐
+- `ven_local_enhanced.py`: Enhanced VEN with Web UI and DR events (~900 lines)
+- `run.sh`: Basic VEN runner script with cert setup
+- `run_enhanced.sh`: Enhanced VEN runner script
 - `test.sh`: Automated test script
-- `docs/LOCAL_VEN.md`: **Comprehensive setup & troubleshooting guide**
-- `README.md`: This file
-- `docs/CHANGES.md`: Migration history and rationale
+- `docs/`: Documentation folder
+  - `LOCAL_VEN.md`: **Comprehensive setup & troubleshooting guide**
+  - `ENHANCED_FEATURES.md`: Enhanced VEN feature details
+  - `QUICK_START.md`: Quick reference guide
+  - `CHANGES.md`: Migration history and rationale
 - `requirements.txt`: Python dependencies (paho-mqtt, boto3)
 - `device_simulator.py`: Device simulation logic (for future use)
 - `certs/`: TLS certificates (auto-fetched, gitignored)
-- `tests/`: Unit tests
 
 
 ## Prerequisites
@@ -86,7 +89,14 @@ docker run --rm volttron-ven
 
 ## Testing
 
-### Verify VEN Operation
+### Automated Test Script
+
+Run the automated test script to verify VEN operation:
+```bash
+./test.sh
+```
+
+### Manual Verification
 
 ```bash
 # 1. Run local VEN
@@ -105,18 +115,7 @@ python3 ../scripts/ven_cmd_publish.py \
   --corr-id test-001
 ```
 
-### Unit Tests
-
-Run pytest for unit tests:
-```bash
-pytest tests/
-```
-
-Tests cover:
-- Event handling and MQTT publish logic
-- Main loop and shadow sync
-- Health endpoint and OpenAPI spec
-- TLS hostname verification
+See [docs/QUICK_START.md](docs/QUICK_START.md) for more testing examples.
 
 ## Architecture
 
@@ -144,6 +143,6 @@ See [LOCAL_VEN.md](docs/LOCAL_VEN.md) for detailed troubleshooting, including:
 ## Contributing
 - Add docstrings and comments to new code
 - Update documentation for new features
-- Run tests before committing: `pytest tests/`
+- Run `./test.sh` to verify functionality before committing
 - Update docs/LOCAL_VEN.md for operational changes
 
