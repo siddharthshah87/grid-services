@@ -1,0 +1,11629 @@
+STPM32, STPM33, STPM34
+Datasheet
+
+ASSP for metering applications with up to four independent 24-bit 2nd order
+sigma-delta ADCs, 4 MHz OSF and 2 embedded PGLNA
+Features
+•
+
+•
+•
+•
+•
+•
+•
+•
+
+Active power accuracy:
+–
+< 0.1% error over 5000 : 1 dynamic range
+–
+< 0.5% error over 10000 : 1 dynamic range
+Exceeds 50-60 Hz EN 50470-x, IEC 62053-2x,
+ANSI12.2x standard requirements for AC watt meters
+Reactive power accuracy:
+–
+< 0.1% error over 2000 : 1 dynamic range
+Dual mode apparent energy calculation
+Instantaneous and averaged power
+RMS and instantaneous voltage and current
+Under and overvoltage detection (sag and swell) and monitoring
+Overcurrent detection and monitoring
+UART and SPI serial interface with programmable CRC polynomial verification
+Programmable LED and interrupt outputs
+
+•
+•
+•
+•
+
+Four independent 24-bit 2nd order sigma-delta ADCs
+Two programmable gain chopper stabilized low-noise and low-offset amplifiers
+Bandwidth 3.6 kHz at -3 dB
+Vcc supply range 3.3 V ± 10%
+
+•
+
+Supply current Icc 4.3 mA (STPM32)
+
+•
+•
+
+Input clock frequency 16 MHz, Xtal or external source
+Twin precision voltage reference: 1.18 V with independent programmable TC,
+30 ppm/°C typ.
+Internal low drop regulator at 3 V (typ.)
+QFN packages
+Operating temperature from -40 °C to +105 °C
+
+•
+•
+
+Product status link
+STPM32
+STPM33
+STPM34
+
+Product label
+
+•
+•
+•
+
+Description
+The STPM3x is an ASSP family designed for high accuracy measurement of power
+and energies in power line systems using the Rogowski coil, current transformer or
+shunt current sensors. The STPM3x provides instantaneous voltage and current
+waveforms and calculates RMS values of voltage and currents, active, reactive and
+apparent power and energies. The STPM3x is a mixed signal IC family consisting of
+an analog and a digital section. The analog section consists of up to two
+programmable gain low-noise low-offset amplifiers and up to four 2nd order 24-bit
+sigma-delta ADCs, two bandgap voltage references with independent temperature
+compensation, a low drop voltage regulator and DC buffers. The digital section
+consists of digital filtering stage, a hardwired DSP, DFE to the input and a serial
+communication interface (UART or SPI). The STPM3x is fully configurable and allows
+a fast digital system calibration in a single point over the entire current dynamic
+range.
+
+DS10272 - Rev 13 - September 2023
+For further information contact your local STMicroelectronics sales office.
+
+www.st.com
+
+STPM32, STPM33, STPM34
+Schematic diagram
+
+1
+
+Schematic diagram
+Figure 1. STPM34 block diagram
+CLKOUT/
+ZCR LED1 LED2 INT1 INT2
+
+VIP1
+VIN1
+
+VIP2
+
+2nd ordΣΔ
+modulator
+
+Decimation
+
+Phase
+Compensation
+
+2nd ordΣΔ
+modulator
+
+Decimation
+
+Phase
+Compensation
+
+EN
+
+VIN2
+Filters
+
+IIP1
+
+PLNA
+
+2nd ordΣΔ
+modulator
+
+PLNA
+
+2nd ordΣΔ
+modulator
+
+Decimation
+
+Phase
+Compensation
+
+Decimation
+
+Phase
+Compensation
+
+IIN1
+
+IIP2
+IIN2
+
+DSP
+
+VDDD
+VrefC2
+LDR 1.2V
+
+VOLTAGE
+REFERENCE
+
+VRefV2
+VRefC1
+
+VCC
+
+LDR 3.0V
+
+VOLTAGE
+REFERENCE
+
+VDDA
+
+DS10272 - Rev 13
+
+VRefV1
+VREF2 VREF1
+
+OSC 16MHz
+
+SPI/UART
+
+XTAL1XTAL2 SCS MISO/ MOSI/ SCL SYN
+TXD RXD
+
+page 2/89
+
+STPM32, STPM33, STPM34
+Schematic diagram
+
+Figure 2. STPM33 block diagram
+CLKOUT/
+ZCR
+
+VIP1
+
+LED1
+
+LED2 INT1
+
+2nd ordΣΔ
+modulator
+
+Decimation
+
+Phase
+Compensation
+
+2nd ordΣΔ
+modulator
+
+Decimation
+
+Phase
+Compensation
+
+Decimation
+
+Phase
+Compensation
+
+INT2
+
+EN
+
+VIN1
+
+IIP1
+PLNA
+
+IIN1
+
+IIP2
+PLNA
+
+2nd ordΣΔ
+modulator
+
+Filters
+
+DSP
+
+IIN2
+
+VDDD
+VRefC2
+VOLTAGE
+REFERENCE
+
+LDR 1.2V
+
+VRefV2
+VRefC1
+
+VCC
+
+VOLTAGE
+REFERENCE
+
+LDR 3.0V
+
+OSC 16MHz
+
+SPI/UART
+
+XTAL1 XTAL2
+
+SCS MISO/ MOSI/ SCL SYN
+TXD RXD
+
+VRefV1
+
+VDDA
+
+VREF2 VREF1
+
+Figure 3. STPM32 block diagram
+CLKOUT/
+ZCR
+
+VIP1
+
+2nd ordΣΔ
+modulator
+
+Decimation
+
+LED1
+
+LED2 INT1
+
+INT2
+
+EN
+
+Phase
+Compensation
+
+VIN1
+
+Filters
+
+IIP1
+PLNA
+
+2nd ordΣΔ
+modulator
+
+Decimation
+
+IIN1
+
+DSP
+
+Phase
+Compensation
+
+VDDD
+LDR 1.2V
+
+VRefC1
+
+VCC
+
+VOLTAGE
+REFERENCE
+
+LDR 3.0V
+
+OSC 16MHz
+
+SPI/UART
+
+XTAL1 XTAL2
+
+SCS MISO/ MOSI/ SCL SYN
+TXD RXD
+
+VRefV1
+
+VDDA
+
+DS10272 - Rev 13
+
+VREF1
+
+page 3/89
+
+STPM32, STPM33, STPM34
+Pin configuration
+
+2
+
+Pin configuration
+
+25 GNDD
+
+26 GNDD
+
+27 VDDD
+
+28 SYN
+
+29 SCS
+
+30 SCL
+
+31 MOSI/RXD
+
+32 MISO/TXD
+
+Figure 4. STPM34 pinout (top view), QFN32L 5x5x1
+
+CLKOUT/ZCR 1
+
+24 NC
+
+CLKIN/XTAL2 2
+
+23 VCC
+22 GND_REG
+
+XTAL1 3
+LED1 4
+
+21 VDDA
+
+STPM34
+
+LED2 5
+
+20 GNDA
+
+INT1 6
+
+19 VREF2
+
+INT2 7
+
+18 GND_REF
+
+EN 8
+VIP2 16
+
+VIN2 15
+
+IIP2 14
+
+IIN2 13
+
+IIN1 12
+
+IIP1 11
+
+VIN1 10
+
+VIP1
+
+9
+
+17 VREF1
+
+26 GNDD
+
+27 VDDD
+
+28 SYN
+
+29 SCS
+
+30 SCL
+
+25 NC
+
+NC
+
+CLKOUT/ZCR
+
+1
+
+24
+
+CLKIN/XTAL2
+
+2
+
+23 VCC
+
+XTAL1
+
+3
+
+22
+
+GND_REG
+
+LED1
+
+4
+
+21
+
+VDDA
+
+LED2
+
+5
+
+20
+
+GNDA
+
+INT1 6
+
+19
+
+VREF2
+
+INT2
+
+7
+
+18
+
+GND_REF
+
+EN
+
+8
+
+17
+
+VREF1
+
+NC 16
+
+NC 15
+
+IIP2 14
+
+IIN2 13
+
+IIN1 12
+
+IIP1 11
+
+VIN1 10
+
+9
+
+STPM33
+
+VIP1
+DS10272 - Rev 13
+
+31 MOSI/RXD
+
+32 MISO/TXD
+
+Figure 5. STPM33 pinout (top view), QFN32L 5x5x1
+
+page 4/89
+
+STPM32, STPM33, STPM34
+Pin configuration
+
+19 VDDD
+
+20 SYN
+
+21 SCS
+
+22 SCL
+
+23 MOSI/RXD
+
+24 MISO/TXD
+
+Figure 6. STPM32 pinout (top view), QFN24L 4x4x1
+
+CLKOUT/ZCR
+
+1
+
+18
+
+CLKIN/XTAL2
+
+2
+
+17 VCC
+
+XTAL1
+
+3
+
+LED1
+
+4
+
+LED2
+
+5
+
+14 GNDA
+
+INT1
+
+6
+
+13 GND_REF
+
+16 GND_REG
+
+9
+
+10
+
+11
+
+12
+
+VIP1
+
+VIN1
+
+IIP1
+
+IIN1
+
+VREF1
+
+15 VDDA
+
+8
+
+7
+
+STPM32
+
+EN
+
+GNDD
+
+Table 1. STPM34, STPM33, STPM32 pin description
+
+DS10272 - Rev 13
+
+STPM34
+
+STPM33
+
+STPM32
+
+Name
+
+1
+
+1
+
+1
+
+CLKOUT/ZCR
+
+2
+
+2
+
+2
+
+CLKIN/XTAL2
+
+3
+
+3
+
+3
+
+XTAL1
+
+4
+
+4
+
+4
+
+LED1
+
+5
+
+5
+
+5
+
+LED2
+
+6
+
+6
+
+6
+
+INT1
+
+7
+
+7
+
+-
+
+INT2
+
+8
+
+8
+
+7
+
+EN
+
+9
+
+9
+
+8
+
+10
+
+10
+
+11
+12
+
+Description and multiplexed
+function
+-Zero-crossing output
+
+Voltage range
+
+Functional
+section
+
+From 0 to VCC
+
+Multifunctional
+
+From 0 to VCC
+
+Oscillator
+
+From 0 to VCC
+
+Oscillator
+
+From 0 to VCC
+
+Multifunctional
+
+From 0 to VCC
+
+Multifunctional
+
+From 0 to VCC
+
+Multifunctional
+
+From 0 to VCC
+
+Multifunctional
+
+Enable pin
+
+From 0 to VCC
+
+Signal
+
+VIP1
+
+Positive voltage primary input
+
+From -0.3 V to 0.3 V
+
+Signal
+
+9
+
+VIN1
+
+Negative voltage primary input
+
+From -0.3 V to 0.3 V
+
+Signal
+
+11
+
+10
+
+IIP1
+
+Positive current primary input
+
+From -0.3 V to 0.3 V
+
+Signal
+
+12
+
+11
+
+IIN1
+
+Negative current primary input
+
+From -0.3 V to 0.3 V
+
+Signal
+
+-System clock output
+-Input of external clock
+-External crystal input 2
+-External crystal input 1
+-Pulse output 1
+-Primary current SD bitstream
+-Pulse output 2
+-Secondary current SD bitstream
+-Interrupt 1
+-Primary voltage SD bitstream
+-Interrupt 2
+-Secondary voltage SD bitstream
+
+page 5/89
+
+STPM32, STPM33, STPM34
+Pin configuration
+
+STPM34
+
+STPM33
+
+STPM32
+
+Name
+
+Description and multiplexed
+function
+
+Voltage range
+
+Functional
+section
+
+13
+
+13
+
+-
+
+IIN2
+
+Negative current secondary input
+
+From -0.3 V to 0.3 V
+
+Signal
+
+14
+
+14
+
+-
+
+IIP2
+
+Positive current secondary input
+
+From -0.3 V to 0.3 V
+
+Signal
+
+15
+
+-
+
+-
+
+VIN2
+
+Negative voltage secondary input
+
+From -0.3 V to 0.3 V
+
+Signal
+
+16
+
+-
+
+-
+
+VIP2
+
+Positive voltage secondary input
+
+From -0.3 V to 0.3 V
+
+Signal
+
+17
+
+17
+
+12
+
+VREF1
+
+Output of voltage reference 1
+
+From 1.16 V to 1.18
+V
+
+Power
+
+18
+
+18
+
+13
+
+GND_REF
+
+Analog ground of VREF
+
+-
+
+Power
+
+19
+
+19
+
+-
+
+VREF2
+
+Output of voltage reference 2
+
+From 1.16 V to 1.18
+V
+
+Power
+
+20
+
+20
+
+14
+
+GNDA
+
+Analog ground (shield)
+
+-
+
+Power
+
+21
+
+21
+
+15
+
+VDDA
+
+Output of voltage regulator
+
+3.0 V
+
+Power
+
+22
+
+22
+
+16
+
+GND_REG
+
+Ground
+
+-
+
+Power
+
+23
+
+17
+
+VCC
+
+Voltage supply
+
+From 3.0 V to 3.6 V
+
+Power
+
+-
+
+NC
+
+Not connected
+
+-
+
+-
+
+23
+24
+
+DS10272 - Rev 13
+
+15, 16,
+24, 25
+
+25, 26
+
+26
+
+18
+
+GNDD
+
+Digital ground
+
+-
+
+Power
+
+27
+
+27
+
+19
+
+VDDD
+
+Output of voltage regulator
+
+1.2 V
+
+Power
+
+28
+
+28
+
+20
+
+SYN
+
+Synchronization pin
+
+From 0 to VCC
+
+SPI/UART
+
+29
+
+29
+
+21
+
+SCS
+
+From 0 to VCC
+
+SPI/UART
+
+30
+
+30
+
+22
+
+SCL
+
+From 0 to VCC
+
+SPI
+
+31
+
+31
+
+23
+
+MOSI/RXD
+
+From 0 to VCC
+
+SPI/UART
+
+32
+
+32
+
+24
+
+MISO/TXD
+
+From 0 to VCC
+
+SPI/UART
+
+Chip-select
+SPI/UART select
+SPI clock
+SPI master OUT slave IN
+UART RX
+SPI master IN slave OUT
+UART TX
+
+page 6/89
+
+STPM32, STPM33, STPM34
+Absolute maximum ratings
+
+3
+
+Absolute maximum ratings
+Table 2. Absolute maximum ratings
+Symbol
+
+Value
+
+Unit
+
+-0.3 to 4.2
+
+V
+
+-0.3 to VCC+0.3
+
+V
+
+-0.7 to 0.7
+
+V
+
+VCC
+
+DC input voltage
+
+VID
+
+Any pin input voltage
+
+VIA
+
+Analog pin input voltage (VIP, VIN, IIP, IIN)
+
+ESD
+
+Human body model (all pins)
+
+±2
+
+kV
+
+ILATCH
+
+Current injection latch-up immunity
+
+100
+
+mA
+
+Junction temperature
+
+125
+
+°C
+
+-40 to 150
+
+°C
+
+Tj
+TSTG
+
+Note:
+
+Parameter
+
+Storage temperature range
+
+absolute maximum ratings are those values beyond which damage to the device may occur. Functional
+operation under these conditions is not implied. All values are referred to GND.
+Table 3. Thermal data
+Symbol
+RthJA
+
+Note:
+
+Parameter
+Thermal resistance junction-ambient
+
+Package
+
+Value
+
+QFN32L 5x5x1
+
+30
+
+QFN24L 4x4x1
+
+35
+
+Unit
+°C/W
+
+this value is referred to single-layer PCB, JEDEC standard test board.
+
+DS10272 - Rev 13
+
+page 7/89
+
+STPM32, STPM33, STPM34
+Electrical characteristics
+
+4
+
+Electrical characteristics
+VCC= 3.3 V, CL= 1 μF between VDDA and GNDA, CL= 4.7 μF between VDDD and GNDD, CL= 1 μF between
+VCC and GND, CL = 100 nF between VREF1, 2 and GNDREF, FCLK = 16 MHz, TAMB = 25 °C, EN = VCC, SPI/
+UART not used, unless otherwise specified.
+Table 4. Electrical characteristics
+Symbol
+
+Parameter
+
+Test conditions
+
+Min.
+
+Typ.
+
+Max.
+
+Unit
+
+General section
+TOP
+
+Operating junction temperature
+range
+
+-
+
+-40
+
+-
+
+105
+
+°C
+
+VCC
+
+Operating supply voltage
+
+-
+
+2.95
+
+3.3
+
+3.65
+
+V
+
+STPM32
+
+-
+
+4.3
+
+-
+
+STPM33
+
+-
+
+5.0
+
+-
+
+STPM34
+
+-
+
+5.9
+
+-
+
+-
+
+4.5
+
+-
+
+-
+
+4.0
+
+-
+
+STPM34
+
+ICC
+
+Operating current
+
+Primary channel ON: ENVREF1 = 1,
+enV1 = enC1 = 1
+Secondary channel OFF: ENVREF2 =
+0, enV2 = enC2 = 0
+
+mA
+
+STPM34
+Primary current channel ON only:
+ENVREF1 = 1, enV1 = 0, enC1 = 1
+Secondary channel OFF: ENVREF2 =
+0, enV2 = enC2 = 0
+FCLK
+
+Nominal frequency
+
+-
+
+-
+
+16
+
+-
+
+MHz
+
+t_comm
+
+Interface selection timing
+
+-
+
+125
+
+-
+
+-
+
+ns
+
+Duty cycle of CLKIN signal
+
+-
+
+40
+
+-
+
+60
+
+%
+
+Rise time (10% to 90%) of CLKIN
+signal
+
+-
+
+-
+
+-
+
+3
+
+ns
+
+Maximum critical crystal gm
+
+-
+
+-
+
+-
+
+0.46
+
+mA/V
+
+Drive level
+
+-
+
+-
+
+100
+
+-
+
+uW
+
+Internal capacitance of oscillator
+inputs
+
+-
+
+-
+
+4
+
+-
+
+pF
+
+External Clock Source(1)
+Duty cycle
+t_rise
+
+Crystal Oscillator(1)
+Gm_crit_ma
+x
+DL
+COSC_IN
+
+Power management (VDDA, VDDD, GNDA, GNDD, GND_REG, EN)
+VPOR
+
+Power-on-reset on VCC
+
+-
+
+-
+
+2.5
+
+-
+
+V
+
+ISTBY
+
+Standby current consumption
+
+EN = GND
+
+-
+
+<1
+
+-
+
+μA
+
+VDDA
+
+Analog regulated voltage
+
+-
+
+-
+
+2.85
+
+-
+
+V
+
+VDDD
+
+Digital regulated voltage
+
+-
+
+-
+
+1.2
+
+-
+
+V
+
+Power supply rejection ratio(1)
+
+50 Hz
+
+-
+
+50
+
+-
+
+dB
+
+PSRRREGS
+
+On-chip reference voltage (VREF1, VREF2)
+
+DS10272 - Rev 13
+
+VREF
+
+Reference voltage
+
+No load on VREF pin, TC = 010
+(default)
+
+-
+
+1.18
+
+-
+
+V
+
+TC
+
+Temperature coefficient(2)
+
+Default
+
+-
+
+30
+
+-
+
+ppm/°C
+
+TC step
+
+TC programmable step(2)
+
+-
+
+±30
+
+-
+
+ppm/°C
+
+-
+
+page 8/89
+
+STPM32, STPM33, STPM34
+Electrical characteristics
+
+Symbol
+
+Parameter
+
+Test conditions
+
+Min.
+
+Typ.
+
+Max.
+
+Unit
+
+Voltage channels (VIP1-VIN1, VIP2VIN2)
+
+-300
+
+-
+
++300
+
+mV
+
+Gain 2X
+
+-300
+
+-
+
++300
+
+Gain 4X
+
+-150
+
+-
+
++150
+
+Gain 8X
+
+-75
+
+-
+
++75
+
+Gain 16X
+
+-37.5
+
+-
+
++37.5
+
+1
+
+-
+
+mV
+MΩ
+
+Analog inputs (VIP1, VIN1, VIP2, VIN2, IIP1, IIN1, IIP2, IIN2)
+
+Current channels (IIP1-IIN1, IIP2-IIN2)
+VMAX
+
+Maximum input signal levels
+
+mV
+
+Voff
+
+Amplifier offset(2)
+
+Shorted and grounded input
+
+-
+
+ZVin
+
+Voltage channel input impedance(1)
+
+-
+
+-
+
+8
+
+-
+
+Gain 2X
+
+-
+
+90
+
+-
+
+Gain 4X
+
+-
+
+170
+
+-
+
+Gain 8X
+
+-
+
+300
+
+-
+
+Gain 16X
+
+-
+
+510
+
+-
+
+Input VMAX/2
+
+-
+
+±5
+
+-
+
+Voltage to current channels
+
+-
+
+-120
+
+-
+
+Current to voltage channels
+
+-
+
+-120
+
+-
+
+-
+
+3.3
+
+V
+
+-0.3
+
+-
+
+0.6
+
+V
+
+ZIin
+
+GERR
+
+Current channel input differential
+impedance(1)
+
+Channel gain error
+Crosstalk(1)
+
+kΩ
+
+%
+dB
+
+Digital I/O (EN, CLKOUT/ZCR, INT1, INT2, MISO, MOSI, SCL, SCS, SYN)
+0.75 ·
+
+VIH
+
+Input high-voltage
+
+-
+
+VIL
+
+Input low-voltage
+
+VCC = 3.2 V
+
+VOH
+
+Output high-voltage
+
+IO = -1 mA, VCC = 3.2 V
+
+VCC - 0.4
+
+-
+
+-
+
+V
+
+VOL
+
+Output low-voltage
+
+IO = +1 mA, VCC = 3.2 V
+
+-
+
+-
+
+0.4
+
+V
+
+VCC
+
+Digital Output (LED1, LED2)
+VOH
+
+Output high-voltage
+
+IO = - 4 mA, VCC = 3.2
+
+VCC - 0.4
+
+-
+
+-
+
+V
+
+VOL
+
+Output high-voltage
+
+IO = + 4 mA, VCC = 3.2
+
+-
+
+-
+
+0.4
+
+V
+
+External Clock Input (CLKIN/XTAL2)(3)
+VIH
+
+Input high-voltage
+
+VCC = 3.3 V
+
+0.8
+
+-
+
+3.3
+
+V
+
+VIL
+
+Input low-voltage
+
+VCC= 3.3 V
+
+-0.3
+
+-
+
+0.1
+
+V
+
+-
+
+0.1
+
+-
+
+%
+
+-
+
+0.5
+
+-
+
+%
+
+-
+
+0.1
+
+-
+
+%
+
+-
+
+0.5
+
+-
+
+%
+
+Energy measurement accuracy
+Over dynamic range 5000:1
+AP
+
+Active power
+
+PGA = 2 to 16
+Over dynamic range 10000:1
+PGA = 2 to 16
+
+RP
+
+RMS
+fBW
+
+Reactive power
+
+Over dynamic range 2000:1
+PGA = 2 to 16
+
+Voltage RMS
+
+Over dynamic range 1:200
+
+Current RMS
+
+Over dynamic range 1:500
+
+-
+
+0.5
+
+-
+
+%
+
+Effective bandwidth
+
+-3 dB, HPF = 1
+
+4
+
+-
+
+3600
+
+Hz
+
+Sigma-delta ADC performance
+
+DS10272 - Rev 13
+
+OSF
+
+Oversampling frequency
+
+-
+
+-
+
+4
+
+-
+
+MHz
+
+DR
+
+Decimation ratio
+
+-
+
+-
+
+1/512
+
+-
+
+-
+
+Fs
+
+Sampling frequency
+
+-
+
+-
+
+7.8125
+
+-
+
+kHz
+
+FBW
+
+Flat band
+
+< 0.05 dB allowed ripple
+
+2
+
+-
+
+-
+
+kHz
+
+page 9/89
+
+STPM32, STPM33, STPM34
+Electrical characteristics
+
+Symbol
+BW
+
+Parameter
+Effective band width
+
+Test conditions
+-3 dB, HPF = 0
+
+Min.
+
+Typ.
+
+Max.
+
+Unit
+
+0
+
+-
+
+3600
+
+Hz
+
+-
+
+65
+
+-
+
+dB
+
+DC measurement accuracy
+Voltage input shorted
+PSRRAC
+
+Power supply AC rejection(2)
+
+Current input shorted
+VCC = 3.3V ± 150 mVp at 1 kHz
+
+SPItimings(3)
+t_en
+
+Time between selection and clock
+
+-
+
+50
+
+-
+
+-
+
+ns
+
+t_clk
+
+Clock period
+
+-
+
+50
+
+-
+
+-
+
+ns
+
+t_cpw
+
+Clock pulse width
+
+-
+
+25
+
+-
+
+-
+
+ns
+
+t_setup
+
+Set-up time before slave sampling
+
+-
+
+10
+
+-
+
+-
+
+ns
+
+t_hold
+
+Hold time after slave sampling
+
+-
+
+40
+
+-
+
+-
+
+ns
+
+tpZL
+
+Enable to low level time
+
+VCC = 3.3 V ± 10%,
+
+-
+
+25
+
+-
+
+ns
+
+-
+
+15
+
+-
+
+ns
+
+VIN = 0 to 3 V, 1 MHz
+tpLZ
+
+Disable from low level time
+
+Rise time = fall time = 6 ns
+RL = 1 kΩ, CL = 50 pF
+see Figure 10
+
+UART timings(3)
+t1
+
+-
+
+CS enable to RX start
+
+5
+
+-
+
+-
+
+ns
+
+t2
+
+-
+
+Stop bit to CS disable
+
+1
+
+-
+
+-
+
+μs
+
+t3
+
+-
+
+CS disable to TX idle hold time
+
+-
+
+-
+
+250
+
+ns
+
+Enable to high level time
+
+VCC = 3.3 V ± 10%,
+
+-
+
+21
+
+-
+
+ns
+
+-
+
+11
+
+-
+
+ns
+
+tpZH
+
+VIN = 0 to 3 V, 1 MHz,
+tpHZ
+
+Disable from high level time
+
+Rise time = fall time = 6 ns
+RL = 1 kΩ, CL = 50 pF
+see Figure 10
+
+SYN timings(3)
+t_ltch
+
+Time between de-selection and latch
+
+-
+
+20
+
+-
+
+-
+
+ns
+
+t_lpw
+
+Latch pulse width
+
+-
+
+4
+
+-
+
+-
+
+μs
+
+t_w
+
+Time between two consecutive latch
+pulses
+
+-
+
+4
+
+-
+
+-
+
+μs
+
+t_rpw
+
+Reset pulse width
+
+-
+
+4
+
+-
+
+-
+
+μs
+
+t_rel
+
+Time between pulse and selection
+
+-
+
+40
+
+-
+
+-
+
+ns
+
+t_startup
+
+Time between power-on and reset
+
+-
+
+35
+
+-
+
+-
+
+ms
+
+1. Guaranteed by design.
+2. Guaranteed by characterization.
+3. Guaranteed by application.
+
+DS10272 - Rev 13
+
+page 10/89
+
+STPM32, STPM33, STPM34
+Electrical characteristics
+
+Figure 7. SPI timings
+
+t_en
+
+SCS
+
+t_clk
+t_cpw
+
+SCL
+
+MOSI
+
+t_setup
+t_hold
+t_lpw
+
+t_rpw
+
+SYN
+
+t_ltch
+
+t_w
+
+t_rel
+
+Figure 8. SPI enable and disable timing diagrams
+
+6ns(*)
+
+SCS
+
+6ns(*)
+
+3.0V
+
+90%
+
+90%
+1.5V
+
+1.5V
+10%
+
+10%
+
+tpZL
+
+GND
+
+tpLZ
+
+MISO
+
+Vcc
+1.5V
+VOL +0.3V
+
+VOL
+
+(*) Rising and falling time are measuring conditions and not an input operating specification
+
+DS10272 - Rev 13
+
+page 11/89
+
+STPM32, STPM33, STPM34
+Pin programmability
+
+Figure 9. UART enable and disable timing diagrams
+
+6ns(*)
+
+6ns(*)
+
+90%
+
+3.0V
+
+90%
+
+1.5V
+
+1.5V
+
+10%
+
+SCS
+
+10%
+
+tpZH
+
+GND
+
+tpHZ
+
+VOH -0.3V
+
+VOH
+
+1.5V
+GND
+
+MISO
+(*) Rising and falling time are measuring conditions and not an input operating specification
+
+Figure 10. Output load circuit for enable and disable times
+
+Probe
+
+MISO
+
+1Kohm
+50pF (*)
+
+Vcc
+GND
+
+(*) Probe and board capacitances included
+
+4.1
+
+Pin programmability
+Table 5. Programmable pin functions
+Name
+CLKOUT/ZCR
+
+Multiplexed function
+
+Functional description
+
+System clock signal
+
+Clock signals (DCLK, SCLK, MCLK, CLKIN)
+
+Zero-crossing
+
+Line voltage/current zero-crossing
+
+I/O
+Output
+
+Primary channel energies (A, AF, R, S)(1)
+LED1
+
+Programmable pulse 1
+
+Secondary channel energies (A, AF, R, S)
+Primary ± secondary channel energies (A, AF, R, S)
+
+SD out current (DATI1)
+
+Output
+
+Sigma-delta bitstream of primary current channel
+Primary channel energies (A, AF, R, S)
+
+LED2
+
+INT1
+
+INT2
+
+SCS
+
+DS10272 - Rev 13
+
+Programmable pulse 2
+
+Secondary channel energies (A, AF, R, S)
+Primary ± secondary channel energies (A, AF, R, S)
+
+SD out current (DATI2)
+
+Sigma-delta bitstream of secondary current channel
+
+Interrupt
+
+Programmable interrupt 1
+
+SD out voltage (DATV1)
+
+Sigma-delta bitstream of primary voltage
+
+Interrupt
+
+Programmable interrupt 2
+
+SD out voltage (DATV2)
+
+Sigma-delta bitstream of secondary voltage
+
+SPI/UART select
+
+Serial port selection at power-up
+
+Chip-select
+
+SPI/UART
+
+Output
+
+Output
+
+Output
+
+Input
+
+page 12/89
+
+STPM32, STPM33, STPM34
+Pin programmability
+
+Name
+MOSI/RXD
+
+MISO/TXD
+
+Multiplexed function
+
+Functional description
+
+Master OUT slave IN
+
+SPI
+
+RX
+
+UART
+
+Master IN slave OUT
+
+SPI
+
+TX
+
+UART
+
+I/O
+Input
+
+Output
+
+1. A: active wideband; AF: active fundamental; R: reactive; S: apparent
+
+DS10272 - Rev 13
+
+page 13/89
+
+STPM32, STPM33, STPM34
+Typical application example
+
+5
+
+Typical application example
+Figure 11 below shows the reference schematic of an application with the following properties:
+•
+
+Constant pulses CP = 41600 imp/kWh
+
+•
+
+INOM = 5 A
+
+•
+
+IMAX = 90 A
+
+Typical values for current sensor sensitivity are indicated in Table 6.
+Please refer to Section 9 for more information about the application dimensioning and calibration
+Figure 11. STPM34 application schematic
+Vcc
+R7
+
+10K 10K 10K 10K
+
+C10 10n
+R6
+4.7K
+
+C11 150p
+SPI
+J6
+
+C12 150p
+
+2
+4
+6
+8
+10
+
+R5
+4.7K
+
+Vcc
+
+C8
+
+R2
+
+2
+
+1
+1
+Ena ble /RS T
+
+C9
+
+100n 150p
+
+22K
+
+1
+2
+
+R14
+270K
+
+Vp1
+
+1
+
+Vp2
+
+2
+C28
+
+C29
+
+C30
+
+100n
+
+1u
+
+C32
+
+150p
+
+C31
+150p
+
+Vre f1
+
+R25
+270K
+
+C24
+
+R15
+
+R26
+
+C34
+
+270K
+
+22n
+
+470R
+
+470R
+
+22n
+
+R24
+270K
+
+R23
+270K
+
+270K
+line 2
+
+J 10
+
+1
+L2
+
+Ip1
+
+R17
+
+Ip2
+
+1K
+J8
+
+RS 1
+BKW-M-R0003-5.0
+
+1
+
+DS10272 - Rev 13
+
+J 11
+Vre f 1-2
+
+Vre f2
+
+L1
+
+N
+
+Vcc
+
+Vre f2
+
+R12
+J9
+
+C23
+
+1
+24
+23
+22
+21
+20
+19
+18
+17
+
+R13
+
+Vn2
+
+2
+
+Vcc
+
+Vn1
+
+J4
+
+3
+
+NC
+VCC
+GNDre g
+VDDA
+GNDA
+VREF2
+GNDre f
+VREF1
+
+9
+10
+11
+12
+13
+14
+15
+16
+
+100R R3
+
+3
+
+100n 100u 10V
+
+100n
+
+CKout/ZCR
+CKin/XTAL2
+U3
+XTAL1
+LED1
+S TP M33/34
+LED2
+INT1
+INT2
+EN
+
+C22
+
+C26
+
+1
+2
+3
+4
+5
+6
+7
+8
+
+16MHz
+
+Vre f1
+
+C27
+
+Y1
+
+R4
+1M
+C17
+15p
+
+Ex
+
+MIS O
+MOS I
+S CL
+S CS
+S YN
+VDDD
+GNDD
+GNDD-NC
+
+Ex
+
+C16
+15p
+
+VP 1
+VN1
+IP 1
+IN1
+IN2
+IP 2
+VN2/NC
+VP 2/NC
+
+DIGITAL I/O
+1 Int1
+2 Int2
+3 Led2
+4 En/Rst
+5 Led1
+6 Gnd
+7 Ckin
+8 Ckout/ZCR
+
+100n 4.7u
+
+32
+31
+30
+29
+28
+27
+26
+25
+
+TXD
+
+100n
+
+RXD
+C15 150p
+
+J7
+DC S upply
+
+C20
+
+150p
+
+1
+3
+5
+7
+
+100R R11
+
+C14 150p
+
+2
+4
+6
+8
+
+C19
+
+C21
+
+C13 150p
+J5
+
+150p
+
+LED2
+
+C18
+
+DL2
+
+1 NC
+2 MOSI
+3 Gnd
+4 MISO
+5 SCS
+6 SCL
+7 NC
+8 SYN
+9 NC
+10 Vcc
+
+R10
+
+150p
+
+LED1
+
+R9
+
+1
+3
+5
+7
+9
+
+DL1
+
+R8
+
+S CS
+
+R19
+0R
+
+R18
+
+C25
+
+C33
+
+10n
+
+10n
+
+R20
+1K
+
+T2
+R21
+6R
+VAC 4626-X002
+
+In1
+1K
+
+In2
+
+R22
+1K
+
+page 14/89
+
+STPM32, STPM33, STPM34
+Typical application example
+
+Table 6. Suggested external components in metering applications
+Function
+
+Component
+
+Line voltage
+interface
+
+Resistor divider
+
+Description
+R to R ratio VRMS = 230 V
+
+1:1650
+
+R to R ratio VRMS = 110 V
+
+1:830
+
+Rogowski coil
+Line current
+interface
+
+CT
+Shunt
+
+Note:
+
+Value
+
+Current to voltage ratio kS
+
+Tolerance
+± 1%
+
+0.15
+
+± 5%
+
+2.4
+
+± 5%
+
+0.3
+
+± 5%
+
+Unit
+
+50 ppm/°C
+
+V/V
+
+50 ppm/°C
+
+mV/A
+
+Above listed components refer to typical metering applications. The STPM3x operation is not limited to the
+choice of these external components.
+
+DS10272 - Rev 13
+
+page 15/89
+
+STPM32, STPM33, STPM34
+Terminology
+
+6
+
+Terminology
+
+6.1
+
+Conventions
+The lowest analog and digital power supply voltage is named GND and represents the system ground. All voltage
+specifications for digital input/output pins are referred to GND. The highest power supply voltage is named VCC.
+The highest core power supply is internally generated and is named VDDA. Positive currents flow to a pin. Sinking
+current means that the current is flowing to the pin and it is positive. Sourcing current means that the current is
+flowing out of the pin and it is negative. A positive logic convention is used in all equations.
+Table 7. Convention table
+
+6.2
+
+Type
+
+Convention
+
+Example
+
+Pins
+
+All capitals
+
+VDDA
+
+Internal signal
+
+All capitals are italic
+
+VDDA
+
+Configuration bit
+
+All capitals are underlined
+
+ROC1
+
+Register name
+
+All capitals are bold
+
+DSP_CR1
+
+Measurement error
+The power measurement error is defined by the following equation:
+(1)
+e%
+
+measuredpower − truepower
+=
+truepower
+
+All measurements come from the comparison with a higher class power (0.02% error) meter reference. Output
+bitstream of modulator is indicated as bsV and bsC for voltage and current channel respectively.
+
+6.3
+
+ADC offset error
+This is the error due to DC component associated with the analog inputs of the A/D converters. Due to the internal
+automatic DC offset cancellation, the STPM3x measurement is not affected by DC components in voltage and
+current channel. DC offset cancellation is implemented in DSP thanks to a dedicated HPF.
+
+6.4
+
+Gain error
+The gain error is due to the signal channel gain amplifiers.This is the difference between the measured ADC code
+and the ideal output code. The difference is expressed as percentage of the ideal code.
+
+DS10272 - Rev 13
+
+page 16/89
+
+STPM32, STPM33, STPM34
+Typical performance characteristics
+
+7
+
+Typical performance characteristics
+Active energy error is measured at T = 25 °C, over phi (0°, 60°, -60°).
+Reactive energy error is measured at T = 25 °C, over phi (90°, -90°, 60°, -60°).
+Figure 12. Active energy error vs. current gain=2x
+integrator off
+
+Figure 13. Active energy error vs. current gain=16x
+integrator off
+
+1
+
+1
+
+0.8
+
+0.8
+
+phi=0°
+phi=-60°
+phi=+60°
+0.6
+
+0.6
+
+phi=0°
+phi=+60°
+phi=-60°
+
+0.4
+
+0.4
+
+0.2
+
+error[%]
+
+error[%]
+
+0.2
+
+0
+
+0
+
+-0.2
+
+-0.2
+
+-0.4
+
+-0.4
+
+-0.6
+
+-0.6
+
+-0.8
+
+-0.8
+
+-1
+0.01
+
+0.1
+
+1
+
+10
+
+-1
+
+100
+
+0.01
+
+0.1
+
+Current Amplitude to Full-Scale ratio [%]
+
+1
+
+10
+
+Figure 14. Active energy error vs. frequency
+gain=2x integrator off
+
+Figure 15. Active energy error vs. frequency
+gain=16x integrator off
+1
+
+1
+
+phi=0°
+
+phi=0°
+0.8
+
+0.8
+
+phi=+60°
+
+phi=+60°
+phi=-60°
+
+0.6
+
+0.6
+
+0.4
+
+0.4
+
+0.2
+
+0.2
+
+error [%]
+
+error [%]
+
+phi=-60°
+
+0
+
+0
+
+-0.2
+
+-0.2
+
+-0.4
+
+-0.4
+
+-0.6
+
+-0.6
+
+-0.8
+
+-0.8
+
+-1
+
+-1
+45
+
+50
+
+55
+
+Frequency [Hz]
+
+DS10272 - Rev 13
+
+100
+
+Current Amplitude to Full-Scale ratio [%]
+
+60
+
+65
+
+45
+
+50
+
+55
+
+60
+
+65
+
+Frequency [Hz]
+
+page 17/89
+
+STPM32, STPM33, STPM34
+Typical performance characteristics
+
+Figure 16. Reactive energy error vs. current
+gain=2x integrator off
+
+Figure 17. Reactive energy error vs. current
+gain=16x integrator off
+
+1
+
+1
+
+0.8
+
+0.8
+
+0.6
+
+0.6
+
+phi=+60°
+phi=-60°
+phi=+90°
+phi=-90°
+
+0.4
+
+0.4
+
+0.2
+
+0.2
+
+error[%]
+
+error[%]
+
+phi=+60°
+phi=-60°
+phi=+90°
+phi=-90°
+
+0
+
+0
+
+-0.2
+
+-0.2
+
+-0.4
+
+-0.4
+
+-0.6
+
+-0.6
+
+-0.8
+
+-0.8
+
+-1
+
+-1
+
+0.01
+
+0.1
+
+1
+
+10
+
+0.01
+
+100
+
+0.1
+
+1
+
+10
+
+Figure 18. Reactive energy error vs. frequency
+gain=2x integrator off
+
+Figure 19. . Reactive energy error vs. frequency
+gain=16x integrator off
+
+1
+
+1
+
+phi=+90°
+
+phi=+90°
+phi=-90°
+
+0.8
+
+phi=-90°
+
+0.8
+
+phi=+60°
+
+phi=+60°
+phi=-60°
+0.6
+
+0.6
+
+0.4
+
+0.4
+
+0.2
+
+0.2
+
+error [%]
+
+error [%]
+
+100
+
+Current Amplitude to Full-Scale ratio [%]
+
+Current Amplitude to Full-Scale ratio [%]
+
+0
+
+phi=-60°
+
+0
+
+-0.2
+
+-0.2
+
+-0.4
+
+-0.4
+
+-0.6
+
+-0.6
+
+-0.8
+
+-0.8
+
+-1
+
+-1
+45
+
+50
+
+55
+
+60
+
+45
+
+65
+
+50
+
+Frequency [Hz]
+
+55
+
+60
+
+65
+
+Frequency [Hz]
+
+Figure 20. Active energy error vs. current gain=16x
+integrator on
+
+Figure 21. Reactive energy error vs. current
+gain=16x integrator on
+
+1
+
+1
+
+phi=0°
+phi=-60°
+
+0.8
+
+0.8
+
+0.6
+
+0.4
+
+0.4
+
+0.2
+
+0.2
+error [%]
+
+error [%]
+
+phi=+60°
+0.6
+
+0
+
+-0.2
+
+-0.4
+
+-0.4
+
+-0.6
+
+-0.6
+
+-0.8
+
+-0.8
+
+0.100
+
+1.000
+
+Current Amplitude to Full-Scale ratio [%]
+
+DS10272 - Rev 13
+
+0
+
+-0.2
+
+-1
+0.010
+
+10.000
+
+100.000
+
+phi=+60°
+phi=-60°
+phi=+90°
+phi=-90°
+
+-1
+0.010
+
+0.100
+
+1.000
+Current Amplitude to Full-Scale ratio [%]
+
+10.000
+
+100.000
+
+page 18/89
+
+STPM32, STPM33, STPM34
+Theory of operation
+
+8
+
+Theory of operation
+
+8.1
+
+General operation description
+The STPM3x product family measures up to two line voltages and two line currents to perform active, reactive
+and apparent power and energy, RMS and instantaneous values, and line frequency information measurement of
+a single, split or poly-phase metering system.
+The STPM3x generates up to two independent train pulse output signals proportional to the active, reactive,
+apparent or cumulative power. It also generates up to two programmable interrupt output signals.
+The internal register map and the configuration registers can be accessed by SPI or UART interface.
+The STPM3x converts analog signals, through four independent channels in parallel via sigma-delta analog-todigital converters, into a binary stream of sigma-delta signals with the appropriate not overlapped control signal
+generator.
+This technique fits to measure electrical line parameters (voltage and current) via analog signals from voltage
+sensors and current sensors (inductive Rogowski coil, current transformer or shunt resistors). Current channel
+inputs are connected, through external anti-aliasing RC filter, to a Rogowski coil or current transformer (CT) or
+shunt current sensor which converts line current into the appropriate voltage signal. Each current channel
+includes a low-noise voltage preamplifier with a programmable gain. Voltage channels are connected to a line
+voltage modulator (ADC). All channels have quiescent zero signal point on GND, so the STPM3x samples
+differential signals on both channels with their zero point around GND.
+The converted sigma-delta signals feed an internal decimation filter stage that decimates 4 MHz bitstreams of a
+factor 512 allowing a 3.6 kHz bandwidth at -3 dB. The 24-bit voltage and current data feed an internal
+configurable filtering block and the hardwired DSP that performs the final computation of metrology quantities.
+The STPM3x also includes two programmable temperature compensated bandgap reference voltage generators
+and low drop supply voltage regulator. All reference voltages are designed to eliminate the channel crosstalk.
+The mode of operation and configuration of the device can be selected by dedicated configuration registers.
+
+8.2
+
+Functional description of the analog part
+The analog part of the STPM3x consists of the following sections:
+•
+
+Power management section:
+–
+–
+–
+
+•
+
+Analog front end section:
+–
+
+•
+•
+
+8.2.1
+
+Reference voltage generators with programmable independent temperature compensation
++3 V low drop supply voltage regulator
++1.2 V low drop supply voltage regulator
+Preamplifiers in the two current channels
+
+–
+2nd order sigma-delta modulators
+Clock generator
+Power-on-reset (POR)
+
+Power management section
+Supply pins for the analog part are: VCC, VDDA, VDDD and GND. GND pins represent the reference point.
+VCC pin is the power supply input namely +3.3 V to GND_REG, it has to be connected to GND_REG via a 1 μF
+capacitor.
+VDDA and VDDD are analog output pins of internal +3.0 V and +1.2 V low drop voltage regulators.
+At least 1 μF capacitor should be connected between VDDA and GNDA. At least 1 μF (better 4.7 μF) capacitor
+should be connected between VDDD and GNDD. The input of the mentioned regulators is VCC.
+There are two voltage references embedded in the STPM33 and STPM34, while the STPM32 embeds a single
+reference.
+It is possible to switch off each reference voltage and each voltage or current channel independently for power
+saving purpose.
+EN_REF1 and EN_REF2 bits in DSP_CR1 and DSP_CR2 switch on/off the voltage reference.
+
+DS10272 - Rev 13
+
+page 19/89
+
+STPM32, STPM33, STPM34
+Functional description of the analog part
+
+To disable a single voltage or current channel, enV1, enC1 bits for primary channel and enV2, enC2 for
+secondary channel should be cleared in DFE_CR1 and DFE_CR2 respectively. Switching off some channels
+allows an operating current reduction as reported in Table 4
+As described in Figure 22, two EN_REF1 and EN_REF2 bits enable the voltage references; if a unique voltage
+reference is used, one of these two bits must be disabled and VREF1 and VREF2 pins must be shorted; if an
+external reference is used both bits must be disabled and the external reference must be connected to VREF1,
+VREF2 pins. VREF1 and VREF2 outputs should be connected to GNDREF via a 100 nF capacitor independently.
+Figure 22. Power management internal connection scheme and polarization
+
+VDDD
+TC2
+
+VRefC2
+
+VREF1_EN
+
+1uF
+
+VOLTAGE
+REFERENCE
+
+LDR 1.2V
+
+GNDD
+
+VRefV2
+
+TC1
+
+3.3V
+
+VRefC1
+
+VREF2_EN
+
+VCC
+
+VOLTAGE
+REFERENCE
+
+LDR 3.0V
+
+100nF
+
+VRefV1
+GND_REG
+
+GNDA
+
+VREF2
+
+VDDA GNDREF
+
+VREF1
+
+100
+nF
+1uF
+
+100nF
+
+Temperature compensated reference voltage generators produce VREF1 = VREF2 = 1.18 V at default settings.
+The primary voltage reference is always on and supplies the voltage and the primary current channel, the
+secondary voltage reference is by default in on-state and supplies the secondary channel.
+These reference temperature compensation curves can be selected through three configuration bits: TCx[2:0]
+(DSP_CR1 and DSP_CR2).
+Table 8. Temperature compensation selection
+
+DS10272 - Rev 13
+
+TCx0
+
+TCx1
+
+TCx2
+
+TC_VREF (ppm/°C)
+
+0
+
+0
+
+0
+
+-30
+
+0
+
+0
+
+1
+
+0
+
+0
+
+1
+
+0
+
+30 (default)
+
+0
+
+1
+
+1
+
+60
+
+1
+
+0
+
+0
+
+90
+
+1
+
+0
+
+1
+
+120
+
+1
+
+1
+
+0
+
+150
+
+1
+
+1
+
+1
+
+180
+
+page 20/89
+
+STPM32, STPM33, STPM34
+Functional description of the analog part
+
+Figure 23. Temperature compensation typical curves
+1.260
+
+Reference Voltage [V]
+
+1.250
+1.240
+
+TC 0
+
+1.230
+
+TC 1
+
+1.220
+
+TC 2
+
+1.210
+
+TC 3
+
+1.200
+
+TC 4
+
+1.190
+
+TC 5
+
+1.180
+
+TC 6
+
+1.170
+
+TC 7
+
+1.160
+-60
+
+-40
+
+-20
+
+0
+
+20
+
+40
+
+60
+
+80
+
+100
+
+120
+
+Temperature [ °C]
+
+8.2.2
+
+Analog front end
+Analog channel inputs of voltages VIP1, VIN1, VIP2, VIN2 and currents IIP1, IIN1, IIP2, IIN2 are fully differential.
+Voltage channels have a preamplification gain of 2, which defines the maximum differential voltage on voltage
+channel inputs to ±300 mV.
+Current channels have a programmable gain selectable among 2, 4, 8 and 16, which defines the maximum
+differential voltage on current channel to ±300 mV, ±150 mV, ±75 mV or ±37.5 mV respectively.
+The selection is given by GAINx[1:0] (DFE_CR1, DFE_CR2) bits as described in Table 9 .
+Table 9. Current channel input preamplifier gain selection
+GAINx0
+
+GAINx1
+
+Gain
+
+Differential input
+
+0
+
+0
+
+X2
+
+±300 mV
+
+0
+
+1
+
+X4
+
+±150 mV
+
+1
+
+0
+
+X8
+
+±75 mV
+
+1
+
+1
+
+X16
+
+±37.5 mV
+
+The oversampling frequency of the modulators is 4 MHz, the output bitstreams of the 2nd order sigma-delta
+modulators relative to the voltage and to the two current channels are available on INT and LED output pins
+through the proper configuration (see configuration bit map in Table 1, Table 41 and Table 42).
+
+DS10272 - Rev 13
+
+page 21/89
+
+STPM32, STPM33, STPM34
+Functional description of the analog part
+
+Figure 24. Analog front end internal scheme
+
+VIPx
+
+bsV
+
+2nd ord ΣΔ
+modulator
+
+VINx
+
+DFE
+GAINx[1:0]
+
+IIPx
+
+bsC
+
+2nd ordΣΔ
+modulator
+
+PLNA
+
+IINx
+
+PLNA uses the chopping technique to cancel the intrinsic offset of the amplifier.
+A dedicated block generates chopper frequencies for voltage and current channels. The amplified signals are fed
+to the 2nd order sigma-delta modulator.
+The analog-to-digital conversion in the STPM3x is carried out using four 2nd order sigma-delta converters. A
+pseudo-random block generates pseudo-random signals for voltage and current channels. These random signals
+implement the dithering technique in order to de-correlate the output of the modulators and avoid accumulation
+points on the frequency spectrum. The device performs A/D conversions of analog signals on four independent
+channels in parallel.
+Figure 25. Block diagram of the modulator
+Dithering
+
+1st integrator
+
+2nd integrator
+
+comparator
+
+input
+
+stream out
+-
+
+-
+
+a1
+
+a2
+D/A
+
+The sigma-delta modulators convert the input signals into a continuous serial stream of “1” and “0” at a rate
+determined by the sampling clock. In the STPM3x, the oversampling clock is equal to 4 MHz.
+1-bit DAC in the feedback loop is driven by the serial data stream. DAC output is subtracted from the input signal
+and from the integrated error. If the loop gain is high enough, the average value of DAC output (and therefore the
+bitstream) can approach to the input signal level. When a large number of samples are averaged, a very precise
+value of the analog signal is obtained. This average is described in DSP section.
+
+DS10272 - Rev 13
+
+page 22/89
+
+STPM32, STPM33, STPM34
+Functional description of the analog part
+
+The converted sigma-delta bitstreams of voltage and current channels are fed to the internal hardwired DSP unit,
+which decimates, filters and processes those signals in order to boost the resolution and to yield all necessary
+signals for computations.
+
+8.2.3
+
+Clock generator
+All the internal timing of the STPM3x is based on the input clock signal, namely 16 MHz. This signal can be
+provided in two different ways:
+1.
+External quartz: the oscillator works with an external crystal
+2.
+External clock: the XTAL2 pin can be fed by an external 16 MHz clock signal. For specific features of crystal
+oscillator or CLKIN signal please refer to Table 4.
+The clock generator is powered by the analog supply and is responsible for two tasks. The former delays the turnon of some function blocks after POR in order to help a smooth start of external power supply circuitry by keeping
+off all major loads. The latter provides all necessary clocks for analog and digital parts.
+Figure 26. Different oscillator circuits (a): with quartz; (b): with external source
+
+From the external 16 MHz clock, the entire clock tree is generated. All internal clocks have 50% duty cycle.
+Table 10. Clock tree
+CLK name
+
+Name
+
+Typical value
+
+Input clock
+
+CLKIN
+
+16 MHz
+
+External clock
+
+Master clock
+
+MCLK
+
+4 MHz
+
+Master root clock
+
+Analog sampling clock
+
+SCLK
+
+4 MHz
+
+OSF of sigma-delta modulators
+
+Decimated clock
+
+DCLK
+
+7.8125 kHz
+
+Description
+
+Sampling frequency of instantaneous voltage and current
+values
+
+CLKOUT pin can be used to feed another STPM3x device clock with 16 MHz, when multiple STPM3x are used in
+cascade as shown in Figure 27.
+A STPM3x can provide clock from CLKOUT pin to one or two cascaded devices for synchronization purposes.
+The clock signal routing should guarantee that the signal provided to each STPM3x clock input is compliant with
+the specifications in Table 4.
+
+DS10272 - Rev 13
+
+page 23/89
+
+STPM32, STPM33, STPM34
+Functional description of the analog part
+
+Figure 27. Clock feed for multiple devices
+
+XTAL1
+
+XTAL1
+
+CLKOUT/ZCR
+
+CLKIN/XTAL2
+
+CLKIN/XTAL2
+
+CLKIN/XTAL2
+
+CLKOUT/ZCR
+
+CLKOUT/ZCR
+
+XTAL1
+1MΩ
+
+15pF
+
+8.2.4
+
+15pF
+
+Power-on-reset (POR) and enable (EN)
+The STPM3x contains a power-on-reset (POR) circuit which delays the startup of the digital domain about 750 μs.
+If VCC supply is less than 2.5 V the STPM3x goes to the inactive state, all functions are blocked asserting a reset
+condition. This is useful to assure the correct device operation during the power-up and power-down.
+POR sequence is illustrated in Figure 28: after the start of two LDOs and internal PowerOK signals are asserted,
+the analog block first and the digital block after start the processing.
+Figure 28. Power-on-reset sequence
+VDDD
+EN
+
+LDR 1.2V
+
+PowerOK_1.2V
+POR
+
+VDDA
+VCC
+
+PowerOK_3.0V
+
+LDR 3.0V
+
+CLKIN
+
+XTAL1
+16MHz Osc
+
+OSC
+
+XTAL2
+
+The STPM3x also has an enable pin (EN) which works as follows:
+•
+•
+
+EN is high: when the power is on and EN pin raises, the device is enabled and starts after POR procedure
+as above described.
+EN is low: when the power is on and EN pin has a transition high to low, the device is disabled. It stops and
+the internal digital memory is deleted so a new initialization is needed when EN goes back to high.
+
+After POR, to ensure a correct initialization, it is necessary to perform a reset of DSP and communication
+peripherals through three SYN pulses (see Figure 29. Global startup reset) and a single SCS pulse, as shown in
+the figure below. SCS pulse can be performed before or after SYN pulses, but minimum startup time before reset
+(as indicated in Table 4) has to be respected.
+
+DS10272 - Rev 13
+
+page 24/89
+
+STPM32, STPM33, STPM34
+Functional description of the digital part
+
+Figure 29. Global startup reset
+
+SCS
+t_rpw
+
+SYN
+t_startup
+
+VCC
+
+8.3
+
+Functional description of the digital part
+Each voltage and current channel has an independent digital signal processing chain, which is composed of:
+•
+•
+•
+•
+•
+
+Digital front end (DFE)
+Phase compensation
+Decimation
+Filters
+Calibration.
+
+The outcoming signals are fed to a common hardwired DSP, which processes the metrology data.
+Figure 30. DSP block functional description
+
+1
+
+1
+
+SCLK
+
+SCLK
+
+Phase
+Compensation
+
+24
+
+24
+
+DCLK
+
+DCLK
+
+Decimation
+
+DFE
+
+8.3.1
+
+1
+
+1
+
+SCLK
+
+SCLK
+
+Phase
+Compensation
+
+Calibration
+
+24
+DCLK
+
+Filters
+
+24
+
+24
+
+DCLK
+
+DCLK
+
+Calibration
+
+DSP
+
+24
+DCLK
+
+Digital front end (SDSx bits)
+This block synchronizes and checks the sigma-delta bitstreams of voltage and current signals.
+Each channel sigma-delta stream has an SDSx status bit associated, which is cleared if the stream is correct,
+while it is set if the bitstream is stuck to 0 or 1 (this is the case of an input waveform saturating the dynamic input
+of the sigma-delta modulator).
+To set SDSx bit, sigma-delta (ƩΔ) stream should be stuck to 0 or 1 for a time between:
+tƩΔstuck = 2 / (MCLK / 256) = 128 μs … tƩΔstuck = 3 / (MCLK / 256) = 192 μs.
+Outputs are stored on bit number 20, 24 of DSP_SR1,2 and 13, 20 of DSP_EV1,2.
+If SDSx = 1, the instantaneous values of voltage current are set on positive or negative maximum value,
+according to sigma-delta stream. In this case active powers and energies are calculated with those values of
+signals.
+If sigma-delta stream of voltage channel is stuck, the reactive energy is zero.
+
+8.3.2
+
+Decimation block
+The decimation block operates a serial decimation of three sigma-delta serial bitstreams coming from three
+modulators of voltage, primary and secondary current channels.
+
+DS10272 - Rev 13
+
+page 25/89
+
+STPM32, STPM33, STPM34
+Functional description of the digital part
+
+The decimation ratio, out of the filter cascade, is 512 so that outputs of this block are parallel 24-bit data at a rated
+frequency of 7.8125 kHz.
+The decimation block has a magnitude response -3 dB band of 3.6 kHz and a 2.0 kHz flat band.
+
+8.3.3
+
+Filter block
+The block includes:
+•
+•
+•
+
+DC cancellation filter (BHPFVx, BHPFCx bits)
+Rogowski coil Integrator (ROCx bit)
+Fundamental harmonic component filter.
+Figure 31. Filter block diagram
+CHVx[11:0]
+
+Vx Data [23:0]
+
+Vx Fund[23:0]
+
+BHPFVx
+
+BLPFVx
+Vx [23:0]
+HPF
+
+LPF
+
+CHCx [11:0]
+BHPFCx
+
+ROCx
+
+HPF
+
+ROCOIL
+INT
+
+Cx Fund[23:0]
+
+Cx Data [23:0]
+
+Reactive
+Filter
+
+BLPFCx
+Cx [23:0]
+
+8.3.4
+
+LPF
+
+DC cancellation filter
+This block removes the DC component of signal from voltage and current signals.
+It is a selectable block which can be bypassed in case of particular needs with BHPFVx and BHPFCx bits in
+DSP_CR1 and DSP_CR2.
+The filter has a passband at -3 dB of 8 Hz
+BHPFVx = 0: voltage HPF is included for x channel
+BHPFVx = 1: voltage HPF is bypassed for x channel
+BHPFCx = 0: current HPF is included for x channel
+BHPFCx = 1: current HPF is bypassed for x channel
+Rogowski coil Integrator
+ROCx bit in DSP_CR1 and DSP_CR2 selects the type of current sensors (CT, shunt or Rogowski coil):
+ROCx = 0: channel x current sensor is CT or shunt
+ROCx = 1: channel x current sensor is Rogowski coil
+In case of ROCx = 1, integrator filter is included to integrate current signal coming from Rogowski coil current
+sensor. Rogowski coil integrator is selectable independently for each current channel.
+
+8.3.5
+
+Fundamental component filter
+This low-pass filter on the voltage and current signals is used to calculate: zero-crossing, period, phase angles
+and fundamental active and reactive energy. Filtered voltage and current components are available on
+DSP_REG6, DSP_REG7, DSP_REG8, DSP_REG9 named VxFund and CxFund.
+
+8.3.6
+
+Reactive filter
+Reactive filter introduces a delay in current and voltage streams respectively; these signals are used to calculate
+reactive power and energy.
+
+DS10272 - Rev 13
+
+page 26/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Input streams for reactive filter are VxFund and CxFund signals.
+
+8.4
+
+Functional description of hardwired DSP
+From the decimation and filtering block, signals are fed to hardwired DSP to compute the following quantities for
+primary and secondary channels:
+•
+•
+•
+•
+•
+•
+
+Active power and energy wideband 0 Hz (4 Hz) - 3.6 kHz
+Active power and energy fundamental 45 - 65 Hz
+Reactive power and energy
+Apparent power and energy from RMS data
+Apparent power vectorial calculation
+Signal measurement: RMS, period, zero-crossing, phase-delay, sag and swell, tamper
+
+Each power signal is accumulated in the correspondent energy register every new sample, so at a rate of 7.8125
+kHz.
+Energy registers are up-down counters. The accumulation is signed so that the negative energy is subtracted
+from the positive energy. When the measured power is positive, the energy register increases its content from
+0x00000000 up to the maximum value, 0xFFFFFFFF, then it rolls from 0xFFFFFFFF back to 0x00000000.
+Vice versa, when the power is negative, the register decreases its content; from 0x00000000 rolls to 0xFFFFFFFF
+and continues decreasing till 0x00000000.
+To monitor each energy register overflow and power sign, status bits are available on DSP_SR1 and DSP_SR2.
+When an energy threshold is reached, a pulse is generated on LED pin.
+This pulse is generated by monitoring two consecutive bits of the energy register: the LED signal goes high when
+the two selected bits commute to 01 and goes low when the bits change to 11.
+The configuration bits LPWx[3:0] in DSP_CR1 and DSP_CR2 shift the default bits for pulse generation, thus
+changing the default pulse frequency of a given factor, indicated in Table 11 for each configuration value.
+Maximum LED pulse width is anyway fixed to 81.92 ms (640 periods of 7812.5 Hz clock).
+Table 11. LPWx bits
+LPWx
+
+LED_PWM
+
+0000
+
+0.0625
+
+0001
+
+0.125
+
+0010
+
+0.25
+
+0011
+
+0.5
+
+0100
+
+1
+
+0101
+
+2
+
+0110
+
+4
+
+0111
+
+8
+
+1000
+
+16
+
+1001
+
+32
+
+1010
+
+64
+
+1011
+
+128
+
+1100
+
+256
+
+1101
+
+512
+
+1110
+
+1024
+
+1111
+
+2048
+
+The signal chain for each power, energy calculations and related frequency conversion are explained in the
+following section.
+
+DS10272 - Rev 13
+
+page 27/89
+
+Functional description of hardwired DSP
+
+STPM32, STPM33, STPM34
+
+Figure 32. DSP block diagram
+VIPx
+VINx
+
+IIPx
+IINx
+
+PLNA
+
+2nd ord ΣΔ
+modulator
+
+2nd ord ΣΔ
+modulator
+
+bsV
+
+bsC
+
+Phase
+Compensation
+
+Phase
+Compensation
+
+Decimation
+
+Decimation
+
+Vx [23:0]
+
+Cx [23:0]
+
+BHPFVx
+
+HPF
+
+BHPFCx
+
+HPF
+
+ROCx
+
+ROCOIL
+INT
+
+CHVx[11:0]
+
+Vx Data [23:0]
+
+CHCx[11:0]
+
+Cx Data [23:0]
+
+LPF
+
+LPF
+
+Vx Fund[23:0]
+
+Cx Fund[23:0]
+
+BLPFVx
+
+BLPFCx
+
+Reactive
+Filter
+
+Offset
+
+Offset
+
+RMS
+
+RMS
+
+Offset
+
+LPF
+
+A LED
+
+Σ
+
+X2
+
+X2
+
+Offset
+
+R LED
+
+Σ
+APMx
+
+Σ
+
+LPF
+
+LPF
+
+Vx RMS Data [17:0]
+
+Cx RMS Data [17:0]
+
+F LED
+
+√¯
+
+AEMx
+
+Σ
+
+S LED
+
+page 28/89
+
+DS10272 - Rev 13
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+8.4.1
+
+Active power and energy calculation
+The signal chain for the active power, energy calculations and related frequency conversion are shown in
+Figure 33. The instantaneous power signal p(t) is generated by multiplying the current and voltage signals. This
+value can be compensated by the active power offset calibration block (OFAx[8:0] in DSP_CR9 and DSP_CR11
+registers). DC component of the instantaneous power signal (average power) is then extracted by LPF (low-pass
+filter) to obtain the active power information.
+Figure 33. Active power and energy calculation block diagram
+
+CHVx[11:0]
+BHPFVx
+
+VIPx
+ADC
+
+bsV
+
+Phase
+Compensation
+
+Vx [23:0]
+
+Vx Data [23:0]
+HPF
+
+VINx
+
+OFAx[9:0]
+PHx Active Power[28:0]
+
+Offset
+
+LPF
+
+Σ
+
+LED
+
+CHCx[11:0]
+
+IIPx
+PLNA
+
+IINx
+
+bsC
+ADC
+
+Phase
+Compensation
+
+BHPFCx
+
+ROCx
+
+HPF
+
+ROCOIL
+INT
+
+Cx [23:0]
+
+PHx Momentary Active Power[28:0]
+
+PHx Active Energy[31:0]
+
+Cx Data [23:0]
+
+The active power is calculated simultaneously and independently for primary and secondary current channels.
+Results of the calculated quantities are stored in the registers as follows:
+EP1 = primary current channel active energy PH1 ACTIVE Energy[31:0]
+P1 = primary current channel active power PH1 Active Power[28:0]
+p1(t) = primary current channel instantaneous active power PH1 Momentary Active Power [28:0]
+EP2 = secondary current channel active energy PH2 Active Energy[31:0]
+P2 = secondary current channel active power PH2 Active Power[28:0]
+p2(t) = secondary current channel instantaneous active power PH2 Momentary Active Power[28:0]
+Active power measurements have a bandwidth of 3.6 kHz and include the effects of any harmonic within that
+range.
+
+8.4.2
+
+Fundamental active power and energy calculation
+The signal chain for the fundamental active power, energy calculations and related frequency conversion are
+shown in Figure 34. The signal flow is the same as the active energy wideband, but voltage and current
+waveforms are filtered to remove all harmonic components but the first (45 - 65 Hz). Power value can be
+compensated by the active power offset calibration block (OFAFx[8:0] in DSP_CR9 and DSP_CR11).
+
+DS10272 - Rev 13
+
+page 29/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Figure 34. Fundamental active power and energy calculation block diagram
+
+CHVx[11:0]
+BHPFVx
+
+VIPx
+
+bsV
+
+ADC
+
+Vx [23:0]
+
+Phase
+Compensation
+
+Vx Data [23:0]
+LPF
+
+HPF
+
+Vx Fund[23:0]
+
+VINx
+
+OFAFx[9:0]
+PHx Fundamental Power[28:0]
+
+Offset
+
+LPF
+
+Σ
+
+LED
+
+CHCx[11:0]
+
+IIPx
+
+bsC
+
+PLNA
+
+ADC
+
+IINx
+
+Phase
+Compensation
+
+BHPFCx
+
+ROCx
+
+HPF
+
+ROCOIL
+INT
+
+Cx [23:0]
+
+PHx Momentary Fundamental Power[28:0]
+
+Cx Data [23:0]
+
+PHx Fundamental Energy[31:0]
+
+Cx Fund[23:0]
+LPF
+
+Results of the calculated quantities are stored in the registers as follows:
+EF1 = primary current channel active fundamental energy PH1 Fundamental Energy[31:0]
+F1 = primary current channel active fundamental Power PH1 Fundamental Power[28:0]
+f1(t) = primary current channel instantaneous active fundamental power PH1 Momentary Fundamental Power
+[28:0]
+EF2 = secondary current channel active fundamental energy PH2 Fundamental Energy[31:0]
+F2 = secondary current channel active fundamental power PH2 Fundamental Power[28:0]
+f2(t) = secondary current channel instantaneous active fundamental power PH2 Momentary Fundamental Power
+[28:0]
+The fundamental active power measurements have a bandwidth of 80 Hz.
+
+8.4.3
+
+Reactive power and energy calculation
+The signal chain for the reactive power, energy calculations and related frequency conversion are shown in
+Figure 35. The instantaneous reactive power signal is generated by multiplying the filtered signals of current and
+voltage. This value can be compensated by the reactive power offset calibration block (OFRx[8:0] in DSP_CR10
+and DSP_CR12). The DC component of the instantaneous power signal is extracted from LPF to obtain the
+reactive power information.
+Figure 35. Reactive power and energy calculation block diagram
+CHVx[11:0]
+BHPFVx
+
+VIPx
+ADC
+
+bsV
+
+Phase
+Compensation
+
+Vx [23:0]
+
+Vx Data [23:0]
+HPF
+
+LPF
+
+Vx Fund[23:0]
+
+VINx
+
+BLPFVx
+OFRx[9:0]
+0
+PHx Reactive Power[28:0]
+1
+BLPFCx
+
+Reactive
+Filter
+
+Offset
+
+LPF
+
+Σ
+
+LED
+
+CHCx[11:0]
+1
+BHPFCx
+
+ROCx
+0
+
+IIPx
+PLNA
+
+IINx
+
+bsC
+ADC
+
+Phase
+Compensation
+
+Cx [23:0]
+HPF
+
+ROCOIL
+INT
+
+Cx Data [23:0]
+
+PHx Momentary Reactive Power[28:0]
+
+PHx Reactive Energy[31:0]
+
+Cx Fund[23:0]
+LPF
+
+Results of the calculated quantities are stored in the registers as follows:
+EQ1 = primary current channel reactive energy PH1 Reactive Energy[31:0]
+Q1 = primary current channel reactive power PH1 Reactive Power[28:0]
+q1(t) = primary current channel instantaneous reactive power PH1 Momentary Reactive Power[28:0]
+EQ2 = secondary current channel reactive energy PH2 Reactive Energy[31:0]
+
+DS10272 - Rev 13
+
+page 30/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Q2 = secondary current channel reactive power PH2 Reactive Power[28:0]
+q2(t) = secondary current channel instantaneous active power PH2 Momentary Reactive Power[28:0].
+
+8.4.4
+
+Apparent power and energy calculation
+The signal chain for the apparent power, energy calculations and related frequency conversion are shown in
+Figure 36. The apparent power signal S is generated in two ways:
+•
+
+Vectorial methodology: uses the scalar product of active and reactive power. The active power is selectable
+through the active power mode bit (APMx in DSP_CR1 and DSP_CR2) between wideband or fundamental.
+
+Equation 2
+
+•
+
+Svec = P2 + Q2
+
+(2)
+
+SRMS = VRMS ∙ IRMS
+
+(3)
+
+RMS methodology: uses the product of RMS data of voltage and current. This value can be compensated
+by the apparent power offset calibration block (OFSx[8:0] in DSP_CR10 and DSP_CR12).
+
+Equation 3
+The apparent energy is calculated from vectorial or from RMS apparent power according to AEMx configuration
+bit in DSP_CR1 and DSP_CR2.
+Figure 36. Apparent power and energy calculation block diagram
+APMx
+PHx Fundamental Power[28:0]
+0
+PHx Active Power[28:0]
+
+X2
+
+PHx Apparent Vectorial Power[28:0]
+
+1
+
+√¯
+PHx Reactive Power[28:0]
+
+AEMx
+
+X2
+
+1
+OFSx[9:0]
+
+Σ
+
+S LED
+
+0
+
+Vx RMS Data [17:0]
+PHx Apparent Energy[31:0]
+
+Offset
+Cx RMS Data [17:0]
+
+PHx Apparent RMS Power[28:0]
+
+Results of the calculated quantities are stored in the registers as:
+ES1 = primary current channel apparent energy PH1 Apparent Energy[31:0]
+S1RMS = primary current channel apparent RMS power PH1 Apparent RMS Power[28:0]
+S1vec = primary current channel apparent vectorial power PH1 Apparent Vectorial Power[28:0]
+ES2 = secondary current channel apparent energy PH2 Apparent Energy[31:0]
+S2RMS = primary current channel apparent RMS power PH2 Apparent RMS Power[28:0]
+S1vec = primary current channel apparent vectorial power PH2 Apparent Vectorial Power[28:0]
+
+8.4.5
+
+Sign of power
+Power measurements are signed calculations. Negative power indicates that energy has been injected into the
+grid. DSP_SR1, DSP_SR2 status registers and DSP_EV1, DSP_EV2 registers include sign indication bits for
+each calculated power.
+If the sign of power is negative, the sign bit is set. SIGN = 0: positive power
+SIGN = 1: negative power
+In the calculation of the sign, a delay equal to half line period is included. If the period of signal is T = 20 ms (f =
+50 Hz), the applied delay is 10 ms.
+
+DS10272 - Rev 13
+
+page 31/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Figure 37. Power sign status bit delay
+Power
+
+t < T/2
+
+t = T/2
+
+t = T/2
+
+Sign
+
+8.4.6
+
+Calculation of power and energy
+In the following section, constant parameters, coming from the device architecture, are used:
+Table 12. STPM3x internal parameters
+Parameter
+
+Value
+
+Voltage reference
+
+VREF = 1.18 [V]
+
+Decimation clock
+
+DCLK = 7812.5 [Hz]
+
+Integrator gain
+
+kint = 1
+
+If ROC bit = 0 in DSP_CR1,2
+
+(for Rogowski coil only)
+
+kint = 0.8155773
+
+If ROC bit = 1 in DSP_CR1,2
+
+Basic calculations are listed in Table 13:
+Table 13. STPM3x basic calculations
+Parameter
+
+Voltage
+
+Current Shunt
+
+Current CT
+
+Current RoCoil
+
+Gain
+
+AV = 2
+
+AI = 16
+
+AI = 2
+
+AI = 16
+
+R2
+R1 + R2 V/A
+
+kS = RSℎunt Ω
+
+Calibrators(1)
+Sensitivity
+Voltage at channel
+inputs
+Integrator gain (only for
+Rogowski Coil sensor)
+ΣΔ bit stream(2)
+Input active power
+
+calV = 0.875
+R
+
+VinV = R +2R ∙ V V
+1
+
+-
+
+2
+
+A
+
+VΣΔ = VinV ∙ V V
+
+Power register
+normalized
+
+DS10272 - Rev 13
+
+VinC = kS ∙ I V
+
+A
+
+IΣΔ = VinC ∙ V I
+
+ref
+
+kS = kRoCoil V/A
+
+kint = 0.8155773
+
+ref
+
+Pin = V ∙ I ∙ cosφ = V ∙ I W
+
+V
+
+∙A
+
+IΣΔ = V inC∙ k I
+ref
+
+int
+
+P = VΣΔ ∙ calV ∙ IΣΔ ∙ calC ∙ cosφ
+
+LED freq at rated
+power(3)
+
+Pulse value
+
+R
+
+kS = Nb V/A
+
+kint = 1
+
+Active power
+
+Constant pulse
+
+calI = 0.875
+
+P ∙ DClk
+LEDf = LED_PWM
+∙ 2 Hz
+
+LEDf pulses
+3600000 ∙ LEDf pulses
+=
+Pin
+Ws
+kWℎ
+
+CP = P
+in
+
+R
+A ∙ A ∙ calV ∙ calI
+pulses
+DClk
+∙ LED_PWM
+CP = 12 ∙ R +2R ∙ kS ∙ kint ∙ V I
+Ws
+2
+1
+
+2
+
+p n
+
+Pnorm =
+
+Vref
+
+Ws
+Ppulse = C1 pulses
+P
+
+−1 ∙ 228 ∙ p n 28 + p n 27: 0
+228
+
+page 32/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Parameter
+
+Voltage
+
+Current Shunt
+
+Power LSB value
+
+LSBP =
+
+Energy LSB value
+
+LSBE =
+
+Current CT
+
+Current RoCoil
+
+Vref2 ∙ 1 + R1 R2
+
+Ppulse
+W
+∙ DClk =
+229
+kint ∙ AV ∙ AI ∙ kS ∙ calV ∙ calI ∙ 228 LSB
+
+Vref2 ∙ 1 + R1 R2
+Ppulse
+Wℎ
+=
+18
+2
+3600 ∙ DClk ∙ kint ∙ AV ∙ AI ∙ kS ∙ calV ∙ calI ∙ 217 LSB
+
+1. CHVx and CHCx calibrator bits introduce in the signal processing a correction factor of ±12.5% (with an attenuation from
+0.75 to 1). In order to have the maximum available up/down correction range, by default calibrator values are in the middle
+of their range (0x800) corresponding to an attenuation factor calV = calI = 0.875.
+2. ƩΔ bitstream should be kept lower than 0.5 (50%) to minimize modulator distortions.
+3. LED_PWM is the LED frequency divider that can be set through LPWx bits in DSP_CR1 and DSP_CR2 control registers for
+primary and secondary current channels respectively. Default value is 1. Please refer to Table 35
+
+For each power register, a configurable offset value (default = 0) can be added to the instantaneous power p(n)
+through OFA[9:0], OFAF[9:0], OFR[9:0], OFAS[9:0]bits in this way:
+Equation 4
+
+8.4.7
+
+p′ n = p n + −1
+
+RMS calculation
+
+OFx 9
+
+∙ OFx 8: 0 ∙ 22
+
+(4)
+
+RMS block calculates RMS values of current and voltage on each phase continuously every 128 μs, as soon as a
+new sample is available from the ADC, according to the following formulas:
+Equation 5
+
+Equation 6
+
+VRMS =
+
+1 t0 + T 2
+v t dt
+T ∫t0
+
+IRMS =
+
+1 t0 + T 2
+i t dt
+T ∫t0
+
+with T = 200 ms
+RMS block architecture is shown in Figure 38
+
+(5)
+
+(6)
+
+Figure 38. RMS block
+
+x
+
+/
+
+x2
+R
+
+x
+R
+
+LPF
+
+R
+2
+
+R
+
+1/2
+
+R
+
+LPF
+
+RMS(x)
+
+If the cut-off frequency of an LP filter is set much below the input signal spectrum, it can be considered as an
+average operator. In this case and according to the figure, the first LP filter averages its input signal which is
+produced by division and multiplication:
+Equation 7
+
+DS10272 - Rev 13
+
+page 33/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+R=
+
+x2
+R
+
+(7)
+
+By assumption, the feedback signal R is DC type and therefore, it can be extracted from the average operation
+and the above equation can be rearranged into:
+Equation 8
+R2 = x2
+
+(8)
+
+x2
+
+(9)
+
+By a square-root operation on both sides of previous equation we get:
+Equation 9
+R=
+
+which is RMS value exact definition.
+With an AC input signal:
+Equation 10
+
+x = x t = Asin ωt
+
+x2 = A2sin2 ωt =
+
+(10)
+
+A2 1 − cos 2ωt
+2
+
+The LP filter cuts the 2nd harmonic component of input signal multiplying it by a dumping factor α:
+Equation 11
+R=A
+
+1 − αcos 2ωt
+2
+
+A
+2
+
+1 − α2 cos ωt
+
+(11)
+
+R result is a DC signal plus the 2nd harmonic ripple with the amplitude of α/2. For dumping factor | α |<<1:
+Equation 12
+R
+
+A
+2
+
+(12)
+
+RMS updated values are available in DSP_REG14 and DSP_REG15 registers every 128 μs.
+Raw ADC samples are also available for post-processing by MCU in registers from DSP_REG2 to DSP_REG9.
+By taking into account the internal parameters in Table 12 and the analog front end components in Table 13, LSB
+values of voltage and current registers are the following:
+Table 14. STPM3x current voltage LSB values
+Parameter
+
+8.4.8
+
+Value
+
+Voltage RMS LSB value
+
+LSBVRMS =
+
+Current RMS LSB value
+
+LSBIRMS =
+
+Instantaneous voltage normalized
+
+v n
+
+Instantaneous current normalized
+
+i n
+
+Vnorm =
+Inorm =
+
+Vref ∙ 1 + R1 R2
+calV ∙ AV ∙ 215
+Vref
+
+V
+
+calI ∙ AI ∙ kS ∙ kint ∙ 217
+
+A
+
+− 1 ∙ 223 ∙ v n 23 − v n 22: 0
+223
+
+−1 ∙2
+
+Instantaneous voltage LSB value
+
+LSBVMOM =
+
+Instantaneous current LSB value
+
+LSBIMOM =
+
+23
+
+∙ i n 23 − i n 22: 0
+223
+
+Vref ∙ 1 + R1 R2
+calV ∙ AV ∙ 223
+
+V
+
+Vref
+A
+calI ∙ AI ∙ kS ∙ kint ∙ 223
+
+Zero-crossing signal
+Zero-crossing signals of voltage and current come from fundamental values of voltage and current and output
+from LPF filter. Resolution of the zero-crossing signal is 8 μs given by FCLK clock = 125 kHz.
+
+DS10272 - Rev 13
+
+page 34/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Figure 39. Zero-crossing generation
+FClk 125kHz
+
+Vx Fund[23:0]
+
+ZRC_V
+
+ZCR detector
+Cx Fund[23:0]
+
+ZRC_I
+
+ZRC signal is delayed by an instantaneous voltage current signal: 5.1 ms (typical), as shown in Figure 40.
+Figure 40. Zero-crossing signal
+Signal
+
+ZRC
+
+8.4.9
+
+Phase meter
+Phase meter detects:
+•
+•
+
+The period of the voltage line
+The phase-angle delay between voltage and current
+Figure 41. Phase meter
+FClk 125kHz
+
+PHx PERIOD[11:0]
+
+ZRC_V
+
+ZRC_I
+
+Period
+&
+Phase Angle
+Detector
+
+PER_ERR
+
+Cx_PHA[11:0]
+
+Period measurement
+Starting from ZRC signals, line period and voltage/current phase shift are calculated. Period information for the
+two phases is located in DSP_REG1 register.
+The measurement of the period is from ZRC signal of voltage channel. The period is calculated like an average of
+last eight measured periods.
+The initial values of period are set on 0x9C4 (2500). LSB of period is 8 μs given by FCLK clock = 125 kHz. Limits
+to consider the correct period are between 0x600 (1536) and 0xF00 (3840) corresponding to a frequency range
+between 32.55 and 81.38 Hz.
+
+DS10272 - Rev 13
+
+page 35/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+If the voltage signal frequency is out of this range, PER_ERR status bit is set in DSP_SR1/2.
+PER_ERR = 0: period in the range
+PER_ERR = 1: period out of range
+PER_ERR bit can be also set when a sag event is detected.
+When PER_ERR bit is set, PHx_PERIOD[11:0] is not updated and keeps the previous correct value.
+Setting the default line frequency through REF_FREQ bit in register DSP_CR3 speeds up the period calculation
+algorithm convergence.
+Phase-angle measurement
+From the period information, the device calculates phase-delay between voltage and current for the fundamental
+harmonic.
+Cx_PHA[11:0] data for primary and secondary channel are located in DSP_REG17 and
+DSP_REG19 respectively.
+Phase-angle φ in degrees can be calculated from the register value as follows:
+Equation 13
+
+Resolution at 50 Hz is:
+Equation 14
+
+φ=
+
+Cx_PHA 11: 0
+FClk
+
+∙ f ∙ 360°
+
+0x001
+∆PℎaseAngle = 125
+kHz ∙ 50 Hz ∙ 360° = 0.144°
+
+(13)
+
+(14)
+
+When PER_ERR bit is set, Cx_PHA[11:0] is not updated and keeps the previous correct value.
+
+8.4.10
+
+Sag and swell detection
+The device can detect and monitor the undervoltage (also called voltage dip or sag) and the overvoltage or
+overcurrent events (swell).
+A 4-bit event register stores every time that the sag or swell condition is verified.The event history is stored in
+DSP_EV1 and DSP_EV2 registers as SAGx_EV[3:0], SWVx_EV[3:0] and SWCx_EV[3:0]. From the event
+register, interrupts can be generated, and the event duration is stored in time registers: from DSP_REG16 to
+DSP_REG19.
+To correctly detect the event, thresholds have to be set from DSP_CR5 to DSP_CR8 as explained below.
+To clear event history and time registers, once the event has been detected, ClearSS bit in DSP_CR1, DSP_CR2
+has to be set. This bit is reset automatically.
+To avoid a race condition on digital counters, a time register CLRSS_TO[3:0] (ClearSS reset time) can be set to
+extend the reset duration of ClearSS bit. LSB of this register is 8 μs.
+Status bits are also available in case of sag and swell events in DSP_SR1 and DSP_SR2, they can give the
+information about the sag/swell event start or end and generate an interrupt if masked in DSP_IRQ1 and
+DSP_IRQ2 registers.
+
+DS10272 - Rev 13
+
+page 36/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Figure 42. Sag and swell detection blocks
+Vx Fund[23:0]
+
+Vx_SAG_end
+Vx_SAG_start
+
+SAG_THRx[9:0]
+
+SAG
+
+SAGx_EV[3:0]
+
+SAG_TIME_THR[13:0]
+
+SAGx_TIME[14:0]
+
+Vx Fund[23:0]
+
+SWV_EV[3:0]
+SWV_TIME[14:0]
+
+SWV_THRx[9:0]
+
+Vx_SWELL_end
+Vx_SWELL_start
+
+SWELL
+Cx Fund[23:0]
+SWC_THRx[9:0]
+
+SWC_EV[3:0]
+SWC_TIME[14:0]
+Cx_SWELL_end
+Cx_SWELL_start
+
+ClearSS
+
+Voltage sag detection
+To detect a voltage sag, the fundamental component of voltage is compared to the 10-bit threshold
+SAG_THRx[9:0] in DSP_CR5 and DSP_CR7 for primary and secondary channel respectively.
+An internal time counter is incremented until momentary voltage value is below the threshold. Sag event is
+recorded when the timer counter reaches a programmable value set by SAG_TIME_THR[13:0] bits in DSP_CR3.
+This time threshold is unique for both channels.
+When a sag event is detected, LSB of SAGx_EV[3:0] event register and SAG_Start bit are set in the interrupt
+status register and an interrupt is generated.
+If sag event ceases, SAGx_EV register is left shifted and zero is added as LSB, besides, SAG_end bit in the
+interrupt status register is set as well.
+The duration of the event is stored in SAGx_TIME[14:0] in DSP_REG16 and DSP_REG18 for primary and
+secondary voltage channel respectively.
+If the overflow of SAG_TIME register occurs, SAGx_EV register is left shifted and its LSB is set, as shown in
+Figure 43.
+LSB of time registers is 8 μs.
+To disable sag detection, the SAG_THRx register must be set to zero.
+
+DS10272 - Rev 13
+
+page 37/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Figure 43. Sag detection process
+VFUND
+
++ SAG_THRx
+
+- SAG_THRx
+
+SAG_TIME_THR
+
+SAG_EV = 0000
+
+Reset state
+
+0001
+SAG Event
+Start
+
+0010
+
+0101
+SAG Event
+Start
+
+SAG Event
+End
+
+1011
+Overflow
+
+SAG_TIME
+
+SAG_TIME_THR
+
+Voltage/current swell detection
+To detect a voltage or a current swell, the fundamental component of signal is compared to the 10-bit threshold
+SWV_THRx[9:0] and SWC_THRx[9:0] in DSP_CR5, DSP_CR6, DSP_CR7 and DSP_CR8.
+When the signal overcomes the threshold, a swell event is detected and LSB of SWVx_EV[3:0] or SWCx_EV[3:0]
+event register is set. At the same time, SWELL_Start bit is set in the interrupt status register and an interrupt can
+be generated.
+If the swell event ceases, SWV_EV or SWC_EV register is shifted and its LSB is set to zero, also SWELL_End bit
+in the interrupt status register is set.
+The duration of the event is stored in SWV_TIME[14:0] or SWC_TIME[14:0] in registers from DSP_REG16 to
+DSP_REG19 for primary and secondary voltage and current channel respectively.
+If the overflow of SWV_TIME or SWC_TIME register occurs, the related SWVx_EV and SWCx_EV register is left
+shifted and its LSB is set, as shown in figure below.
+LSB of time registers is 8 μs.
+To disable swell detection, the registers SWV_THRx and SWC_THRx must have maximum value 0x3FF.
+
+DS10272 - Rev 13
+
+page 38/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Figure 44. Swell detection process
+VFUND
+CFUND
+SWV_THR
+SWC_THR
+
+SWV_EV/SWC_EV = 0000
+
+0001
+
+0010
+
+1011
+
+0101
+
+0110
+
+Reset state
+
+SWELL Event
+End
+
+SWELL Event
+Start
+
+SWELL Event
+Start
+
+SWELL Event
+End
+
+Overflow
+
+SWV_TIME / SWC_TIME
+
+Sag and swell threshold calculation
+Thresholds for sag voltage detection are calculated below, according to the following input parameters:
+VL: line voltage nominal RMS value
+VSAG: target RMS value of sag voltage
+R1, R2: voltage divider resistors
+AV = 2, voltage channel gain
+DSAG= 210, length of sag threshold register
+calV = 0.875, calibrator mid value
+Table 15. Voltage sag
+Parameter
+
+Value
+
+SAG peak voltage
+
+VSAG_peak = VSAG ∙ 2
+
+R
+
+Vin_SAG_peak = VSAG ∙ 2 ∙ R +2R
+
+Input signal
+
+1
+
+V
+
+2
+
+V
+
+R
+
+Vin_SAG_peak FS = VSAG ∙ AV ∙ calV ∙ 2 ∙ R +2R
+ref
+1
+2
+
+Percentage of FS input
+
+V
+
+R
+
+SAGV = VSAG ∙ AV ∙ 2 ∙ R +2R
+
+Register value
+
+ref
+
+LSBSAG_V =
+
+Register LSB RMS value
+
+1
+
+2
+
+∙ calV ∙ DSAG HEX
+
+Vref ∙ R1 + R2
+V
+AV ∙ 2 ∙ R2 ∙ calV ∙ DSAG
+
+To calculate the filtering time for the sag event, we consider the time in which the nominal instantaneous voltage
+is below the sag threshold, that is:
+Equation 15
+time = 2 ∙ arcsin
+
+VSAG
+VL
+
+1000
+∙ 2πf
+ms
+L
+
+(15)
+
+To correctly distinguish between normal sinusoidal voltage and sag event, the filtering time should be added to
+this component, for example half line period (10 ms at 50 Hz). Since LSB of SAG_TIME_THRx register is 8 μs
+(FCLK = 125 kHz), the value to set is:
+Equation 16
++ dt
+TIME = time
+HEX
+8 us
+
+DS10272 - Rev 13
+
+(16)
+
+page 39/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+In the same way:
+VSWELL: target RMS value of swell voltage
+AV: voltage sensor gain
+DSWELL= 210, length of swell threshold register
+calV = 0.875, calibrator mid value
+Following the above calculation we obtain the hexadecimal value of voltage swell threshold:
+Table 16. Voltage swell
+Parameter
+Register value
+Register LSB RMS value
+
+Value
+V
+R2
+SWELLV = SWELL
+Vref ∙ AV ∙ 2 ∙ R1 + R2 ∙ calV ∙ DSWELL HEX
+
+LSBSWELL_V =
+
+Vref ∙ R1 + R2
+V
+AV ∙ 2 ∙ R2 ∙ calV ∙ DSWELL
+
+For the current swell, an analogue procedure can be followed:
+ISWELL: target RMS value of swell current
+kS: current sensor sensitivity [V/A]
+AI: current sensor gain
+calI= 0.875, calibrator mid value
+The swell threshold is:
+Table 17. Current swell
+Parameter
+Register value
+Register LSB RMS value
+
+8.4.11
+
+Value
+I
+SWELLC = SWELL
+Vref ∙ AI ∙ 2 ∙ kS ∙ calI ∙ DSWELL HEX
+
+LSBSWELL_C =
+
+Vref
+A
+AI ∙ 2 ∙ kS ∙ calI ∙ DSWELL
+
+Tamper detection
+The device includes a tamper detection module (the STPM34 and STPM33 only).
+To enable this feature, TMP_EN bit and TMP_TOL[1:0] tamper tolerance have to be set in DSP_CR3. Tamper
+detection feature is disabled by default. It is possible to choose among four different tolerances according to
+Table 18 :
+Table 18. Tamper tolerance setting
+TMP_TOL[1:0]
+
+Tamper tolerance
+
+0x00
+
+TOL = 12.5%
+
+0x01
+
+TOL = 8.33%
+
+0x10
+
+TOL = 6.25%
+
+0x11
+
+TOL = 3.125%
+
+Tamper module monitors active energy registers of the two channels. Tamper condition is detected when the
+absolute value of the difference between the two active energy values is greater than the chosen percentage of
+the averaged value. This occurs when the following equation is satisfied:
+Equation 17
+(17)
+|EnergyCH1 - EnergyCH2| > TOL * |EnergyCH1 + EnergyCH2|
+
+DS10272 - Rev 13
+
+page 40/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+where TOL is selected according to Table 18.
+Detection threshold is much higher than the accuracy difference of the current channels, which should be less
+than 0.2%, but, some headroom should be left for possible transition effect, due to accidental synchronism of load
+current change at the rate of energy sampling.
+Tamper circuit works if energies associated with the two current channels are both positive or negative, if two
+energies have different sign, a warning flag “TAMPER OR WRONG” in DSP_SR1 or DSP_SR2 is set.
+The channel with higher energy is signaled by PHx TAMPER status bit in DSP_SR1 or DSP_SR2.
+When internal signals are not good enough to perform the calculations, for example line period is out or range or
+sigma-delta signals from analog section are stuck at high or low logic level, the tamper module is disabled and its
+state is set to normal.
+
+8.4.12
+
+AH accumulation
+In this particular tamper, the neutral wire is disconnected from the meter and the STPM3x does not sense the
+voltage anymore, while it keeps sensing the current information. In these conditions, AH accumulator can be used
+by the microcontroller to regularly calculate the billing based on a nominal voltage value due to the following
+equation:
+Equation 18
+(18)
+Energy = AH_ACC[31:0] · LSBAH_ACC · VNOM [Wh]
+Figure 45. AH accumulation block
+DCLK
+
+IRMS[17:0]
+
+Σ
+
+AH_ACC[31:0]
+
+The accumulation of current values is controlled by AH status bit. AH bit is set when PER_ERR = 1 and real
+values of current overcome an upper threshold set in AH_UPx[11:0] in DSP_CR9 and DSP_CR11. This bit is
+cleared when RMS current drops below AH_DOWNx[11:0] threshold in DSP_CR10 and DSP_CR12.
+To stabilize the current accumulation, SAG event should be monitored by setting some thresholds in the related
+register.
+
+DS10272 - Rev 13
+
+page 41/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Figure 46. AH accumulation thresholds
+
+SAG
+
+PER_ERR
+
+I_RMS
+AH_UP
+
+AH_DOWN
+
+AH
+
+AH_ACC
+
+Table 19. AH accumulator LSB
+Parameter
+
+Value
+LSB
+
+LSBAH_UP = LSBAH_DOWN = LSBI_RMS ∙ 25 A
+
+AH threshold register LSB
+
+8.4.13
+
+∙2
+
+I_RMS
+LSBAH_ACC = 3600
+∙ DCLK Aℎ
+
+AH accumulator register LSB
+
+Status bits, event bits and interrupt masks
+The device detects and monitors events like sag and swell, tamper, energy register overflow, power sign and
+errors, generating an interrupt signal on INTx pins when the masked event is triggered.
+When the event is triggered, the correspondent bit is set in two registers:
+•
+•
+
+Live event register DSP_EV1,2
+Status (also called interrupt) register DSP_SR1,2
+
+To output the interrupt on INTx pins, the correspondent bit should be set in the interrupt control mask register
+DSP_IRQ1,2
+Live event register
+In live event registers (DSP_EV1 and DSP_EV2), events are set and cleared by DSP at the sampling rate DCLK
+= 7.8125 kHz.
+Table 20. Live events
+Bit
+
+Internal signal
+
+0
+1
+2
+
+Sign total active power
+PH1+PH2 events(1)
+
+3
+4
+
+DS10272 - Rev 13
+
+Description
+
+Sign total reactive power
+Overflow total active energy
+Overflow total reactive energy
+
+PHx events
+
+Sign active power
+
+page 42/89
+
+STPM32, STPM33, STPM34
+Functional description of hardwired DSP
+
+Bit
+
+Internal signal
+
+Description
+
+5
+
+Sign active fundamental power
+
+6
+
+Sign reactive power
+
+7
+8
+
+Sign apparent power
+PHx events
+
+Overflow active energy
+
+9
+
+Overflow active fundamental energy
+
+10
+
+Overflow reactive energy
+
+11
+
+Overflow apparent power
+
+12
+
+Current zero-crossing
+
+13
+
+Current sigma-delta bitstream stuck
+
+14
+
+Current AH accumulation
+
+15
+
+Cx events
+
+16
+
+Current swell event history
+
+17
+18
+19
+
+Voltage zero-crossing
+
+20
+
+Voltage sigma-delta bitstream stuck
+
+21
+
+Voltage period error (out of range)
+
+22
+23
+24
+
+Vx events
+
+Voltage swell event history
+
+25
+26
+27
+
+Voltage sag event history
+
+28
+29
+30
+
+-
+
+Reserved
+
+31
+
+-
+
+Reserved
+
+1. Valid for the STPM33 and STPM34 only.
+
+Status interrupt register
+When an event is detected, DSP sets the status register (DSP_SR1 and DSP_SR2) bits that remain latched,
+even if the event ceases, until they are cleared to zero by a write operation.
+Table 21. Status register
+Bit
+
+Internal signal
+
+0
+1
+2
+
+Sign total active power
+PH1+PH2 status(1)
+
+Sign total reactive power
+Overflow total active energy
+
+3
+
+Overflow total reactive energy
+
+4
+
+Sign secondary channel active power
+
+5
+6
+
+DS10272 - Rev 13
+
+Description
+
+PH2 IRQ status(1)
+
+Sign secondary active fundamental power
+Sign secondary reactive power
+
+page 43/89
+
+STPM32, STPM33, STPM34
+Functional description of communication peripheral
+
+Bit
+
+Internal signal
+
+7
+
+Sign secondary apparent power
+
+8
+9
+
+Description
+
+Overflow secondary channel active energy
+PH2 IRQ status(1)
+
+Overflow secondary channel active fundamental energy
+
+10
+
+Overflow secondary channel reactive energy
+
+11
+
+Overflow secondary channel apparent energy
+
+12
+
+Sign primary channel active power
+
+13
+
+Sign primary channel active fundamental power
+
+14
+
+Sign primary channel reactive power
+
+15
+16
+
+PH1 IRQ status
+
+Sign primary channel apparent power
+Overflow primary channel active energy
+
+17
+
+Overflow primary channel active fundamental energy
+
+18
+
+Overflow primary channel reactive energy
+
+19
+
+Overflow primary channel apparent energy
+
+20
+
+Current sigma-delta bitstream stuck
+
+21
+22
+
+Cx IRQ status
+
+AH1 - accumulation of current
+Current swell detected
+
+23
+
+Current swell end
+
+24
+
+Voltage sigma-delta bitstream stuck
+
+25
+
+Voltage period error
+
+26
+27
+
+Vx IRQ status
+
+Voltage sag detected
+Voltage sag end
+
+28
+
+Voltage swell detected
+
+29
+
+Voltage swell end
+
+30
+31
+
+Tamper status(1)
+
+Tamper
+Tamper or wrong connection
+
+1. Valid for the STPM33 and STPM34 only.
+
+Interrupt control mask register
+Each bit in the status register has a correspondent bit in DSP_IRQ1, DSP_IRQ2 interrupt mask registers. For
+each bit set, the relative event detection is output on INT1, INT2 pins respectively. In the STPM32, DSP_IRQ1 is
+mapped on INT1 pin only.
+Status bits can be monitored by an external microcontroller application, in fact when INTx pin triggers, the
+application reads the relative status register content and clears it.
+Note:
+
+8.5
+
+Power sign status bits generate level interrupts.
+
+Functional description of communication peripheral
+The STPM3x can be interfaced to a control unit through a programmable communication peripheral which can be:
+•
+•
+
+5 pins SPI (MISO, MOSI, SCS, SYN, SCL)
+4 pins UART (RX, TX, SCS, SYN).
+
+The serial communication peripherals share same pins so that they cannot be used at the same time.
+Interface selection is implemented through an internal detection system that, at the device startup, detects which
+of the two communication interfaces has to be used. This feature allows communication to be quickly established
+with minimal initialization.
+Auto-detection works at startup, (power-up or EN pin transition from low to high) by monitoring SCS pin status
+and automatically selecting the communication interface that matches the configuration:
+
+DS10272 - Rev 13
+
+page 44/89
+
+STPM32, STPM33, STPM34
+Communication protocol
+
+•
+•
+
+If SCS pin is held low the communication method is SPI
+If SCS pin is held high the communication interface is UART.
+
+For the communication interface selection the SCS pin must be kept low or high for SPI or UART selection
+respectively for at least 125ns after the internal clock signal starts.
+According to POR sequence in Figure 28, only after the regulated voltages are OK the PWR_OK internal signal
+enables the CLKIN signal to the digital section. After two clock periods, the digital section sets and locks the
+interface to the selected type. Note that the regulated voltages could be ready later than the Vcc minimum
+threshold of 2.5 V, because of the capacitance on VDDA and VDDD pins.
+Below a timing diagram of startup and interface selection.
+Figure 47. Startup interface selection timing
+VCC
+3.3 V
+2.5 V
+
+Vdda
+2.85 V
+
+Vddd
+1.2 V
+POW_OK
+SCS
+UART
+
+SPI
+t_comm
+
+After the selected communication interface is established, the interface is locked to prevent the communication
+method from changes, and SCS pin is used as chip-select for the device.
+Pins used by the serial communication peripheral are listed in Table 22.
+Table 22. Communication pin description
+
+8.6
+
+Name
+
+Function
+
+SYN
+
+Synchronization
+
+SCS
+
+Chip-select
+
+SCL
+
+SPI connection
+
+UART connection
+
+GPIO , VCC at startup
+
+GPIO, VCC at startup
+
+-Start-up interface selection at GND
+
+-Start-up interface selection at VCC
+
+-Chip-select at GND
+
+-Chip-select at VCC
+
+Clock
+
+SPI CLK
+
+Not used
+
+MOSI/RXD
+
+Data in
+
+SPI MOSI
+
+UART RX
+
+MISO/TXD
+
+Data out
+
+SPI MISO
+
+UART TX
+
+Communication protocol
+A single communication session consists of 4 + 1 (optional CRC) bytes full-duplex data sequence organized as
+follows:
+Table 23. Communication session structures
+Byte
+
+DS10272 - Rev 13
+
+Master-side transmitted data
+
+Slave-side transmitted data
+
+1
+
+ADDRESS for 32-bit register to be read
+
+Previously requested data byte LSB
+
+2
+
+ADDRESS for 16-bit register to be written
+
+Previously requested data byte 2 out of 4
+
+3
+
+DATA for 16-bit register to be written, LSB
+
+Previously requested data byte 3 out of 4
+
+4
+
+DATA for16-bit register to be written, MSB
+
+Previously requested data byte MSB
+
+page 45/89
+
+STPM32, STPM33, STPM34
+Communication protocol
+
+Byte
+5 (optional)
+
+Master-side transmitted data
+Master CRC verification packet
+
+Slave-side transmitted data
+Slave CRC verification packet
+
+The above information is exchanged between master and slave in the same communication session, or
+transaction. SPI master can issue a read-request and a write-request (optional).
+The master initiates the communication sending the STPM3x a frame see Table 23 (read address - write address
+- LS data byte - MS data byte - optional CRC).
+Two command codes are provided:
+•
+•
+
+Dummy read address 0xFF increments by one the internal read pointer
+Dummy write address 0xFF specifies that no writing is requested (the two following incoming data frames
+are ignored)
+
+Upon the reception of a frame, the STPM3x replies to master data sending the 32-bit register addressed during
+the previous communication session; during the first session the slave sends, by default, the 32-bit data stored
+into the first (row 0) memory register. Data are organized in 8-bit packets so that the least significant byte is sent
+first and the most significant byte is sent last.
+A final 8-bit CRC packet is sent to master to verify no data corruption has occurred during the transmission from
+slave to master. The CRC feature, enabled by default, can be controlled by a configuration bit into US_REG1
+memory row (read address 0x24, write address 0x24).
+If CRC bit in US_REG1 is cleared, the communication consists of 4 bytes only.
+Write-requests are executed immediately after the transaction has completed, while read- requests are fulfilled at
+the end of the next transaction only, because the sent read-address has just set the internal register pointer to
+deliver data during the following transaction.
+So, while one transaction is enough to write data into memory, at least two transactions are needed to read
+selected data from memory.
+Databytes are swapped with respect to the order of the byte, since during transmission, the 3rd byte sent to MOSI
+line is the least-significant (LS) byte (bits [7:0]) and the 4th byte is the most-significant (MS) byte of the data to be
+written (bits [15:8]).
+On MISO line, the first data byte received is the least-significant (LS, bits [7:0]) and the last is the most-significant
+(MS, bits [31:24]) of the record, as shown below.
+Figure 48. Single communication time frame
+MOSI
+Read Address
+
+Write Address
+
+LS Data [7:0]
+
+MS Data [15:8]
+
+CRC Byte
+
+Data [7:0]
+
+Data [15:8]
+
+Data [23:16]
+
+Data [31:24]
+
+CRC Byte
+
+MISO
+
+SCS
+timeline
+
+Data and configuration registers are organized into 32-bit rows in the internal memory, but can only be accessed
+16-bit at a time for writing operations.
+The address space is 70 rows wide, so there are 70 32-bit addressable elements for reading operations; since the
+first 21 configuration registers are writable, there are 42 (= 21 x 2) 16-bit addressable elements for writing
+operations.
+
+DS10272 - Rev 13
+
+page 46/89
+
+STPM32, STPM33, STPM34
+Communication protocol
+
+Figure 49. Memory data organization
+32 bits
+16 bits
+
+Read Address
+
+MS Data [15:8]
+
+LS Data [7:0]
+
+MS Data [15:8]
+
+LS Data [7:0]
+
+Data [31:24]
+
+Data [23:16]
+
+Data [15:8]
+
+Data [7:0]
+
+Data [31:24]
+
+Data [23:16]
+
+Data [15:8]
+
+Data [7:0]
+
+Data [31:24]
+
+Data [23:16]
+
+Data [15:8]
+
+Data [7:0]
+
+Write Address
+
+Two different codes are used for the read address space and write address space, which can be found in the
+register map.
+
+8.6.1
+
+Synchronization and remote reset functionality
+Data into read-only registers are updated internally by DSP with frequency: 7.8125 kHz (clock frequency
+measure). Latching is used to sample the updated results into transmission latches. The transmission latches are
+flip-flops holding the data in the communication interface.
+Data latching can be implemented in three ways:
+•
+•
+•
+
+Using SYN and SCS pin
+Writing the channel latch bits before each reading (S/W Latchx in DSP_CR3)
+Writing auto-latch bit (S/W Auto Latch in DSP_CR3) to automatically latch data registers every clock
+measure period (128 μs).
+
+The remote reset can be performed in two ways:
+•
+•
+
+Using SYN and SCS pin
+Writing the reset bit (S/W reset in DSP_CR3).
+
+SYN pin: latching, reset and global reset
+Latching of internal memory registers can be carried out by producing pulses of a given width on SYN pin while
+SCS line is high as depicted in Figure 50.
+If a single pulse on SYN is detected, latch occurs.
+If two consecutive pulses are detected, a reset of measurement registers occurs and the counters are reset, as
+well.
+If three consecutive pulses are detected, a global reset occurs, the configuration is also reset and the chip must
+be initialized again.
+Note:
+
+To ensure a correct initialization of DSP, it is recommended to perform a global reset through three SYN pulses
+at start up and before setting configuration bits.
+Figure 50. Latching and reset through SYN pulses
+
+SCS
+SYN
+
+timeline
+Latch edges
+
+Reset edge
+
+Latch pulse width and other SPI timings are reported in Table 4.
+
+DS10272 - Rev 13
+
+page 47/89
+
+STPM32, STPM33, STPM34
+Communication protocol
+
+Figure 51. Latching through SYN pulses
+MOSI
+MISO
+SCS
+SYN
+active edge
+
+inactive edges
+
+active edge
+timeline
+
+Software latch
+Writing S/W Latchx configuration bits of DSP_CR3 register can latch data into transmission latches. These two
+bits latch channel 1 and channel 2 data registers respectively; once set, they latch data and are automatically
+reset. By setting S/W Auto Latch bit, latching is performed automatically at the rate of sampling clock, so data
+latching, before each reading request, is no longer necessary.
+Software reset
+Writing SW Reset configuration bit in DSP_CR3 brings the configuration registers to their default values. Data
+registers are not reset. This bit is automatically cleared after this action.
+
+8.6.2
+
+SPI peripheral
+The device implements a full-duplex communication protocol using MISO, MOSI ports for data exchange, SCL for
+clock port, SCS port for data exchange activation and SYN for internal register data latching and resetting, when
+no data activation is set (SCS in off-state). Latching and resetting can also be performed by setting the related
+bits in DSP_CR3 register.
+With reference to the general SPI protocol, the peripheral is configured to work according to the following settings:
+cpol = 1, cpha = 1.
+SPI control register
+US_REG1 register contains 16-bits with all the configuration parameters of t SPI and UART interfaces of the
+STPM3x. Table 24 describes SPI related bits:
+Table 24. SPI control register
+Bit position in row
+
+Name
+
+Description
+
+Default value
+
+15
+
+LSBfirst
+
+Little(1) or big(0) - endian for bit transmission in databyte
+
+0
+
+14
+
+CRCenable
+
+Enable/disable CRC feature
+
+1
+
+[7:0]
+
+CRCPolynomial
+
+Polynomial used to validate transmitted and received
+data
+
+0x07
+
+LSBfirst: endianness of data-byte transmission and reception
+CRCenable: enables the optional CRC feature
+CRCPolynomial: default polynomial used is 0x07 (x8+x2+x+1)
+SPI timings
+Any single transaction timing follows the scheme in Figure 7.
+For consecutive writing transactions, a minimum time interval of 4μs has to be taken into account in order to avoid
+overrun issues.
+For latch and consecutive read transactions a minimum time interval of 4 μs has to be taken into account in order
+to avoid overrun issues.
+
+DS10272 - Rev 13
+
+page 48/89
+
+STPM32, STPM33, STPM34
+Communication protocol
+
+Examples
+All frames in the following examples do not contain CRC byte, which has to be added just in case the feature has
+not been disabled previously. After that CRC has been disabled, the frame consists of four bytes only.
+To write bits from 31 to 16 (most significant bits) in row 1 with data byte 0xABCD and read row 2 in the following
+transaction, the first four bytes of the transmission (without CRC) are: 04_03_CD_AB. To receive data from
+register 04 the master should send the frame: FF_FF_FF_FF.
+To write lower (least significant) 16-bits in row 3 with data #AABB and read back from the same row the frame to
+send is 06_06_BB_AA, followed by the frame FF_FF_FF_FF to receive requested data from the device.
+The sent frame changes according to LSBfirst setting:
+Table 25. LSBfirst example
+LSBfirst = 0
+
+04_03_CD_AB
+
+LSBfirst = 1
+
+20_C0_B3_D5
+
+MISO line is valid as well. In this case, there is a full-reverse data transmission when LSBfirst = 1,since data bit
+reception order changes as shown in Table 26.
+Table 26. LSBfirst and MISO line
+Byte[0]
+
+Byte[1]
+
+Byte[2]
+
+Byte[3]
+
+LSBfirst = 0
+
+[7:0]
+
+[15:8]
+
+[23:16]
+
+[31:24]
+
+LSBfirst = 1
+
+[0:7]
+
+[8:15]
+
+[16:23]
+
+[24:31]
+
+LSBfirst can be programmed using the transactions (other configuration bits involved in the transaction are set to
+their default states):
+Table 27. LSBfirst programming
+LSBfirst = 1
+
+24_24_07_CO
+
+LSBfirst = 0
+
+24_24_EO_02
+
+The transaction to write LSBfirst = 0 is byte-reversed, since the system has moved from the LSBfirst = 1
+condition. The read address is set so to read in the following transaction the content of US_REG1.
+Following the frames to enable/disable CRC feature:
+Table 28. CRCenable programming
+CRCenable = 1
+
+24_24_07_40
+
+CRCenable = 0
+
+24_24_07_00
+
+To reset all SPI and UART status register's bits, the following frame should be sent: 28_29_00_00.
+To clear SPI status bits only, SPI-master can send 1 s sequence to UART status bit register. Referring to the
+previous example, this leads to the following transaction: 28_29_FF_00.
+Events are associated to interrupts so that, when the correspondent event mask bit in SPI IRQ register is
+activated, INT line is sensitive to that event.
+For example, to activate CRC error interrupt (bit 12, related to status bit 28), the mask 0x1000 has to be written to
+write address 0x28 by the following transaction: 28_28_00_10.
+
+DS10272 - Rev 13
+
+page 49/89
+
+STPM32, STPM33, STPM34
+Communication protocol
+
+8.6.3
+
+UART peripheral
+The STPM3x provides the UART interface, which allows a communication using two single direction pins only.
+The connection to SCS and SYN pins is recommended to ensure proper device start up and reset procedures.
+Main features of this interface are:
+•
+•
+•
+•
+•
+•
+•
+•
+
+Full-duplex, asynchronous communication
+Low-level sequential data exchange protocol (1 start, 8 data, 1 stop)
+NRZ standard format (mark/space)
+Fractional baud rate generator system (to offer a wide range of baud rates)
+Several error detection flags
+Configurable frame length
+Optional configurable CRC checksum
+Optional noise immunity algorithm.
+
+TX pin accesses this interface, which transmits data to the microcontroller, and RX pin, which receives data from
+the microcontroller. A simple master/slave topology is implemented on the UART interface where the STPM3x
+acts as the slave.
+Transmission and reception are driven by a common baud rate generator; the clock for each one is generated
+only when UART is enabled.
+UART transmitting and receiving sections must have the same bit speed, frame length and stop bits.
+Chip selection in UART mode requires SCS bit is kept high.
+Communication starts when the master sends slave a valid frame (the microcontroller). The format of the frame is
+shown below.
+Figure 52. UART frame
+Start
+Bit
+
+Bit 0
+
+Bit 2
+
+Bit 1
+
+Bit 3
+
+Bit 4
+
+Bit 5
+
+Bit 6
+
+Bit 7
+
+Stop
+Bit
+
+Next
+Start
+Bit
+
+Clock
+
+Idle frame
+
+Start
+Bit
+
+Break frame
+
+Extra
+
+Start
+Bit
+
+As shown in Figure 52, each frame consists of 10 bits. Each bit is sent to a variable rate. All frame data are sent
+LSBfirst.
+If a BREAK frame is received, a break flag is set and the whole packet reception aborts. The frame receiver can
+recognize an IDLE frame, but packet processing is not involved.
+UART control register
+US_REG1 and US_REG2 registers respectively contain all the configuration parameters of SPI and UART
+interfaces of the STPM3x. Table 29 describes UART bits:
+Table 29. UART control register US_REG1
+Row bit position
+[23:16]
+
+DS10272 - Rev 13
+
+Name
+Timeout
+
+Description
+Timeout threshold [ms]
+
+Default value
+0
+
+page 50/89
+
+STPM32, STPM33, STPM34
+Communication protocol
+
+Row bit position
+
+•
+
+•
+•
+
+•
+
+Name
+
+Description
+
+Default value
+
+9
+
+Break on error
+
+Enable/disable the operation to send break frame in case
+of error
+
+0
+
+8
+
+Noise detection enable
+
+Enable/disable error detection based on noise immunity
+algorithm
+
+0
+
+[7:0]
+
+CRCPolynomial
+
+Polynomial used to validate transmitted and received data
+
+0x07
+
+Timeout: any communication session should be completed within this configurable time threshold (ms). If
+the timeout value is zero this threshold is disabled. If timeout expires, the reception and the transmission
+processes stop and, if enabled, a BREAK character is transmitted to warn the master about the error.
+Packet processing can resume only after that BREAK transmission has been completed and an IDLE
+frame has been received.
+Break on error: if an error occurs (framing/noise/timeout/RX overrun) a BREAK command is transmitted to
+the master.
+Noise error detection. An oversampling technique is implemented to raise the noise level immunity:
+received bit value is accomplished taking in account the value of three samples, and applying to them the
+majority rule. This noise immunity algorithm is automatically enabled: if “noise detection enable” bit is set,
+all samples must have the same value to get a valid bit reception. In this case, when noise is detected
+within a frame, a noise detection error is issued and the whole packet is discarded.
+CRCPolynomial: default polynomial used is 0x07 (x8+x2+x+1).
+
+CRC, in case of UART, has to be calculated on the reversed byte frame, because of the internal structure of
+UART blocks.
+For example, if the frame to transmit is 04_03_CD_AB, CRC should be calculated on the frame:
+20_C0_B3_D5 -> CRC = 0x16
+The frame to send is: 04_03_CD_AB with the reversed CRC = 68.
+Note:
+
+For UART peripheral, CRC byte is sent reversed only.
+Table 30. UART control register US_REG2
+
+•
+•
+
+Row bit position
+
+Name
+
+[23:16]
+
+Frame delay
+
+TX frame-to-frame delay [bit periods]
+
+[15:0]
+
+Baud rate
+
+Fractional baud rate generation
+
+Description
+
+Default value
+0
+0x0683
+
+Frame delay: delay (expressed as bit periods) in transmitted frames. The bit period depends on the baud
+rate divider selection (see below).
+Baud rate: set to 9600 default value, the communication baud rate can be programmed in this configuration
+register. Theoretical values for configuration register can be calculated according to the following formulas,
+where a main clock frequency is 16 MHz, BR is the desired baud rate and BRDIV is the theoretical value of
+fractional divider:
+
+Equation 19
+
+Equation 20
+Equation 21
+
+Main Clock Frequency
+
+6
+
+∙ 10
+BRDIV = 16 ∙ Communication Baud Rate = 16
+16 ∙ BR
+
+(19)
+
+BRRI = BRDIV = int BRDIV
+
+(20)
+
+BRRF = round 16 ∙ BRDIV − BRRI
+
+(21)
+
+Bit Period = 16 ∙ BRRI + BRRF ∙ MClk Period
+
+(22)
+
+where BRRI are bits [15:4] and BRRF are bits [3:0] of the register. According to the chosen baud rate divider the
+bit period is:
+Equation 22
+Table 31 summarizes the above calculation of the register value to select some typical baud rates:
+
+DS10272 - Rev 13
+
+page 51/89
+
+STPM32, STPM33, STPM34
+Communication protocol
+
+Table 31. Baud rate register examples
+
+8.6.4
+
+Baud rate
+
+BRDIV
+
+BRRI
+
+BRRF
+
+Register value
+
+2400
+
+416.666667
+
+416 = 0x1A0
+
+11 = 0xB
+
+1A0B
+
+9600
+
+104.166667
+
+104 = 0x68
+
+3 = 0x3
+
+683
+
+19200
+
+52.0833333
+
+52 = 0x34
+
+1 = 0x1
+
+341
+
+57600
+
+17.3611111
+
+17 = 0x11
+
+6 = 0x6
+
+116
+
+115200
+
+8.68055556
+
+8 = 0x8
+
+11 = 0xB
+
+8B
+
+230400
+
+4.34027778
+
+4 = 0x4
+
+5 = 0x5
+
+45
+
+460800
+
+2.17013889
+
+2 = 0x2
+
+3 = 0x3
+
+23
+
+UART/SPI status register and interrupt control register
+At row 20, at read address 0x28, the register is responsible for holding the status of UART/SPI peripherals of the
+STPM3x device. Setting the correspondent bit in IRQ CR the interrupt mask raises an interrupt on both INT1,
+INT2 pins based on the peripheral status.
+Table 32. UART/SPI status and interrupt control register
+Register
+
+SR
+
+IRQ CR
+
+DS10272 - Rev 13
+
+Bit position
+
+Description
+
+Default value
+
+Access mode
+
+30
+
+SPI RX overrun
+
+0
+
+RW
+
+29
+
+SPITX underrun
+
+0
+
+RW
+
+28
+
+SPI CRC error
+
+0
+
+RW
+
+27
+
+UART/SPI write address error
+
+0
+
+RW
+
+26
+
+UART/SPI read address error
+
+0
+
+RW
+
+25
+
+SPITX empty
+
+0
+
+RO
+
+24
+
+SPI RX full
+
+0
+
+RO
+
+22
+
+UART TX overrun
+
+0
+
+RW
+
+21
+
+UART RX overrun
+
+0
+
+RW
+
+20
+
+UART noise error
+
+0
+
+RW
+
+19
+
+UART frame error
+
+0
+
+RW
+
+18
+
+UART timeout error
+
+0
+
+RW
+
+17
+
+UART CRC error
+
+0
+
+RW
+
+16
+
+UART break
+
+0
+
+RW
+
+14
+
+mask for SPI RX overrun error status bit
+
+0
+
+RW
+
+13
+
+maskfor SPI TX underrun error status
+bit
+
+0
+
+RW
+
+12
+
+mask for SPI CRC error status bit
+
+0
+
+RW
+
+11
+
+mask for write address error status bit
+
+0
+
+RW
+
+10
+
+mask for read address error status bit
+
+0
+
+RW
+
+9
+
+mask for SPITX empty
+
+0
+
+RW
+
+8
+
+mask for SPI RX full
+
+0
+
+RW
+
+6
+
+mask for UART TX overrun
+
+0
+
+RW
+
+5
+
+mask for UART RX overrun
+
+0
+
+RW
+
+4
+
+mask for UART noise error
+
+0
+
+RW
+
+3
+
+mask for UART frame error
+
+0
+
+RW
+
+page 52/89
+
+STPM32, STPM33, STPM34
+Communication protocol
+
+Register
+IRQ CR
+
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+Bit position
+
+Description
+
+Default value
+
+Access mode
+
+2
+
+mask for UART timeout error
+
+0
+
+RW
+
+1
+
+mask for UART CRC error
+
+0
+
+RW
+
+SPI RX overrun: occurs when two consecutive write transactions are too fast and close to each other
+SPI TX underrun: occurs when a read-back operation (= write then read the same register) or latch/read is
+too fast
+SPI CRC error: CRC error detected
+UART/SPI write address error: write address out of range (not write address not writable)
+UART/SPI read address error: read address out of range (not read address not readable)
+SPI TX empty: transmission buffer empty (for SPI diagnostic, not recommended for normal IRQ operations)
+SPI RX full: reception buffer full (for SPI diagnostic, not recommended for normal IRQ operations)
+UART TX overrun: occurs when master and slave have different baud rates and master transmits before
+reception has ended
+UART RX overrun: active when received data have not been correctly processed
+UART noise error: noisy bit detected
+UART frame error: missing stop bit detected
+UART timeout error: timeout counter expired
+UART CRC error: CRC error detected
+UART break: break frame (all zeros) received.
+
+Read-write status bits are set by the occurrence of the related event and are not reset when the event ceases, on
+contrary master can only reset them transmitting a write sequence addressed to memory location 0x28.
+
+DS10272 - Rev 13
+
+page 53/89
+
+STPM32, STPM33, STPM34
+Application design and calibration
+
+9
+
+Application design and calibration
+The choice of external components in the transduction section of the application is a crucial point in the
+application design, affecting the precision and the resolution of the whole system. A compromise has to be found
+among the following needs:
+1.
+Maximizing signal-to-noise ratio in the voltage and current channel
+2.
+Choosing current-to-voltage conversion ratio kS and the voltage divider ratio in a way that calibration can be
+achieved for a given constant pulse CP
+3.
+
+Choosing kS to take advantage of the whole current dynamic range according to desired maximum current
+and resolution
+In this section, the rules for a good application design are described. After the design phase, any tolerance of the
+real components from these values or device internal parameter drift can be compensated through calibration.
+Please refer to Section 8.4.6 and Section 8.4.7 for device basic calculations.
+
+9.1
+
+Application design
+To reach CP target output constant pulse at default LPW value, the analog front end component choice has to
+depend on:
+•
+
+value of R1 voltage divider resistor, given R2 and kS current sensor sensitivity
+
+•
+
+kS given R1 and R2 voltage divider resistors Calculations for these two methods are developed below:
+
+First method: constant kS
+Given R2 (smaller voltage divider resistor), kS (current sensor sensitivity) and the target meter constant pulse CP
+(pulses/kWh) as input of the calculations, the value of the voltage divider resistor R1 comes from the following
+formula:
+Equation 23
+R1 = R2 ∙
+
+Second method: constant R1
+
+1800 ∙ kS ∙ kint ∙ AV ∙ AI ∙ calV ∙ calI ∙ DClk
+−1
+2
+Vref ∙ CP
+
+Ω
+
+(23)
+
+Given R1, R2 (voltage divider resistors) and CP target meter constant pulse (pulses/kWh) as input of the
+calculations, the value of kS current sensor comes from the following formula:
+Equation 24
+
+Note:
+
+2
+Vref ∙ CP ∙ 1 + R1 R2
+V I int ∙ calV ∙ calI ∙ DClk
+
+kS = 1800 ∙ A ∙ A ∙ k
+
+mV/A
+
+(24)
+
+The resistor (the former) or the current channel sensor sensitivity (the latter) must be chosen as closer as
+possible to the target; small tolerance is compensated by the calibration, to reach the target constant pulse CP.
+With the above external components, the maximum measurable values of RMS voltage and current are:
+Equation 25
+
+Equation 26
+
+Vref
+
+VMAX = 12 ∙ A ∙ 2 ∙
+V
+
+Vref
+
+R1 + R2
+R2
+
+IMAX = 12 ∙ A ∙ 2 ∙ k ∙1k
+I
+
+S
+
+int
+
+V
+
+(25)
+
+A
+
+(26)
+
+A
+
+(27)
+
+These values are calculated leaving some available room for the input range with the peak value and minimizing
+modulator distortions.
+The current resolution value is equal to 4 times LSBIRMS:
+Equation 27
+
+Example: current transformer case
+
+DS10272 - Rev 13
+
+IMIN =
+
+Vref
+
+AI ∙ calI ∙ kint ∙ kS ∙ 215
+
+page 54/89
+
+STPM32, STPM33, STPM34
+Application design
+
+This example shows the correct dimensioning of a meter using a current transformer having the following
+specification:
+Table 33. Example 1 design data
+Parameter
+
+Value
+
+VN nominal voltage
+
+230 VRMS
+
+IN nominal current
+
+5 ARMS
+
+IMax maximum current
+
+40 ARMS
+
+CP constant pulses
+
+1000 imp/kWh
+
+The dimension of the voltage channel considers the voltage divider resistor values as 770 kΩ and 470 Ω.
+Setting CP= 64000 pulses/kWh (at LPWx = 1 - device default value) and according to calculation above the
+following values are:
+Table 34. Example 1 calculated data
+Parameter
+
+Value
+
+Current sensor sensitivity
+
+kS = 1800 ∙ A ∙ A ∙ cal ∙ cal 2∙ DClk = 3.51 mV/A
+V I
+V
+I
+
+2
+Vref ∙ CP ∙ 1 + R1 R
+
+CP ∙ VN ∙ IN
+= 20.44 Hz
+LEDf = 3600000
+
+LED frequency at PN
+
+VMAX = 12 ∙
+
+VMAX
+
+Vref
+R +R
+∙ 1R 2 = 347.8 V
+AV ∙ 2
+2
+
+IMAX = 12 ∙
+
+IMAX
+
+IMIN =
+
+IMIN
+
+LSBP
+
+LSBP =
+
+LSBE
+
+LSBE =
+
+Vref
+∙ 1 = 60.5 A
+AI ∙ 2 kS
+Vref
+
+= 5.97 mA
+AI ∙ calI ∙ kint ∙ kS ∙ 215
+
+Vref2 ∙ 1 + R1 R2
+
+kint ∙ AV ∙ AI ∙ kS ∙ calV ∙ calI ∙ 228
+Vref2 ∙ 1 + R1 R2
+
+= 0.818 mW/LSB
+
+3600 ∙ DClk ∙ kint ∙ AV ∙ AI ∙ kS ∙ calV ∙ calI ∙ 217
+
+= 0.214 mWs/LSB
+
+To set the desired LED pulse output, division factor LED_PWM can be set through LPWx[3:0] bits in DSP_CR1
+and DSP_CR2 configuration registers.
+Table 35. LPWx bits, Cp, LED frequency relationships
+
+DS10272 - Rev 13
+
+LPWx
+
+LED_PWM
+
+CP [imp/kWh]
+
+LED at PNom [Hz]
+
+Pulse value [Ws]
+
+0000
+
+0.0625
+
+1024000
+
+327.11
+
+3.52
+
+0001
+
+0.125
+
+512000
+
+163.56
+
+7.03
+
+0010
+
+0.25
+
+256000
+
+81.78
+
+14.06
+
+0011
+
+0.5
+
+128000
+
+40.89
+
+28.13
+
+0100
+
+1
+
+64000
+
+20.44
+
+56.25
+
+0101
+
+2
+
+32000
+
+10.22
+
+112.50
+
+0110
+
+4
+
+16000
+
+5.11
+
+225
+
+0111
+
+8
+
+8000
+
+2.56
+
+450
+
+page 55/89
+
+STPM32, STPM33, STPM34
+Application calibration
+
+LPWx
+
+LED_PWM
+
+CP [imp/kWh]
+
+LED at PNom [Hz]
+
+Pulse value [Ws]
+
+1000
+
+16
+
+4000
+
+1.28
+
+900
+
+1001
+
+32
+
+2000
+
+0.64
+
+1800
+
+1010
+
+64
+
+1000
+
+0.32
+
+3600
+
+1011
+
+128
+
+500
+
+0.16
+
+7200
+
+1100
+
+256
+
+250
+
+0.08
+
+14400
+
+1101
+
+512
+
+125
+
+0.04
+
+28800
+
+1110
+
+1024
+
+62.5
+
+0.02
+
+57600
+
+1111
+
+2048
+
+31.25
+
+0.01
+
+115200
+
+The closer value to desired CP is given by setting LPWx divider to 1010.
+Any tolerance producing small variation of CP from 1000 imp/kWh can be compensated by calibration: setting
+CHV and CHC bits.
+
+9.2
+
+Application calibration
+The meter has to be calibrated so to compensate external component tolerances and internal VREF possible drift.
+After the calibration, a meter using the STPM3x can reach IEC class 0.2 accuracy, taking into account that the
+component choice follows the rules explained above, and the layout and signal routing minimize the noise
+capture.
+
+9.2.1
+
+Voltage and current calibration (CHVx, CHCx bits)
+Thanks to the device internal architecture and linearity, all calculated values (RMS, energies and powers) can be
+calibrated in a single point, just calibrating voltage and current streams.
+For this purpose, a known nominal voltage VN and current IN must be applied to the meter under calibration.
+Referring to Section 9.1 and Section 5, having R1 or kS calculated as stated in the previous section, the target
+values of voltage and current RMS registers, XV and XI respectively are calculated as follows:
+Table 36. Calibration target values
+Parameter
+
+Value
+15
+
+V ∙ A ∙ calV ∙ 2
+XV = N V
+R
+
+Voltage register value at VN
+
+Vref ∙ 1 + 1 R2
+
+Note:
+
+17
+
+I ∙ A ∙ calI ∙ kint ∙ kS ∙ 2
+XI = N I
+V
+
+Current register value at IN
+
+ref
+
+For the above calculation, the calculated value of the component kS or R1 (accordingto the chosen design
+method) must be used; the difference of the real component is compensated by calibration as a tolerance.
+To start calibration, the device has to be programmed with the proper gain and current sensor; moreover, to obtain
+the greatest correction dynamic, calibrators are initially set in the middle of their range (0x800), thus obtaining a
+calibration range of ± 12.5% per voltage or current channel.
+After applying VN and current IN to the meter, a certain number of voltage and current RMS samples must be read
+and averaged (please, refer to averaged register values as VAV and IAV) to calculate voltage and channel
+calibrators as follows:
+Table 37. Calibrator calculation
+Parameter
+Calibrator value
+
+DS10272 - Rev 13
+
+Value
+X
+
+CHV = 14336 ∙ V V − 12288
+AV
+
+X
+
+CHC = 14336 ∙ I I − 12288
+AV
+
+page 56/89
+
+STPM32, STPM33, STPM34
+Application calibration
+
+Parameter
+Correction factor
+
+Value
+CHV
++ 0.75
+KV = 0,125 ∙ 2048
+
+CHC
++ 0.75
+KI = 0,125 ∙ 2048
+
+The above procedure must be repeated for all voltage/current channels.
+Note:
+
+9.2.2
+
+for proper energy calculation of secondary channel in STPM33, the value of CHV1 calibrator must be copied
+also in CHV2.
+
+Phase calibration (PHVx, PHCx bits)
+The STPM3x does not introduce any phase shift between voltage and current channels.
+However, the voltage and current signals come from transducers, which could have inherent phase errors. For
+example, a phase error of 0.1° to 0.3° is not uncommon for a current transformer (CT). These phase errors can
+vary from part to part, and they must be corrected in order to perform accurate power calculations. The errors
+associated with phase mismatch are particularly noticeable at low power factors.
+The phase compensation block provides a method of digital phase correction of the phase shifting between
+voltage and current channels which can be introduced by the external component intrinsic characteristics or by
+external component mismatch.The amount of phase compensation can be set per each channel, and it is
+executed delaying the currents and voltage samples using bits of the phase calibration configurators: PHCx[9:0]
+and PHVx[1:0].
+These registers act in the same way by delaying the desired waveform by a certain quantity given from the
+equations below in degree:
+Table 38. Phase delay
+Parameter
+
+Value
+fline
+∙ PHCx 9: 0 ∙ 360°
+φC = SCLK
+
+Current shift
+
+f
+
+Voltage shift
+Global phase shift
+
+f
+
+line
+φV = SCLK
+∙ PHVx 1: 0 ∙ 29 ∙ 360°
+
+line
+∙ PHCx 9: 0 − PHVx 1: 0 ∙ 29 ∙ 360°
+φ = SCLK
+
+A capacitive behavior is determined by the current leading the voltage waveform to a certain angle. In this case,
+there is the compensation by delaying the current waveform by the same angle through PHCx register. For a 50
+Hz line the current channel waveform maximum delayed is:
+φC ≤ 4.6035° with step ∆φC = 0.0045°
+An inductive behavior has the opposite effect, so that current lags the voltage waveform. In this case, PHV
+register delays the voltage waveform by the minimum angle to invert the behavior to capacitive and then acting on
+PHCx register for the fine tuning of the current waveform.
+PHV impacts on the calculation of power and energies related to both current channels. For a 50 Hz line, the
+voltage channel waveform maximum delayed is:
+φV ≤ 6.912° with step ∆φV = 2.304°.
+
+DS10272 - Rev 13
+
+page 57/89
+
+STPM32, STPM33, STPM34
+Application calibration
+
+Figure 53. Phase shift error
+
+Voltage
+Current capacitive
+Current inductive
+
+The θ angle can be measured through the error on active power (from LED) averaged over a certain number of
+samples (for example 50) at power factor PF = 0,5.
+For example, if the error = e, the phase shift between voltage and current is:
+Equation 28
+e
+θ = arccos 1 +
+− 60°
+2
+
+(28)
+
+To compensate this error, PHC and PHV bits must be set as below, to introduce a correction factor φ = -θ.
+Table 39. Phase compensation
+Parameter
+
+Value
+PHVx = 0x0
+
+φ ≥ 0
+
+φ ∙ SCLK
+line
+
+PHCx = 360 ∙ f
+
+f
+
+line
+∙ 29 ∙ 360° ≤ φ < 0
+− SCLK
+
+fline
+fline
+∙ 210 ∙ 360° ≤ φ < − SCLK
+∙ 29 ∙ 360°
+− SCLK
+
+f
+
+f
+
+line
+line
+∙ 29 ∙ 3 ∙ 360° ≤ φ < − SCLK
+∙ 210 ∙ 360°
+− SCLK
+
+9.2.3
+
+PHVx = 0x1
+
+PHCx 9 = 0
+
+φ ∙ SCLK
+line
+
+PHCx 8: 0 = PHVx ∙ 29 + 360 ∙ f
+PHVx = 0x2
+
+PHCx 9 = 0x0
+
+φ ∙ SCLK
+line
+
+PHCx 8: 0 = PHVx ∙ 210 + 360 ∙ f
+PHVx = 0x3
+
+PHCx 9 = 0x0
+
+φ ∙ SCLK
+line
+
+PHCx 8: 0 = PHVx ∙ 29 + 360 ∙ f
+
+Power offset calibration (OFAx, OFAFx, OFRx, OFSx bits)
+The device has the power offset compensation register for all measured powers (active, active fundamental,
+reactive and apparent) to compensate, for each channel, the power measured due to noise capture in the
+application.
+Power registers are signed values, (MSB is the sign and negative values are two's complemented); the power
+offset registers are also signed registers with LSB value equal to 4 times the power LSB:
+
+DS10272 - Rev 13
+
+page 58/89
+
+STPM32, STPM33, STPM34
+Application calibration
+
+Table 40. Power offset LSB
+Parameter
+Power LSB value
+
+Power offset LSB value
+
+Value
+LSBP =
+
+Vref2 ∙ 1 + R1 R2
+
+W
+kint ∙ AV ∙ AI ∙ kS ∙ calV ∙ calI ∙ 228 LSB
+
+LSBPO = LSBP ∙ 22 =
+
+Vref2 ∙ 1 + R1 R2
+
+kint ∙ AV ∙ AI ∙ kS ∙ calV ∙ calI ∙ 228
+
+W
+∙ 22 LSB
+
+Power offset can be compensated by measuring the power value when the current I = 0, if the average value is
+not null; the value is due to external influences, then an opposite value should be applied to the power offset
+register.
+Note:
+
+The apparent power offset OFSx is not added to apparent power, but directly to apparent energy (either RMS or
+vectorial apparent energy). In case of vectorial apparent power calculation, an offset applied to active or reactive
+energy will be reflected also on the apparent power.
+
+DS10272 - Rev 13
+
+page 59/89
+
+STPM32, STPM33, STPM34
+Register map
+
+10
+
+Register map
+There are three types of data register:
+•
+•
+•
+
+RW: read and written by application (in yellow in the pictures below)
+RWL: the status bits, set from DSP, must be latched to read updated content, and must be cleared by the
+application (in blue in the pictures below)
+RL: read registers only, they contain measured data and are continuously updated by DSP, so they need to
+be latched before reading (in blue in the pictures below).
+
+The following nomenclature is used in the above registers:
+•
+•
+•
+•
+
+10.1
+
+A: active wideband
+F: active fundamental
+R: reactive
+S: apparent
+
+Register map graphical representation
+Figure 54. Register map 1
+
+DS10272 - Rev 13
+
+page 60/89
+
+STPM32, STPM33, STPM34
+Register map graphical representation
+
+Figure 55. Register map 2
+
+Figure 56. Register map 3
+
+Figure 57. Register map 4
+
+DS10272 - Rev 13
+
+page 61/89
+
+STPM32, STPM33, STPM34
+Configuration register
+
+Figure 58. Register map 5
+
+10.2
+
+Configuration register
+Table 41. Row 0, DSP control register 1 (DSP_CR1)
+Bit
+
+Internal signal
+
+[3:0]
+
+CLRSS_TO1
+
+4
+
+ClearSS1
+
+5
+
+ENVREF1
+
+Description
+
+Default
+
+Set duration of primary channel reset signal to clear sag and swell
+registers
+
+0x0
+
+Clear sag and swell time register and history bits for primary channel,
+auto-reset to '0'
+
+0x0
+
+Enable internal voltage reference for primary channel:
+0: reference disabled – external VREF required
+
+0x1
+
+1: reference enabled
+[8:6]
+
+TC1
+
+[16:9]
+
+-
+
+Temperature compensation coefficient selection for primary channel
+voltage reference VREF1 (see Table 8)
+
+0x2
+
+Reserved
+
+0x0
+
+Apparent energy mode for primary channel:
+17
+
+AEM1
+
+0: use apparent RMS power
+
+0x0
+
+1: use apparent vectorial power
+Apparent vectorial power mode for primary channel:
+18
+
+APM1
+
+0: use fundamental power
+
+0x0
+
+1: use active power
+Bypass hi-pass filter for primary voltage channel:
+19
+
+BHPFV1
+
+0: HPF enabled
+
+0x0
+
+1: HPF bypassed
+Bypass hi-pass filter for primary current channel:
+20
+
+BHPFC1
+
+0: HPF enabled
+
+0x0
+
+1: HPF bypassed
+Add Rogowski integrator to primary current channel filtering pipeline:
+21
+
+ROC1
+
+0: integrator bypassed
+
+0x0
+
+1: integrator enabled
+
+DS10272 - Rev 13
+
+[23:22]
+
+-
+
+[27:24]
+
+LPW1
+
+[29:28]
+
+LPS1
+
+Reserved
+
+0x0
+
+LED1 speed dividing factor: 0x0 = 2^(-4), 0xF = 2^11 Default 0x4 = 1
+
+0x4
+
+LED1 pulse-out power selection: LPS1 [1:0]: 00,01,10,11
+LED1 output: active, fundamental, reactive, apparent
+
+0x0
+
+page 62/89
+
+STPM32, STPM33, STPM34
+Configuration register
+
+Bit
+
+Internal signal
+
+Description
+
+Default
+
+LED1 pulse-out channel selection:
+[31:30]
+
+LCS1 [1:0]: 00,01,10,11
+
+LCS1
+
+0x0
+
+LED1: primary channels, secondary channels, cumulative, sigma-delta
+bitstream
+
+Table 42. Row 1, DSP control register 2 (DSP_CR2)
+Bit
+
+Internal signal
+
+Description
+
+Default
+
+[3:0]
+
+CLRSS_TO2
+
+Set duration of secondary channel reset signal to clear sag and swell
+registers
+
+0x0
+
+4
+
+ClearSS2
+
+Clear sag and swell time register and history bits for secondary
+channel, auto-reset to 0
+
+0x0
+
+5
+
+ENVREF2
+
+Enable internal voltage reference for secondary channel:
+0: reference disabled – external VREF required
+
+0x1
+
+1: reference enabled
+[8:6]
+
+TC2
+
+[16:9]
+
+-
+
+Temperature compensation coefficient selection for secondary
+channel voltage reference VREF2 (see Table 8)
+
+0x2
+
+Reserved
+
+0x0
+
+Apparent energy mode for secondary channel:
+17
+
+AEM2
+
+0: use apparent RMS power
+
+0x0
+
+1: use apparent vectorial power
+Apparent vectorial power mode for secondary channel:
+18
+
+APM2
+
+0: use fundamental power
+
+0x0
+
+1: use active power
+Bypass hi-pass filter for secondary voltage channel:
+19
+
+BHPFV2
+
+0: HPF enabled
+
+0x0
+
+1: HPF bypassed
+Bypass hi-pass filter for secondary current channel:
+20
+
+BHPFC2
+
+0: HPF enabled
+
+0x0
+
+1: HPF bypassed
+Add Rogowski integrator to secondary current channel filtering
+pipeline:
+21
+
+ROC2
+
+0: integrator bypassed
+
+0x0
+
+1: integrator enabled
+[23:22]
+
+-
+
+[27:24]
+
+LPW2
+
+Reserved
+LED2 speed dividing factor: 0x0 = 2^(-4), 0xF = 2^11
+Default 0x4 = 1
+
+0x0
+0x4
+
+LED2 pulse-out power selection:
+[29:28]
+
+LPS2
+
+LPS2 [1:0]: 00,01,10,11
+
+0x2
+
+LED2: output, active, fundamental, reactive, apparent
+LED2 pulse-out channel selection:
+[31:30]
+
+LCS2
+
+LCS2 [1:0]: 00,01,10,11
+
+0x0
+
+LED2: secondary channels, algebraic, sigma-delta bitstream
+
+DS10272 - Rev 13
+
+page 63/89
+
+STPM32, STPM33, STPM34
+Configuration register
+
+Table 43. Row 2, DSP control register 3 (DSP_CR3)
+Bit
+
+Internal signal
+
+[13:0]
+
+TIME_VALUE
+
+Description
+Time counter threshold for voltage sag detection
+
+Default
+0x4E0
+
+Selection bit for ZCR/CLK pin, (output depends on ZCR/CLK enable
+bit):
+[15:14]
+
+ZCR_SEL[1:0]: 00, 01, 10, 11
+
+ZCR_SEL
+
+0x0
+
+ZCR: V1, C1, V2, C2
+CLK: 7.8125 kHz, 4 MHz, 4 MHz, 50% duty cycle, 16 MHz
+ZCR/CLK pin output:
+16
+
+ZCR_EN
+
+0: CLK
+
+0x0
+
+1: ZCR
+Selection bits for tamper tolerance:
+[18:17]
+
+TMP_TOL
+
+TMP_TOL[1:0]: 00, 01, 10, 11
+
+0x0
+
+Tolerance: 12.5%, 8.33%, 6.25%, 3.125%
+Enable tampering feature:
+19
+
+TMP_EN
+
+0: tamper disable
+
+0x0
+
+1: tamper enable
+SW reset brings the configuration registers to default This bit is set to
+zero after this action automatically
+
+20
+
+S/W reset
+
+21
+
+S/W latch1
+
+22
+
+S/W latch2
+
+23
+
+S/WAuto Latch
+
+Primary channel measurement register latch
+This bit is set to zero after this action automatically
+Secondary channel measurement register latch
+This bit is set to zero after this action automatically
+Automatic measurement register latch at 7.8125 kHz
+
+0
+0
+
+0
+0
+
+LED1 pin output disable
+24
+
+0: LED1 output on
+
+LED1OFF
+
+0
+
+1: LED1 output disabled
+When the LED output is disabled the pin is set at low-state
+LED2 pin output disable
+
+25
+
+0: LED2 output on
+
+LED2OFF
+
+0
+
+1: LED2 output disabled
+When the LED output is disabled the pin is set at low-state
+Cumulative energy calculation
+
+26
+
+EN_CUM
+
+0: cumulative is the sum of channel energies
+
+0
+
+1: total is the difference of energies
+Reference line frequency:
+27
+
+REF_FREQ
+
+0: 50 Hz
+
+0
+
+1: 60 Hz
+[31:28]
+
+-
+
+Reserved
+
+0
+
+Table 44. Row 3, DSP control register 4 (DSP_CR4)
+
+DS10272 - Rev 13
+
+Bit
+
+Internal signal
+
+[9:0]
+
+PHC2
+
+Secondary current channel phase compensation register
+
+0x0
+
+[11:10]
+
+PHV2
+
+Secondary voltage channel phase compensation register
+
+0x0
+
+Description
+
+Default
+
+page 64/89
+
+STPM32, STPM33, STPM34
+Configuration register
+
+Bit
+
+Internal signal
+
+Description
+
+Default
+
+[21:12]
+
+PHC1
+
+Primary current channel phase compensation register
+
+0x0
+
+[23:22]
+
+PHV1
+
+Primary voltage channel phase compensation register
+
+0x0
+
+[31:24]
+
+-
+
+Reserved
+
+0x0
+
+Table 45. Row 4, DSP control register 5 (DSP_CR5)
+Bit
+
+Internal signal
+
+[11:0]
+
+CHV1
+
+[21:12]
+[31:22]
+
+Description
+
+Default
+
+Calibration register of primary voltage channel
+
+0x800
+
+SWV_THR1
+
+Swell threshold of primary voltage channel
+
+0x3FF
+
+SAG_THR1
+
+Sag threshold of primary voltage channel
+
+0x0
+
+Table 46. Row 5, DSP control register 6 (DSP_CR6)
+Bit
+
+Internal signal
+
+[11:0]
+
+CHC1
+
+[21:12]
+
+SWC_THR1
+
+[31:22]
+
+-
+
+Description
+
+Default
+
+Calibration register of primary current channel
+
+0x800
+
+Swell threshold of primary current channel
+
+0x3FF
+
+Reserved
+
+0x0
+
+Table 47. Row 6, DSP control register 7 (DSP_CR7)
+Bit
+
+Internal signal
+
+[11:0]
+
+CHV2
+
+[21:12]
+[31:22]
+
+Description
+
+Default
+
+Calibration register of secondary voltage channel
+
+0x800
+
+SWV_THR2
+
+Swell threshold of secondary voltage channel
+
+0x3FF
+
+SAG_THR2
+
+Sag threshold of secondary voltage channel
+
+0x0
+
+Table 48. Row 7, DSP control register 8 (DSP_CR8)
+Bit
+
+Internal signal
+
+[11:0]
+
+CHC2
+
+[21:12]
+
+SWC_THR2
+
+[31:22]
+
+-
+
+Description
+
+Default
+
+Calibration register of secondary current channel
+
+0x800
+
+Swell threshold of secondary current channel
+
+0x3FF
+
+Reserved
+
+0x0
+
+Table 49. Row 8, DSP control register 9 (DSP_CR9)
+Bit
+
+Internal signal
+
+[11:0]
+
+AH_UP1
+
+Primary channel RMS upper threshold (forAH)
+
+0xFFF
+
+[21:12]
+
+OFA1
+
+Offset for primary channel active power
+
+0x0
+
+[31:22]
+
+OFAF1
+
+Offset for primary channel fundamental active power
+
+0x0
+
+Description
+
+Default
+
+Table 50. Row 9, DSP control register 10 (DSP_CR10)
+
+DS10272 - Rev 13
+
+Bit
+
+Internal signal
+
+[11:0]
+
+AH_DOWN1
+
+[21:12
+[31:22]
+
+Description
+
+Default
+
+Primary channel RMS lower threshold (forAH)
+
+0xFFF
+
+OFR1
+
+Offset for primary channel reactive power
+
+0x0
+
+OFS1
+
+Offset for primary channel apparent power
+
+0x0
+
+page 65/89
+
+STPM32, STPM33, STPM34
+Configuration register
+
+Table 51. Row 10, DSP control register 11(DSP_CR11)
+Bit
+
+Internal signal
+
+Description
+
+Default
+
+[11:0]
+
+AH_UP2
+
+Secondary channel RMS upper threshold (forAH)
+
+0xFFF
+
+[21:12]
+
+OFA2
+
+Offset for secondary channel active power
+
+0x0
+
+[31:22]
+
+OFAF2
+
+Offset for secondary channel fundamental active power
+
+0x0
+
+Table 52. Row 11, DSP control register 12 (DSP_CR12)
+Bit
+
+Internal signal
+
+[11:0]
+
+AH_DOWN2
+
+[21:12]
+[31:22]
+
+Description
+
+Default
+
+Secondary channel RMS lower threshold (forAH)
+
+0xFFF
+
+OFR2
+
+Offset for secondary channel reactive power
+
+0x0
+
+OFS2
+
+Offset for secondary channel apparent power
+
+0x0
+
+Table 53. Row 12, digital front end control register 1 (DFE_CR1)
+Bit
+
+Internal signal
+
+0
+
+enV1
+
+[15:1]
+
+-
+
+[16]
+
+enC1
+
+[17:25]
+
+-
+
+Description
+
+Default
+
+Enable for primary voltage channel
+
+0x1
+
+Reserved
+
+0x193
+
+Enable for primary current channel
+
+0x1
+
+Reserved
+
+0x193
+
+Gain selection of primary current channel:
+[27:26]
+
+GAIN1
+
+GAIN1[1:0]: 00, 01, 10, 11
+
+0x3
+
+GAIN: x2, x4, x8, x16
+[31:28]
+
+-
+
+Reserved
+
+0x0
+
+Table 54. Row 13, digital front end control register 2 (DFE_CR2)
+Bit
+
+Internal signal
+
+0
+
+enV2
+
+[15:1]
+
+-
+
+[16]
+
+enC2
+
+[17:25]
+
+-
+
+Description
+
+Default
+
+Enable for secondary voltage channel
+
+0x1
+
+Reserved
+
+0x193
+
+Enable for secondary current channel
+
+0x1
+
+Reserved
+
+0x193
+
+Gain selection of secondary current channel:
+[27:26]
+
+GAIN2
+
+GAIN2 [1:0]:00, 01, 10, 11
+
+0x0
+
+GAIN: x2, x4, x8, x16
+[31:28]
+
+-
+
+Reserved
+
+0x0
+
+Table 55. Row 14, DSP interrupt control mask register 1 (DSP_IRQ1)
+Bit
+
+Internal signal
+
+0
+1
+2
+
+PH1+PH2 IRQ CR
+
+3
+4
+5
+
+DS10272 - Rev 13
+
+PH2 IRQ CR
+
+Description
+
+Default
+
+Sign total active power
+
+0
+
+Sign total reactive power
+
+0
+
+Overflow total active energy
+
+0
+
+Overflow total reactive energy
+
+0
+
+Sign secondary channel active power
+
+0
+
+Sign secondary channel active fundamental power
+
+0
+
+page 66/89
+
+STPM32, STPM33, STPM34
+Configuration register
+
+Bit
+
+Internal signal
+
+Description
+
+Default
+
+6
+
+Sign secondary channel reactive power
+
+0
+
+7
+
+Sign secondary channel apparent power
+
+0
+
+Overflow secondary channel active energy
+
+0
+
+9
+
+Overflow secondary channel active fundamental energy
+
+0
+
+10
+
+Overflow secondary channel reactive energy
+
+0
+
+11
+
+Overflow secondary channel apparent energy
+
+0
+
+12
+
+Sign primary channel active power
+
+0
+
+13
+
+Sign primary channel active fundamental power
+
+0
+
+14
+
+Sign primary channel reactive power
+
+0
+
+Sign primary channel apparent power
+
+0
+
+Overflow primary channel active energy
+
+0
+
+17
+
+Overflow primary channel active fundamental energy
+
+0
+
+18
+
+Overflow primary channel reactive energy
+
+0
+
+19
+
+Overflow primary channel apparent energy
+
+0
+
+20
+
+Primary current sigma-deltabitstream stuck
+
+0
+
+AH1 - accumulation of primary channel current
+
+0
+
+Primary current swell detected
+
+0
+
+23
+
+Primary current swell end
+
+0
+
+24
+
+Primary voltage sigma-delta bitstream stuck
+
+0
+
+25
+
+Primary voltage period error
+
+0
+
+Primary voltage sag detected
+
+0
+
+Primary voltage sag end
+
+0
+
+28
+
+Primary voltage swell detected
+
+0
+
+29
+
+Primary voltage swell end
+
+0
+
+Tamper on primary
+
+0
+
+Tamper or wrong connection
+
+0
+
+8
+
+15
+16
+
+21
+22
+
+26
+27
+
+30
+31
+
+PH2 IRQ CR
+
+PH1 IRQ CR
+
+C1 IRQ CR
+
+V1 IRQ CR
+
+Tamper
+
+Table 56. Row 15, DSP interrupt control mask register 2 (DSP_IRQ2)
+Bit
+
+Internal signal
+
+0
+
+Default
+
+Sign total active power
+
+0
+
+Sign total reactive power
+
+0
+
+Overflow total active energy
+
+0
+
+3
+
+Overflow total reactive energy
+
+0
+
+4
+
+Sign secondary channel active power
+
+0
+
+5
+
+Sign secondary channel active fundamental power
+
+0
+
+6
+
+Sign secondary channel reactive power
+
+0
+
+Sign secondary channel apparent power
+
+0
+
+Overflow secondary channel active energy
+
+0
+
+9
+
+Overflow secondary channel active fundamental energy
+
+0
+
+10
+
+Overflow secondary channel reactive energy
+
+0
+
+11
+
+Overflow secondary channel apparent energy
+
+0
+
+1
+2
+
+7
+8
+
+DS10272 - Rev 13
+
+Description
+
+PH1+PH2 IRQ CR
+
+PH2 IRQ CR
+
+page 67/89
+
+STPM32, STPM33, STPM34
+Configuration register
+
+Bit
+
+Internal signal
+
+Description
+
+Default
+
+12
+
+Sign primary channel active power
+
+0
+
+13
+
+Sign primary channel active fundamental power
+
+0
+
+14
+
+Sign primary channel reactive power
+
+0
+
+Sign primary channel apparent power
+
+0
+
+15
+16
+
+PH1 IRQ CR
+
+Overflow primary channel active energy
+
+0
+
+17
+
+Overflow primary channel active fundamental energy
+
+0
+
+18
+
+Overflow primary channel reactive energy
+
+0
+
+19
+
+Overflow primary channel apparent energy
+
+0
+
+20
+
+Secondary current sigma-delta bitstream stuck
+
+0
+
+AH1 - accumulation of secondary channel current
+
+0
+
+Secondary current swell detected
+
+0
+
+23
+
+Secondary current swell end
+
+0
+
+24
+
+Secondary voltage sigma-delta bitstream stuck
+
+0
+
+25
+
+Secondary voltage period error
+
+0
+
+Secondary voltage sag detected
+
+0
+
+Secondary voltage sag end
+
+0
+
+28
+
+Secondary voltage swell detected
+
+0
+
+29
+
+Secondary voltage swell end
+
+0
+
+Tamper on secondary
+
+0
+
+Tamper or wrong connection
+
+0
+
+21
+22
+
+26
+27
+
+30
+31
+
+C2 IRQ CR
+
+V2 IRQ CR
+
+Tamper
+
+Table 57. Row 16, DSP status register 1 (DSP_SR1)
+Bit
+
+Internal signal
+
+0
+
+Default
+
+Sign total active power
+
+0
+
+Sign total reactive power
+
+0
+
+Overflow total active energy
+
+0
+
+3
+
+Overflow total reactive energy
+
+0
+
+4
+
+Sign secondary channel active power
+
+0
+
+5
+
+Sign secondary channel active fundamental power
+
+0
+
+6
+
+Sign secondary channel reactive power
+
+0
+
+Sign secondary channel apparent power
+
+0
+
+Overflow secondary channel active energy
+
+0
+
+9
+
+Overflow secondary channel active fundamental energy
+
+0
+
+10
+
+Overflow secondary channel reactive energy
+
+0
+
+11
+
+Overflow secondary channel apparent energy
+
+0
+
+12
+
+Sign primary channel active power
+
+0
+
+13
+
+Sign primary channel active fundamental power
+
+0
+
+Sign primary channel reactive power
+
+0
+
+Sign primary channel apparent power
+
+0
+
+16
+
+Overflow primary channel active energy
+
+0
+
+17
+
+Overflow primary channel active fundamental energy
+
+0
+
+1
+2
+
+7
+8
+
+PH1+PH2 status
+
+PH2 IRQ status
+
+14
+15
+
+DS10272 - Rev 13
+
+Description
+
+PH1 IRQ status
+
+page 68/89
+
+STPM32, STPM33, STPM34
+Configuration register
+
+Bit
+18
+
+Internal signal
+
+Description
+
+Default
+
+Overflow primary channel reactive energy
+
+0
+
+19
+
+Overflow primary channel apparent energy
+
+0
+
+20
+
+Primary current sigma-deltabitstream stuck
+
+0
+
+AH1 - accumulation of primary channel current
+
+0
+
+21
+22
+
+PH1 IRQ status
+
+C1 IRQ status
+
+Primary current swell detected
+
+0
+
+23
+
+Primary current swell end
+
+0
+
+24
+
+Primary voltage sigma-delta bitstream stuck
+
+0
+
+25
+
+Primary voltage period error
+
+0
+
+Primary voltage sag detected
+
+0
+
+Primary voltage sag end
+
+0
+
+28
+
+Primary voltage swell detected
+
+0
+
+29
+
+Primary voltage swell end
+
+0
+
+Tamper on primary
+
+0
+
+Tamper or wrong connection
+
+0
+
+26
+27
+
+30
+31
+
+V1 IRQ status
+
+Tamper
+
+Table 58. Row 17, DSP status register 2 (DSP_SR2)
+Bit
+
+Internal signal
+
+0
+
+Default
+
+Sign total active power
+
+0
+
+Sign total reactive power
+
+0
+
+Overflow total active energy
+
+0
+
+3
+
+Overflow total reactive energy
+
+0
+
+4
+
+Sign secondary channel active power
+
+0
+
+5
+
+Sign secondary channel active fundamental power
+
+0
+
+6
+
+Sign secondary channel reactive power
+
+0
+
+Sign secondary channel apparent power
+
+0
+
+Overflow secondary channel active energy
+
+0
+
+9
+
+Overflow secondary channel active fundamental energy
+
+0
+
+10
+
+Overflow secondary channel reactive energy
+
+0
+
+11
+
+Overflow secondary channel apparent energy
+
+0
+
+12
+
+Sign primary channel active power
+
+0
+
+13
+
+Sign primary channel active fundamental power
+
+0
+
+14
+
+Sign primary channel reactive power
+
+0
+
+Sign primary channel apparent power
+
+0
+
+Overflow primary channel active energy
+
+0
+
+17
+
+Overflow primary channel active fundamental energy
+
+0
+
+18
+
+Overflow primary channel reactive energy
+
+0
+
+19
+
+Overflow primary channel apparent energy
+
+0
+
+20
+
+Secondary current sigma-deltabitstream stuck
+
+0
+
+AH1 - accumulation of secondary channel current
+
+0
+
+Secondary current swell detected
+
+0
+
+Secondary current swell end
+
+0
+
+1
+2
+
+7
+8
+
+15
+16
+
+21
+22
+23
+
+DS10272 - Rev 13
+
+Description
+
+PH1+PH2 status
+
+PH2 status
+
+PH1 status
+
+C2 status
+
+page 69/89
+
+STPM32, STPM33, STPM34
+UART/SPI registers
+
+Bit
+
+Internal signal
+
+Default
+
+24
+
+Secondary voltage sigma-delta bitstream stuck
+
+0
+
+25
+
+Secondary voltage period error
+
+0
+
+Secondary voltage sag detected
+
+0
+
+Secondary voltage sag end
+
+0
+
+28
+
+Secondary voltage swell detected
+
+0
+
+29
+
+Secondary voltage swell end
+
+0
+
+Tamper on secondary
+
+0
+
+Tamper or wrong connection
+
+0
+
+26
+
+V2 status
+
+27
+
+30
+
+Tamper
+
+31
+
+10.3
+
+Description
+
+UART/SPI registers
+Table 59. Row 18, UART/SPI control register 1 (US_REG1)
+Bit
+
+Internal signal
+
+Description
+
+Default
+
+[7:0]
+
+CRCpolynomial
+
+UART/SPI polynomial for CRC calculus (SMBus default polynomial
+used: x8+x2+x+1)
+
+0x07
+
+8
+
+Noise detection enable
+
+UART noise immunity feature enabled
+
+0x0
+
+9
+
+Break on error
+
+UART break feature enabled
+
+0x0
+
+-
+
+Reserved
+
+0x0
+
+14
+
+CRCenable
+
+8-bit CRC enable (5th packet required in each transmission)
+
+0x1
+
+15
+
+LSBfirst
+
+0: big-endian, 1: little-endian
+
+0x0
+
+[23:16]
+
+Time out
+
+Time out (ms)
+
+0x0
+
+[31:24]
+
+-
+
+Reserved
+
+0x0
+
+[13:10]
+
+Table 60. UART/SPI control register 2 (US_REG2)
+Bit
+
+Internal signal
+
+Description
+
+Default
+
+[15:0]
+
+Baud rate
+
+Defaulted to 9600 baud
+
+0x683
+
+[23:16]
+
+Frame delay
+
+Frame delay
+
+0x0
+
+[31:24]
+
+-
+
+Reserved
+
+0x0
+
+Table 61. Row 20, UART/SPI control register 3 (US_REG3)
+Bit
+
+Internal signal
+
+0
+
+DS10272 - Rev 13
+
+Description
+
+Default
+
+Reserved
+
+0
+
+1
+
+UART CRC error
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+2
+
+UART timeout error
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+3
+
+UART framing error
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+4
+
+UART noise error
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+5
+
+UART RX overrun
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+6
+
+UART TX overrun
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+7
+
+-
+
+Reserved
+
+0
+
+8
+
+SPI RX full
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+9
+
+SPITX empty
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+page 70/89
+
+STPM32, STPM33, STPM34
+Data registers
+
+Bit
+
+10.4
+
+Internal signal
+
+Description
+
+Default
+
+10
+
+UART/SPI read error
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+11
+
+UART/SPI write error
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+12
+
+SPI CRC error
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+13
+
+SPI TX underrun
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+14
+
+SPI RX overrun
+
+Activate IRQ on both INT1, INT2 for selected signals
+
+0
+
+15
+
+-
+
+Reserved
+
+0
+
+16
+
+UART break
+
+Break frame (all zeros) received
+
+0
+
+17
+
+UART CRC error
+
+CRC error detected
+
+0
+
+18
+
+UART timeout error
+
+Timeout counter expired
+
+0
+
+19
+
+UART framing error
+
+Missing stop bit detected
+
+0
+
+20
+
+UART noise error
+
+Noisy bit detected
+
+0
+
+21
+
+UART RX overrun
+
+Active when received data have not been correctly processed
+
+0
+
+22
+
+UART TX overrun
+
+Occurs when master and slave have different baud rates and master
+transmits before reception has ended
+
+0
+
+23
+
+-
+
+Reserved
+
+0
+
+24
+
+SPI RX full
+
+Reception buffer full (for SPI diagnostic, not recommended for normal
+IRQ operations)
+
+0
+
+25
+
+SPITX empty
+
+Transmission buffer empty (for SPI diagnostic, not recommended for
+normal IRQ operations)
+
+0
+
+26
+
+UART/SPI read address error
+
+Read address out of range
+
+0
+
+27
+
+UART/SPI write address error
+
+Write address out of range
+
+0
+
+28
+
+SPI CRC error
+
+CRC error detected
+
+0
+
+29
+
+SPITX underrun
+
+Occurs when a read-back operation (= write then read the same
+register) or latch + read is too fast
+
+0
+
+30
+
+SPI RX overrun
+
+Occurs when two consecutive write transactions are too fast and
+close to each other
+
+0
+
+31
+
+-
+
+Reserved
+
+0
+
+Data registers
+Table 62. Row 21, DSP live event 1 (DSP_EV1)
+Bit
+
+Internal signal
+
+0
+
+Default
+
+Sign total active power
+
+0
+
+Sign total reactive power
+
+0
+
+Overflow total active energy
+
+0
+
+3
+
+Overflow total reactive energy
+
+0
+
+4
+
+Sign primary channel active power
+
+0
+
+5
+
+Sign primary channel active fundamental power
+
+0
+
+6
+
+Sign primary channel reactive power
+
+0
+
+Sign primary channel apparent power
+
+0
+
+8
+
+Overflow primary channel active energy
+
+0
+
+9
+
+Overflow primary channel active fundamental energy
+
+0
+
+10
+
+Overflow primary channel reactive energy
+
+0
+
+1
+2
+
+7
+
+DS10272 - Rev 13
+
+Description
+
+PH1+PH2 events
+
+PH1 events
+
+page 71/89
+
+STPM32, STPM33, STPM34
+Data registers
+
+Bit
+11
+
+Internal signal
+PH1 events
+
+Description
+
+Default
+
+Overflow primary channel apparent energy
+
+0
+
+12
+
+Primary current zero-crossing
+
+0
+
+13
+
+Primary current sigma-delta bitstream stuck
+
+0
+
+14
+
+Primary current AH accumulation
+
+0
+
+15
+
+C1 events
+
+16
+
+0
+Primary current swell event history
+
+17
+18
+
+0
+0
+0
+
+19
+
+Primary voltage zero-crossing
+
+0
+
+20
+
+Primary voltage sigma-delta bitstream stuck
+
+0
+
+21
+
+Primary voltage period error (out of range)
+
+0
+
+22
+
+0
+
+23
+24
+
+V1 events
+
+Primary voltage swell event history
+
+0
+0
+
+25
+
+0
+
+26
+
+0
+
+27
+
+Primary voltage sag event history
+
+28
+29
+
+0
+0
+0
+
+30
+
+-
+
+Reserved
+
+0
+
+31
+
+-
+
+Reserved
+
+0
+
+Table 63. Row 22, DSP live event 2 (DSP_EV2)
+Bit
+
+Internal signal
+
+0
+
+Description
+Sign total active power
+
+0
+
+Sign total reactive power
+
+0
+
+Overflow active energy total
+
+0
+
+3
+
+Overflow reactive energy total
+
+0
+
+4
+
+Sign secondary channel active power
+
+0
+
+5
+
+Sign secondary channel active fundamental power
+
+0
+
+6
+
+Sign secondary channel reactive power
+
+0
+
+Sign secondary channel apparent power
+
+0
+
+Overflow secondary channel active energy
+
+0
+
+9
+
+Overflow secondary channel active fundamental energy
+
+0
+
+10
+
+Overflow secondary channel reactive energy
+
+0
+
+11
+
+Overflow secondary channel apparent energy
+
+0
+
+12
+
+Secondary current zero-crossing
+
+0
+
+13
+
+Secondary current sigma-deltabitstream stuck
+
+0
+
+Secondary current AH accumulation
+
+0
+
+1
+2
+
+7
+8
+
+14
+
+PH1+PH2 events
+
+PH2 events
+
+C2 events
+
+15
+16
+
+DS10272 - Rev 13
+
+Default
+
+0
+Secondary current swell event history
+
+0
+
+page 72/89
+
+STPM32, STPM33, STPM34
+Data registers
+
+Bit
+17
+
+Internal signal
+C2 events
+
+Description
+Secondary current swell event history
+
+18
+
+0
+0
+
+19
+
+Secondary voltage zero-crossing
+
+0
+
+20
+
+Secondary voltage sigma-delta bitstream stuck
+
+0
+
+21
+
+Secondary voltage period error (out of range)
+
+0
+
+22
+
+0
+
+23
+24
+
+V2 events
+
+Secondary voltage swell event history
+
+0
+0
+
+25
+
+0
+
+26
+
+0
+
+27
+
+Secondary voltage sag event history
+
+28
+29
+
+DS10272 - Rev 13
+
+Default
+
+0
+0
+0
+
+30
+
+-
+
+Reserved
+
+0
+
+31
+
+-
+
+Reserved
+
+0
+
+page 73/89
+
+STPM32, STPM33, STPM34
+Package information
+
+11
+
+Package information
+In order to meet environmental requirements, ST offers these devices in different grades of ECOPACK packages,
+depending on their level of environmental compliance. ECOPACK specifications, grade definitions and product
+status are available at: www.st.com. ECOPACK is an ST trademark.
+
+DS10272 - Rev 13
+
+page 74/89
+
+STPM32, STPM33, STPM34
+QFN24L (4x4x1) 0.5 pitch package information
+
+11.1
+
+QFN24L (4x4x1) 0.5 pitch package information
+Figure 59. QFN24L (4x4x1) 0.5 pitch package outline
+
+DS10272 - Rev 13
+
+page 75/89
+
+STPM32, STPM33, STPM34
+QFN24L (4x4x1) 0.5 pitch package information
+
+Table 64. QFN24L (4x4x1) 0.5 pitch package mechanical data
+Symbol
+
+Dimensions (mm)
+Min.
+
+Typ.
+
+Max.
+
+A
+
+0.80
+
+0.90
+
+1.00
+
+A1
+
+0
+
+0.02
+
+0.05
+
+b
+
+0.18
+
+0.25
+
+0.30
+
+D
+
+3.90
+
+4.00
+
+4.10
+
+D2
+
+2.30
+
+2.45
+
+2.55
+
+E
+
+3.90
+
+4.00
+
+4.10
+
+E2
+
+2.30
+
+2.45
+
+2.55
+
+e
+
+0.45
+
+0.50
+
+0.55
+
+K
+
+0.20
+
+-
+
+-
+
+L
+
+0.30
+
+0.40
+
+0.50
+
+Figure 60. QFN24L (4x4x1) 0.5 pitch recommended footprint
+
+DS10272 - Rev 13
+
+page 76/89
+
+STPM32, STPM33, STPM34
+QFN32L (5x5x1) 0.5 pitch package information
+
+11.2
+
+QFN32L (5x5x1) 0.5 pitch package information
+Figure 61. QFN32L (5x5x1) 0.5 pitch package outline
+
+DS10272 - Rev 13
+
+page 77/89
+
+STPM32, STPM33, STPM34
+QFN32L (5x5x1) 0.5 pitch package information
+
+Table 65. QFN32L (5x5x1) 0.5 pitch package mechanical data
+Symbol
+
+Dimensions (mm)
+Min.
+
+Typ.
+
+Max.
+
+A
+
+0.80
+
+0.90
+
+1.00
+
+A1
+
+0.00
+
+0.02
+
+0.05
+
+A3
+
+-
+
+0.20
+
+-
+
+b
+
+0.18
+
+0.25
+
+0.30
+
+D
+
+4.85
+
+5.00
+
+5.15
+
+D2
+
+3.40
+
+3.45
+
+3.50
+
+E
+
+4.85
+
+5.00
+
+5.15
+
+E2
+
+3.40
+
+3.45
+
+3.50
+
+e
+
+0.45
+
+0.50
+
+0.55
+
+L
+
+0.30
+
+0.40
+
+0.50
+
+Ddd
+
+-
+
+-
+
+0.08
+
+Figure 62. QFN32L (5x5x1) 0.5 pitch recommended footprint
+
+DS10272 - Rev 13
+
+page 78/89
+
+STPM32, STPM33, STPM34
+QFN24L (4x4x1) packing information
+
+11.3
+
+QFN24L (4x4x1) packing information
+Figure 63. QFN24L (4x4x1) carrier tape outline
+
+11.4
+
+QFN32L (5x5x1) packing information
+Figure 64. QFN32L (5x5x1) carrier tape outline
+
+DS10272 - Rev 13
+
+page 79/89
+
+STPM32, STPM33, STPM34
+QFN32L (5x5x1) packing information
+
+Figure 65. Feed direction of square QFN24L and QFN32L reel
+
+User direction of feed
+
+DS10272 - Rev 13
+
+page 80/89
+
+STPM32, STPM33, STPM34
+Ordering information
+
+12
+
+Ordering information
+Table 66. Device summary
+
+DS10272 - Rev 13
+
+Order code
+
+Package
+
+Packing
+
+STPM34TR
+
+QFN32L 5x5x1
+
+Tape and reel
+
+STPM33TR
+
+QFN32L 5x5x1
+
+Tape and reel
+
+STPM32TR
+
+QFN24L 4x4x1
+
+Tape and reel
+
+page 81/89
+
+STPM32, STPM33, STPM34
+
+Revision history
+Table 67. Document revision history
+Date
+
+Version
+
+31-Mar-2014
+
+1
+
+Changes
+Initial release.
+Updated Features.
+
+16-Oct-2014
+
+2
+
+Updated Table 2, from Table 14, to Table 18, from Table 21, to Table 23;
+updated Table 33, Table 35, Table 36, Table 40, Table 41and from Table 44 to
+Table 66. Changed title of Figure 15.
+Updated Figure 22, Figure 31.
+Updated Section 8.2.1, Section 8.2.3,Section 8.3.1, Section 8.4.12, Section
+8.6.3.
+Minor text changes.
+Updated Features.
+Updated Section 8.2.1, Section 8.3.3,Section 8.3.6, Section 8.4, Section 8.4.3,
+Section 8.4.4, Section 8.4.12, Section 8.4.13, Period measurement, Sag and
+swell threshold calculation.
+Added note to Interrupt control mask register.
+Updated Table 5, Table 22, Table 42,Table 44, Table 45, Table 56, Table 57,
+Table 58, Table 59, Table 60, Table 61.
+
+01-Oct-2015
+
+3
+
+Updated equations in Table 14,Table 15, Table 16, Table 17, Table 18, Table
+20, Table 35, Table 37, Table 39, Table 40.
+Updated Equation 29.
+Added Figure 8, Figure 9,Figure 10 and Figure 29.
+Updated Figure 26, Figure 27, Figure 28, Figure 31, Figure 32, Figure 35,
+Figure 36, Figure 45.
+Changed Figure 46.
+Added Figure 56: QFN32L 5x5x1 mm 0.5pitch recommended footprint.
+
+31-Aug-2016
+
+4
+
+02-Nov-2016
+
+5
+
+Added Section11.3: QFN24L (4x4x1) packing information and Section11.4:
+QFN32L (5x5x1) packing information.
+
+11-Sep-2017
+
+6
+
+Updated Table 5, Table 14, Table 42, Table 48 and Table 60.
+
+12-Jan-2018
+
+7
+
+Updated Table 3 and Table 5 . Minor modifications throughout document
+
+14-Dec-2018
+
+8
+
+Updated Table 5, Table 44, and Table 45. Changed Figure 23 and amended
+Section 8.4 and Section 8.4.10
+
+24-Jan-2022
+
+9
+
+Updated Table 1, Table 4, Table 5, Section 8.5, Table 22, Section 8.6,
+Section 9.2.
+
+9-Feb-2022
+
+10
+
+Measurement units typos corrected in Section 8.4.8 Zero-crossing signal,
+Section 8.4.9 Phase meter, Section 8.4.10 Sag and swell detection and
+Section 8.6.2 SPI peripheral.
+
+23-May-2022
+
+11
+
+Equation values changed in Table 14 (second line)
+
+04-Jul-2022
+
+12
+
+Corrected last formula for LSBe in Table 34
+
+25-Sep-2023
+
+13
+
+Corrected formula of register value at IN in Table 36; updated Figure 55
+
+Minor text changes.
+Updated Table 5, Table 9 and changed Figure 23.
+
+DS10272 - Rev 13
+
+page 82/89
+
+STPM32, STPM33, STPM34
+Contents
+
+Contents
+1
+
+Schematic diagram . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .2
+
+2
+
+Pin configuration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .4
+
+3
+
+Absolute maximum ratings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+
+4
+
+Electrical characteristics. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+4.1
+
+Pin programmability . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+
+5
+
+Typical application example. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .14
+
+6
+
+Terminology . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .16
+6.1
+
+Conventions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+
+6.2
+
+Measurement error . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+
+6.3
+
+ADC offset error. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+
+6.4
+
+Gain error . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+
+7
+
+Typical performance characteristics . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .17
+
+8
+
+Theory of operation. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .19
+8.1
+
+General operation description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+
+8.2
+
+Functional description of the analog part . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+
+8.3
+
+8.4
+
+DS10272 - Rev 13
+
+8.2.1
+
+Power management section . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+
+8.2.2
+
+Analog front end . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+
+8.2.3
+
+Clock generator. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+
+8.2.4
+
+Power-on-reset (POR) and enable (EN) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+
+Functional description of the digital part . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+8.3.1
+
+Digital front end (SDSx bits) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+
+8.3.2
+
+Decimation block. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+
+8.3.3
+
+Filter block . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+
+8.3.4
+
+DC cancellation filter . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+
+8.3.5
+
+Fundamental component filter. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+
+8.3.6
+
+Reactive filter . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+
+Functional description of hardwired DSP . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+8.4.1
+
+Active power and energy calculation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29
+
+8.4.2
+
+Fundamental active power and energy calculation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29
+
+8.4.3
+
+Reactive power and energy calculation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30
+
+8.4.4
+
+Apparent power and energy calculation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+
+8.4.5
+
+Sign of power . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+
+8.4.6
+
+Calculation of power and energy . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 32
+
+8.4.7
+
+RMS calculation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+
+8.4.8
+
+Zero-crossing signal . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+
+page 83/89
+
+STPM32, STPM33, STPM34
+Contents
+
+9
+
+10
+
+11
+
+12
+
+8.4.9
+
+Phase meter . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+
+8.4.10
+
+Sag and swell detection . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+
+8.4.11
+
+Tamper detection . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40
+
+8.4.12
+
+AH accumulation. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 41
+
+8.4.13
+
+Status bits, event bits and interrupt masks . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42
+
+8.5
+
+Functional description of communication peripheral . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 44
+
+8.6
+
+Communication protocol. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
+8.6.1
+
+Synchronization and remote reset functionality . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+
+8.6.2
+
+SPI peripheral . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 48
+
+8.6.3
+
+UART peripheral . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50
+
+8.6.4
+
+UART/SPI status register and interrupt control register . . . . . . . . . . . . . . . . . . . . . . . . . . . 52
+
+Application design and calibration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .54
+9.1
+
+Application design . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 54
+
+9.2
+
+Application calibration. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 56
+9.2.1
+
+Voltage and current calibration (CHVx, CHCx bits) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 56
+
+9.2.2
+
+Phase calibration (PHVx, PHCx bits) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 57
+
+9.2.3
+
+Power offset calibration (OFAx, OFAFx, OFRx, OFSx bits) . . . . . . . . . . . . . . . . . . . . . . . . 58
+
+Register map . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .60
+10.1
+
+Register map graphical representation. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 60
+
+10.2
+
+Configuration register . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 62
+
+10.3
+
+UART/SPI registers. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 70
+
+10.4
+
+Data registers . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 71
+
+Package information. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .74
+11.1
+
+QFN24L (4x4x1) 0.5 pitch package information . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 75
+
+11.2
+
+QFN32L (5x5x1) 0.5 pitch package information . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 77
+
+11.3
+
+QFN24L (4x4x1) packing information . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 79
+
+11.4
+
+QFN32L (5x5x1) packing information . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 79
+
+Ordering information . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .81
+
+Revision history . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .82
+List of tables . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .85
+List of figures. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .87
+
+DS10272 - Rev 13
+
+page 84/89
+
+STPM32, STPM33, STPM34
+List of tables
+
+List of tables
+Table 1.
+Table 2.
+Table 3.
+Table 4.
+Table 5.
+Table 6.
+Table 7.
+Table 8.
+Table 9.
+Table 10.
+Table 11.
+Table 12.
+Table 13.
+Table 14.
+Table 15.
+Table 16.
+Table 17.
+Table 18.
+Table 19.
+Table 20.
+Table 21.
+Table 22.
+Table 23.
+Table 24.
+Table 25.
+Table 26.
+Table 27.
+Table 28.
+Table 29.
+Table 30.
+Table 31.
+Table 32.
+Table 33.
+Table 34.
+Table 35.
+Table 36.
+Table 37.
+Table 38.
+Table 39.
+Table 40.
+Table 41.
+Table 42.
+Table 43.
+Table 44.
+Table 45.
+Table 46.
+Table 47.
+Table 48.
+Table 49.
+Table 50.
+Table 51.
+Table 52.
+Table 53.
+
+STPM34, STPM33, STPM32 pin description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+Absolute maximum ratings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+Thermal data. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+Electrical characteristics . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+Programmable pin functions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+Suggested external components in metering applications . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15
+Convention table . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+Temperature compensation selection . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+Current channel input preamplifier gain selection . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+Clock tree . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+LPWx bits . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+STPM3x internal parameters . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 32
+STPM3x basic calculations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 32
+STPM3x current voltage LSB values. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+Voltage sag . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 39
+Voltage swell . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40
+Current swell . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40
+Tamper tolerance setting. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40
+AH accumulator LSB . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42
+Live events . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42
+Status register . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43
+Communication pin description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
+Communication session structures . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
+SPI control register. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 48
+LSBfirst example . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49
+LSBfirst and MISO line . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49
+LSBfirst programming. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49
+CRCenable programming . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49
+UART control register US_REG1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50
+UART control register US_REG2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 51
+Baud rate register examples . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 52
+UART/SPI status and interrupt control register . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 52
+Example 1 design data . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 55
+Example 1 calculated data . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 55
+LPWx bits, Cp, LED frequency relationships . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 55
+Calibration target values . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 56
+Calibrator calculation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 56
+Phase delay . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 57
+Phase compensation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 58
+Power offset LSB . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 59
+Row 0, DSP control register 1 (DSP_CR1) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 62
+Row 1, DSP control register 2 (DSP_CR2) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 63
+Row 2, DSP control register 3 (DSP_CR3) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 64
+Row 3, DSP control register 4 (DSP_CR4) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 64
+Row 4, DSP control register 5 (DSP_CR5) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 65
+Row 5, DSP control register 6 (DSP_CR6) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 65
+Row 6, DSP control register 7 (DSP_CR7) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 65
+Row 7, DSP control register 8 (DSP_CR8) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 65
+Row 8, DSP control register 9 (DSP_CR9) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 65
+Row 9, DSP control register 10 (DSP_CR10). . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 65
+Row 10, DSP control register 11(DSP_CR11) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 66
+Row 11, DSP control register 12 (DSP_CR12) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 66
+Row 12, digital front end control register 1 (DFE_CR1) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 66
+
+DS10272 - Rev 13
+
+page 85/89
+
+STPM32, STPM33, STPM34
+List of tables
+
+Table 54.
+Table 55.
+Table 56.
+Table 57.
+Table 58.
+Table 59.
+Table 60.
+Table 61.
+Table 62.
+Table 63.
+Table 64.
+Table 65.
+Table 66.
+Table 67.
+
+Row 13, digital front end control register 2 (DFE_CR2) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 66
+Row 14, DSP interrupt control mask register 1 (DSP_IRQ1) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 66
+Row 15, DSP interrupt control mask register 2 (DSP_IRQ2) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 67
+Row 16, DSP status register 1 (DSP_SR1) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 68
+Row 17, DSP status register 2 (DSP_SR2) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 69
+Row 18, UART/SPI control register 1 (US_REG1) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 70
+UART/SPI control register 2 (US_REG2). . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 70
+Row 20, UART/SPI control register 3 (US_REG3) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 70
+Row 21, DSP live event 1 (DSP_EV1) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 71
+Row 22, DSP live event 2 (DSP_EV2) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 72
+QFN24L (4x4x1) 0.5 pitch package mechanical data . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 76
+QFN32L (5x5x1) 0.5 pitch package mechanical data . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 78
+Device summary . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 81
+Document revision history . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 82
+
+DS10272 - Rev 13
+
+page 86/89
+
+STPM32, STPM33, STPM34
+List of figures
+
+List of figures
+Figure 1.
+Figure 2.
+Figure 3.
+Figure 4.
+Figure 5.
+Figure 6.
+Figure 7.
+Figure 8.
+Figure 9.
+Figure 10.
+Figure 11.
+Figure 12.
+Figure 13.
+Figure 14.
+Figure 15.
+Figure 16.
+Figure 17.
+Figure 18.
+Figure 19.
+Figure 20.
+Figure 21.
+Figure 22.
+Figure 23.
+Figure 24.
+Figure 25.
+Figure 26.
+Figure 27.
+Figure 28.
+Figure 29.
+Figure 30.
+Figure 31.
+Figure 32.
+Figure 33.
+Figure 34.
+Figure 35.
+Figure 36.
+Figure 37.
+Figure 38.
+Figure 39.
+Figure 40.
+Figure 41.
+Figure 42.
+Figure 43.
+Figure 44.
+Figure 45.
+Figure 46.
+Figure 47.
+Figure 48.
+Figure 49.
+Figure 50.
+Figure 51.
+Figure 52.
+Figure 53.
+
+STPM34 block diagram . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2
+STPM33 block diagram . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+STPM32 block diagram . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+STPM34 pinout (top view), QFN32L 5x5x1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+STPM33 pinout (top view), QFN32L 5x5x1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+STPM32 pinout (top view), QFN24L 4x4x1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+SPI timings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+SPI enable and disable timing diagrams. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+UART enable and disable timing diagrams . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+Output load circuit for enable and disable times . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+STPM34 application schematic . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+Active energy error vs. current gain=2x integrator off . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+Active energy error vs. current gain=16x integrator off . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+Active energy error vs. frequency gain=2x integrator off . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+Active energy error vs. frequency gain=16x integrator off . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+Reactive energy error vs. current gain=2x integrator off . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+Reactive energy error vs. current gain=16x integrator off . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+Reactive energy error vs. frequency gain=2x integrator off . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+. Reactive energy error vs. frequency gain=16x integrator off . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+Active energy error vs. current gain=16x integrator on . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+Reactive energy error vs. current gain=16x integrator on . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+Power management internal connection scheme and polarization . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+Temperature compensation typical curves . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+Analog front end internal scheme . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+Block diagram of the modulator. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+Different oscillator circuits (a): with quartz; (b): with external source . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+Clock feed for multiple devices . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+Power-on-reset sequence . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+Global startup reset. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+DSP block functional description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+Filter block diagram. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+DSP block diagram . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+Active power and energy calculation block diagram . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29
+Fundamental active power and energy calculation block diagram . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30
+Reactive power and energy calculation block diagram . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30
+Apparent power and energy calculation block diagram. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+Power sign status bit delay. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 32
+RMS block . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+Zero-crossing generation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+Zero-crossing signal . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+Phase meter . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+Sag and swell detection blocks . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 37
+Sag detection process . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 38
+Swell detection process . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 39
+AH accumulation block . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 41
+AH accumulation thresholds . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42
+Startup interface selection timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
+Single communication time frame . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 46
+Memory data organization . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+Latching and reset through SYN pulses . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+Latching through SYN pulses . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 48
+UART frame . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50
+Phase shift error . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 58
+
+DS10272 - Rev 13
+
+page 87/89
+
+STPM32, STPM33, STPM34
+List of figures
+
+Figure 54.
+Figure 55.
+Figure 56.
+Figure 57.
+Figure 58.
+Figure 59.
+Figure 60.
+Figure 61.
+Figure 62.
+Figure 63.
+Figure 64.
+Figure 65.
+
+Register map 1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 60
+Register map 2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 61
+Register map 3 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 61
+Register map 4 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 61
+Register map 5 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 62
+QFN24L (4x4x1) 0.5 pitch package outline . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 75
+QFN24L (4x4x1) 0.5 pitch recommended footprint. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 76
+QFN32L (5x5x1) 0.5 pitch package outline . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 77
+QFN32L (5x5x1) 0.5 pitch recommended footprint. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 78
+QFN24L (4x4x1) carrier tape outline . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 79
+QFN32L (5x5x1) carrier tape outline . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 79
+Feed direction of square QFN24L and QFN32L reel . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 80
+
+DS10272 - Rev 13
+
+page 88/89
+
+STPM32, STPM33, STPM34
+
+IMPORTANT NOTICE – READ CAREFULLY
+STMicroelectronics NV and its subsidiaries (“ST”) reserve the right to make changes, corrections, enhancements, modifications, and improvements to ST
+products and/or to this document at any time without notice. Purchasers should obtain the latest relevant information on ST products before placing orders. ST
+products are sold pursuant to ST’s terms and conditions of sale in place at the time of order acknowledgment.
+Purchasers are solely responsible for the choice, selection, and use of ST products and ST assumes no liability for application assistance or the design of
+purchasers’ products.
+No license, express or implied, to any intellectual property right is granted by ST herein.
+Resale of ST products with provisions different from the information set forth herein shall void any warranty granted by ST for such product.
+ST and the ST logo are trademarks of ST. For additional information about ST trademarks, refer to www.st.com/trademarks. All other product or service names
+are the property of their respective owners.
+Information in this document supersedes and replaces information previously supplied in any prior versions of this document.
+© 2023 STMicroelectronics – All rights reserved
+
+DS10272 - Rev 13
+
+page 89/89
+
+
