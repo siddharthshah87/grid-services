@@ -2,12 +2,29 @@
 
 ## 🚀 Run the VEN
 
+### Basic VEN (Simple & Lightweight)
+
 ```bash
 cd volttron-ven
 ./run.sh
 ```
 
-That's it! The VEN will:
+Features: MQTT connection, telemetry publishing, ping commands
+
+### Enhanced VEN (Full Features) ⭐
+
+```bash
+cd volttron-ven
+./run_enhanced.sh
+```
+
+Features: Everything above PLUS:
+- 🌐 Web UI at `http://localhost:8080`
+- 📱 Device Shadow sync
+- ⚡ DR event handling with load curtailment
+- 🎛️ Circuit-level control
+
+The VEN will:
 - Auto-fetch TLS certificates from AWS Secrets Manager
 - Connect to AWS IoT Core with unique client ID
 - Start publishing telemetry every 5 seconds
