@@ -96,23 +96,35 @@ def calculate_total_power():
         total = sum(c["current_kw"] for c in circuits if c.get("enabled", True))
         return round(total, 2)
 
-def distribute_power_to_circuits(total_kw):
-    """Distribute total power among enabled circuits by rated_kw proportion"""
-    with state_lock:
-        enabled = [c for c in circuits if c.get("enabled", True) and c.get("rated_kw", 0.0) > 0]
-        if not enabled or total_kw <= 0:
-            for c in circuits:
-                c["current_kw"] = 0.0
-            return
-        
-        weight_sum = sum(c["rated_kw"] for c in enabled)
+def _distribute_power_to_circuits_unlocked(total_kw):
+    """Internal: Distribute power (ASSUMES LOCK IS HELD)"""
+    enabled = [c for c in circuits if c.get("enabled", True) and c.get("rated_kw", 0.0) > 0]
+    
+    # Disable all circuits first
+    for c in circuits:
+        if c not in enabled:
+            c["current_kw"] = 0.0
+    
+    # If no enabled circuits or no power, set all to zero
+    if not enabled or total_kw <= 0:
         for c in enabled:
-            share = c["rated_kw"] / weight_sum if weight_sum > 0 else 0.0
-            c["current_kw"] = round(total_kw * share, 2)
+            c["current_kw"] = 0.0
+        return
+    
+    # Distribute power proportionally
+    weight_sum = sum(c["rated_kw"] for c in enabled)
+    if weight_sum <= 0:
+        print(f"⚠️ Warning: No rated capacity in enabled circuits")
+        return
         
-        for c in circuits:
-            if c not in enabled:
-                c["current_kw"] = 0.0
+    for c in enabled:
+        share = c["rated_kw"] / weight_sum
+        c["current_kw"] = round(total_kw * share, 2)
+
+def distribute_power_to_circuits(total_kw):
+    """Distribute power among enabled circuits by rated_kw proportion"""
+    with state_lock:
+        _distribute_power_to_circuits_unlocked(total_kw)
 
 def simulate_base_power():
     """Simulate base power with slight jitter"""
@@ -127,6 +139,47 @@ def simulate_base_power():
 # DR EVENT HANDLING
 # ============================================================================
 
+def _apply_curtailment_unlocked(shed_kw):
+    """Internal: Apply curtailment (ASSUMES LOCK IS HELD)"""
+    target_shed = shed_kw
+    actual_shed = 0.0
+    
+    # Priority order for shedding (non-critical first)
+    shed_order = [
+        ("heater1", 1.0),   # Can shed 100% of heater
+        ("lights1", 0.7),   # Can shed 70% of lights
+        ("misc1", 0.6),     # Can shed 60% of house load
+        ("ev1", 1.0),       # Can shed 100% of EV
+        ("hvac1", 0.2),     # Can shed 20% of HVAC (critical, keep 80%)
+        ("fridge1", 0.2),   # Can shed 20% of fridge (critical, keep 80%)
+    ]
+    
+    # Store original power for restoration
+    original_power = {c["id"]: c["current_kw"] for c in circuits}
+    
+    for circuit_id, max_shed_ratio in shed_order:
+        if actual_shed >= target_shed:
+            break
+        
+        circuit = next((c for c in circuits if c["id"] == circuit_id), None)
+        if not circuit or not circuit.get("enabled"):
+            continue
+        
+        current_kw = circuit["current_kw"]
+        max_shed_kw = current_kw * max_shed_ratio
+        shed_amount = min(max_shed_kw, target_shed - actual_shed)
+        
+        if shed_amount > 0:
+            circuit["current_kw"] = round(current_kw - shed_amount, 2)
+            actual_shed = round(actual_shed + shed_amount, 2)
+            print(f"  🔻 Shed {shed_amount:.2f} kW from {circuit['name']}")
+    
+    ven_state["shed_kw"] = actual_shed
+    ven_state["current_power_kw"] = round(ven_state["base_power_kw"] - actual_shed, 2)
+    
+    print(f"✅ Curtailment applied: {actual_shed:.2f} kW shed (target: {target_shed:.2f} kW)")
+    return actual_shed
+
 def apply_curtailment(shed_kw):
     """Apply load curtailment to meet shed_kw target
     
@@ -135,44 +188,7 @@ def apply_curtailment(shed_kw):
     2. If needed, reduce critical loads (HVAC, fridge) to 80% of rated
     """
     with state_lock:
-        target_shed = shed_kw
-        actual_shed = 0.0
-        
-        # Priority order for shedding (non-critical first)
-        shed_order = [
-            ("heater1", 1.0),   # Can shed 100% of heater
-            ("lights1", 0.7),   # Can shed 70% of lights
-            ("misc1", 0.6),     # Can shed 60% of house load
-            ("ev1", 1.0),       # Can shed 100% of EV
-            ("hvac1", 0.2),     # Can shed 20% of HVAC (critical, keep 80%)
-            ("fridge1", 0.2),   # Can shed 20% of fridge (critical, keep 80%)
-        ]
-        
-        # Store original power for restoration
-        original_power = {c["id"]: c["current_kw"] for c in circuits}
-        
-        for circuit_id, max_shed_ratio in shed_order:
-            if actual_shed >= target_shed:
-                break
-            
-            circuit = next((c for c in circuits if c["id"] == circuit_id), None)
-            if not circuit or not circuit.get("enabled"):
-                continue
-            
-            current_kw = circuit["current_kw"]
-            max_shed_kw = current_kw * max_shed_ratio
-            shed_amount = min(max_shed_kw, target_shed - actual_shed)
-            
-            if shed_amount > 0:
-                circuit["current_kw"] = round(current_kw - shed_amount, 2)
-                actual_shed = round(actual_shed + shed_amount, 2)
-                print(f"  🔻 Shed {shed_amount:.2f} kW from {circuit['name']}")
-        
-        ven_state["shed_kw"] = actual_shed
-        ven_state["current_power_kw"] = round(ven_state["base_power_kw"] - actual_shed, 2)
-        
-        print(f"✅ Curtailment applied: {actual_shed:.2f} kW shed (target: {target_shed:.2f} kW)")
-        return actual_shed
+        return _apply_curtailment_unlocked(shed_kw)
 
 def restore_circuits():
     """Restore all circuits to normal operation"""
@@ -192,37 +208,51 @@ def publish_shadow_update():
     if not mqtt_client or not ven_state["connected"]:
         return
     
-    with state_lock:
-        reported = {
-            "power_kw": ven_state["current_power_kw"],
-            "shed_kw": ven_state["shed_kw"],
-            "base_power_kw": ven_state["base_power_kw"],
-            "circuits": [
-                {
-                    "id": c["id"],
-                    "name": c["name"],
-                    "enabled": c["enabled"],
-                    "current_kw": c["current_kw"],
-                    "critical": c["critical"]
-                }
-                for c in circuits
-            ],
-            "active_event": ven_state["active_event"],
-            "timestamp": int(time.time())
-        }
-    
-    shadow_doc = {
-        "state": {
-            "reported": reported
-        }
-    }
-    
     try:
-        mqtt_client.publish(SHADOW_UPDATE_TOPIC, json.dumps(shadow_doc), qos=1)
-        ven_state["last_shadow_update"] = int(time.time())
-        print(f"📤 Shadow updated: {ven_state['current_power_kw']:.2f} kW, shed: {ven_state['shed_kw']:.2f} kW")
+        with state_lock:
+            # Safely extract active event info (avoid complex objects in JSON)
+            active_event_info = None
+            if ven_state["active_event"]:
+                active_event_info = {
+                    "event_id": ven_state["active_event"].get("event_id"),
+                    "shed_kw": ven_state["active_event"].get("shed_kw"),
+                    "end_ts": ven_state["active_event"].get("end_ts")
+                }
+            
+            reported = {
+                "power_kw": ven_state["current_power_kw"],
+                "shed_kw": ven_state["shed_kw"],
+                "base_power_kw": ven_state["base_power_kw"],
+                "circuits": [
+                    {
+                        "id": c["id"],
+                        "name": c["name"],
+                        "enabled": c["enabled"],
+                        "current_kw": c["current_kw"],
+                        "critical": c["critical"]
+                    }
+                    for c in circuits
+                ],
+                "active_event": active_event_info,
+                "timestamp": int(time.time())
+            }
+        
+        shadow_doc = {
+            "state": {
+                "reported": reported
+            }
+        }
+        
+        result = mqtt_client.publish(SHADOW_UPDATE_TOPIC, json.dumps(shadow_doc), qos=1)
+        if result.rc == mqtt.MQTT_ERR_SUCCESS:
+            ven_state["last_shadow_update"] = int(time.time())
+            print(f"📤 Shadow updated: {ven_state['current_power_kw']:.2f} kW, shed: {ven_state['shed_kw']:.2f} kW")
+        else:
+            print(f"⚠️ Shadow update publish failed with rc={result.rc}")
     except Exception as e:
         print(f"❌ Shadow update failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 def handle_shadow_delta(payload):
     """Handle shadow delta (desired vs reported state difference)"""
@@ -646,27 +676,37 @@ def api_state():
 
 @app.route('/api/circuit/toggle', methods=['POST'])
 def api_toggle_circuit():
-    data = request.json
-    circuit_id = data.get('circuit_id')
-    enabled = data.get('enabled', True)
-    
-    with state_lock:
-        circuit = next((c for c in circuits if c["id"] == circuit_id), None)
+    try:
+        data = request.json
+        circuit_id = data.get('circuit_id')
+        enabled = data.get('enabled', True)
+        
+        with state_lock:
+            circuit = next((c for c in circuits if c["id"] == circuit_id), None)
+            if circuit:
+                circuit["enabled"] = enabled
+                print(f"🔄 Circuit {circuit['name']} {'enabled' if enabled else 'disabled'} via UI")
+                
+                # Recalculate power (use unlocked versions since we hold the lock)
+                if ven_state["active_event"]:
+                    # Re-apply curtailment
+                    _apply_curtailment_unlocked(ven_state["active_event"]["shed_kw"])
+                else:
+                    _distribute_power_to_circuits_unlocked(ven_state["base_power_kw"])
+        
+        # Publish shadow update outside the lock
+        publish_shadow_update()
+        
         if circuit:
-            circuit["enabled"] = enabled
-            print(f"🔄 Circuit {circuit['name']} {'enabled' if enabled else 'disabled'} via UI")
-            
-            # Recalculate power
-            if ven_state["active_event"]:
-                # Re-apply curtailment
-                apply_curtailment(ven_state["active_event"]["shed_kw"])
-            else:
-                distribute_power_to_circuits(ven_state["base_power_kw"])
-            
-            publish_shadow_update()
             return jsonify({"status": "success"})
-    
-    return jsonify({"status": "error", "message": "Circuit not found"}), 404
+        else:
+            return jsonify({"status": "error", "message": "Circuit not found"}), 404
+            
+    except Exception as e:
+        print(f"❌ Error toggling circuit: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/event/trigger', methods=['POST'])
 def api_trigger_event():
@@ -780,6 +820,8 @@ def telemetry_loop():
             
         except Exception as e:
             print(f"❌ Telemetry loop error: {e}")
+            import traceback
+            traceback.print_exc()
             time.sleep(5)
 
 def main():
