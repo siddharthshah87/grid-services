@@ -8,7 +8,7 @@ from app.crud import latest_telemetry_map
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 @settings(max_examples=10)
 @given(
@@ -79,7 +79,7 @@ async def test_latest_telemetry_map_property(
         vt2 = VenTelemetry(
             id=2,
             ven_id=ven_id,
-            timestamp=timestamp.replace(year=timestamp.year + 1),
+            timestamp=timestamp + timedelta(days=365),  # Add 365 days instead of 1 year to avoid leap year issues
             used_power_kw=used_power_kw,
             shed_power_kw=shed_power_kw,
             requested_reduction_kw=None,
