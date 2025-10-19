@@ -54,50 +54,72 @@ state_lock = threading.Lock()
 
 # US Electrical Panel Configuration
 PANEL_VOLTAGE = 240  # Standard US residential voltage (120/240V split-phase)
-PANEL_AMPERAGE = int(os.getenv("PANEL_AMPERAGE", "200"))  # 100A, 150A, or 200A panel
-PANEL_MAX_KW = (PANEL_AMPERAGE * PANEL_VOLTAGE) / 1000.0  # Convert to kW
+DEFAULT_PANEL_AMPERAGE = int(os.getenv("PANEL_AMPERAGE", "200"))  # 100A, 150A, or 200A panel
 
-# Circuit definitions with realistic breaker sizes
-# Breaker sizes: 15A, 20A, 30A, 40A, 50A (standard US breaker sizes)
-# rated_kw = (breaker_amps * voltage) / 1000
-circuits = [
-    {"id": "hvac1", "name": "HVAC", "type": "hvac", "enabled": True, "connected": True, 
-     "breaker_amps": 30, "rated_kw": (30 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
-     "critical": True, "mode": "dynamic"},
-    {"id": "heater1", "name": "Water Heater", "type": "heater", "enabled": True, "connected": True,
-     "breaker_amps": 30, "rated_kw": (30 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
-     "critical": False, "mode": "dynamic"},
-    {"id": "ev1", "name": "EV Charger", "type": "ev", "enabled": False, "connected": True,
-     "breaker_amps": 50, "rated_kw": (50 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
-     "critical": False, "mode": "dynamic"},
-    {"id": "dryer1", "name": "Dryer", "type": "dryer", "enabled": True, "connected": True,
-     "breaker_amps": 30, "rated_kw": (30 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
-     "critical": False, "mode": "dynamic"},
-    {"id": "range1", "name": "Electric Range", "type": "range", "enabled": True, "connected": True,
-     "breaker_amps": 40, "rated_kw": (40 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
-     "critical": False, "mode": "dynamic"},
-    {"id": "lights1", "name": "Lighting Circuits", "type": "lights", "enabled": True, "connected": True,
-     "breaker_amps": 15, "rated_kw": (15 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
-     "critical": False, "mode": "dynamic"},
-    {"id": "outlets1", "name": "General Outlets", "type": "outlets", "enabled": True, "connected": True,
-     "breaker_amps": 20, "rated_kw": (20 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
-     "critical": False, "mode": "dynamic"},
-    {"id": "fridge1", "name": "Refrigerator", "type": "fridge", "enabled": True, "connected": True,
-     "breaker_amps": 15, "rated_kw": (15 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
-     "critical": True, "mode": "dynamic"},
-]
+def calculate_panel_max_kw(amperage):
+    """Calculate max kW for a given panel amperage"""
+    return (amperage * PANEL_VOLTAGE) / 1000.0
+
+def get_available_circuits_for_panel(amperage):
+    """Return circuits that are available for a given panel size
+    
+    100A panels: Cannot support EV charger (50A) or large range (40A)
+    150A panels: Can support all except might need to manage EV + range together
+    200A panels: Can support all circuits
+    """
+    all_circuits = [
+        {"id": "hvac1", "name": "HVAC", "type": "hvac", "enabled": True, "connected": True, 
+         "breaker_amps": 30, "current_kw": 0.0, "critical": True, "mode": "dynamic"},
+        {"id": "heater1", "name": "Water Heater", "type": "heater", "enabled": True, "connected": True,
+         "breaker_amps": 30, "current_kw": 0.0, "critical": False, "mode": "dynamic"},
+        {"id": "ev1", "name": "EV Charger", "type": "ev", "enabled": False, "connected": True,
+         "breaker_amps": 50, "current_kw": 0.0, "critical": False, "mode": "dynamic",
+         "min_panel_amps": 150},  # Requires 150A or higher panel
+        {"id": "dryer1", "name": "Dryer", "type": "dryer", "enabled": True, "connected": True,
+         "breaker_amps": 30, "current_kw": 0.0, "critical": False, "mode": "dynamic"},
+        {"id": "range1", "name": "Electric Range", "type": "range", "enabled": True, "connected": True,
+         "breaker_amps": 40, "current_kw": 0.0, "critical": False, "mode": "dynamic",
+         "min_panel_amps": 150},  # Requires 150A or higher panel
+        {"id": "lights1", "name": "Lighting Circuits", "type": "lights", "enabled": True, "connected": True,
+         "breaker_amps": 15, "current_kw": 0.0, "critical": False, "mode": "dynamic"},
+        {"id": "outlets1", "name": "General Outlets", "type": "outlets", "enabled": True, "connected": True,
+         "breaker_amps": 20, "current_kw": 0.0, "critical": False, "mode": "dynamic"},
+        {"id": "fridge1", "name": "Refrigerator", "type": "fridge", "enabled": True, "connected": True,
+         "breaker_amps": 15, "current_kw": 0.0, "critical": True, "mode": "dynamic"},
+    ]
+    
+    # Filter circuits based on panel capacity
+    available_circuits = []
+    for circuit in all_circuits:
+        min_required = circuit.get("min_panel_amps", 0)
+        if amperage >= min_required:
+            # Calculate rated_kw for this circuit
+            circuit["rated_kw"] = (circuit["breaker_amps"] * PANEL_VOLTAGE) / 1000.0
+            circuit["available"] = True
+            available_circuits.append(circuit)
+        else:
+            # Mark as unavailable
+            circuit["rated_kw"] = (circuit["breaker_amps"] * PANEL_VOLTAGE) / 1000.0
+            circuit["available"] = False
+            circuit["enabled"] = False  # Can't enable circuits that exceed panel capacity
+            available_circuits.append(circuit)
+    
+    return available_circuits
+
+# Initialize with default panel
+circuits = get_available_circuits_for_panel(DEFAULT_PANEL_AMPERAGE)
 
 # Calculate realistic base power (typical home usage: 30-50% of panel capacity)
 BASE_POWER_PERCENTAGE = 0.40  # 40% of panel capacity
-BASE_POWER_KW = round(PANEL_MAX_KW * BASE_POWER_PERCENTAGE, 2)
+BASE_POWER_KW = round(calculate_panel_max_kw(DEFAULT_PANEL_AMPERAGE) * BASE_POWER_PERCENTAGE, 2)
 
 # Global state
 ven_state = {
     "connected": False,
     "message_count": 0,
-    "panel_amperage": PANEL_AMPERAGE,
+    "panel_amperage": DEFAULT_PANEL_AMPERAGE,
     "panel_voltage": PANEL_VOLTAGE,
-    "panel_max_kw": PANEL_MAX_KW,
+    "panel_max_kw": calculate_panel_max_kw(DEFAULT_PANEL_AMPERAGE),
     "base_power_kw": BASE_POWER_KW,
     "current_power_kw": BASE_POWER_KW,
     "shed_kw": 0.0,
@@ -157,9 +179,9 @@ def simulate_base_power():
     with state_lock:
         jitter = random.uniform(-0.5, 0.5)
         ven_state["base_power_kw"] = round(ven_state["base_power_kw"] + jitter, 2)
-        # Keep between 30-60% of panel capacity
-        min_power = round(PANEL_MAX_KW * 0.30, 2)
-        max_power = round(PANEL_MAX_KW * 0.60, 2)
+        # Keep between 30-60% of current panel capacity
+        min_power = round(ven_state["panel_max_kw"] * 0.30, 2)
+        max_power = round(ven_state["panel_max_kw"] * 0.60, 2)
         ven_state["base_power_kw"] = max(min_power, min(max_power, ven_state["base_power_kw"]))
         return ven_state["base_power_kw"]
 
@@ -521,9 +543,15 @@ HTML_TEMPLATE = """
         .btn:hover { opacity: 0.9; }
         .input-group { margin-bottom: 15px; }
         .input-group label { display: block; margin-bottom: 5px; font-size: 14px; color: #94a3b8; }
-        .input-group input { 
+        .input-group input, .input-group select { 
             width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #334155;
             background: #0f172a; color: #e2e8f0; font-size: 14px;
+        }
+        .circuit.unavailable { opacity: 0.5; }
+        .circuit.unavailable .circuit-name::after {
+            content: ' (Not available for this panel)';
+            color: #ef4444;
+            font-size: 12px;
         }
     </style>
 </head>
@@ -534,16 +562,18 @@ HTML_TEMPLATE = """
         
         <div class="grid">
             <div class="card">
-                <h2>⚡ Panel Status</h2>
+                <h2>⚡ Panel Configuration</h2>
+                <div class="input-group">
+                    <label>Panel Size</label>
+                    <select id="panel-select" onchange="changePanel()">
+                        <option value="100">100A Panel (24 kW max)</option>
+                        <option value="150">150A Panel (36 kW max)</option>
+                        <option value="200" selected>200A Panel (48 kW max)</option>
+                    </select>
+                </div>
                 <div class="stat">
-                    <div class="stat-label">Panel Rating</div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <select id="panel-selector" onchange="changePanel()" style="padding: 8px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; font-size: 16px; font-weight: 600;">
-                            <option value="100">100 A</option>
-                            <option value="150">150 A</option>
-                            <option value="200" selected>200 A</option>
-                        </select>
-                    </div>
+                    <div class="stat-label">Current Panel</div>
+                    <div class="stat-value" id="panel-rating">-- A</div>
                 </div>
                 <div class="stat">
                     <div class="stat-label">Voltage</div>
@@ -634,12 +664,12 @@ HTML_TEMPLATE = """
                         connStatus.textContent = 'Disconnected';
                     }
                     
-                    // Update panel info and sync selector
-                    document.getElementById('panel-selector').value = data.panel_amperage;
+                    // Update panel info
+                    document.getElementById('panel-rating').textContent = data.panel_amperage + ' A';
                     document.getElementById('panel-voltage').textContent = data.panel_voltage + ' V';
                     document.getElementById('panel-max').textContent = data.panel_max_kw.toFixed(1) + ' kW';
                     
-                    // Calculate and update current usage (dynamically from enabled circuits)
+                    // Calculate and update current usage
                     const currentAmps = ((data.current_power_kw * 1000) / data.panel_voltage).toFixed(1);
                     const panelUtil = ((data.current_power_kw / data.panel_max_kw) * 100).toFixed(1);
                     
@@ -667,13 +697,18 @@ HTML_TEMPLATE = """
                         activeEvent.style.display = 'none';
                     }
                     
-                    // Update circuits with breaker info
+                    // Update panel selector to match current panel
+                    document.getElementById('panel-select').value = data.panel_amperage;
+                    
+                    // Update circuits with breaker info and availability
                     const circuitsList = document.getElementById('circuits-list');
                     circuitsList.innerHTML = data.circuits.map(c => {
                         const currentAmps = ((c.current_kw * 1000) / data.panel_voltage).toFixed(1);
                         const utilPercent = ((currentAmps / c.breaker_amps) * 100).toFixed(0);
+                        const available = c.available !== false;
+                        const unavailableClass = !available ? 'unavailable' : '';
                         return `
-                        <div class="circuit">
+                        <div class="circuit ${unavailableClass}">
                             <div class="circuit-info">
                                 <div>
                                     <span class="circuit-name">${c.name}</span>
@@ -685,6 +720,7 @@ HTML_TEMPLATE = """
                             </div>
                             <label class="toggle">
                                 <input type="checkbox" ${c.enabled ? 'checked' : ''} 
+                                       ${!available ? 'disabled' : ''}
                                        onchange="toggleCircuit('${c.id}', this.checked)">
                                 <span class="slider"></span>
                             </label>
@@ -694,17 +730,21 @@ HTML_TEMPLATE = """
         }
         
         function changePanel() {
-            const amperage = parseInt(document.getElementById('panel-selector').value);
-            fetch('/api/panel/configure', {
+            const newAmperage = parseInt(document.getElementById('panel-select').value);
+            
+            fetch('/api/panel/change', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({amperage: amperage})
+                body: JSON.stringify({amperage: newAmperage})
             }).then(r => r.json()).then(data => {
                 if (data.status === 'success') {
-                    console.log('Panel changed to', amperage, 'A');
-                    fetchState();  // Refresh immediately
+                    console.log('Panel changed to', newAmperage, 'A');
+                    if (data.unavailable_circuits && data.unavailable_circuits.length > 0) {
+                        alert('Panel changed. The following circuits are not available: ' + data.unavailable_circuits.join(', '));
+                    }
+                    fetchState();
                 } else {
-                    alert('Failed to change panel: ' + data.message);
+                    alert('Error changing panel: ' + data.message);
                 }
             });
         }
@@ -717,9 +757,10 @@ HTML_TEMPLATE = """
             }).then(r => r.json()).then(data => {
                 if (data.status === 'success') {
                     console.log('Circuit toggled:', circuitId, enabled);
-                    fetchState();  // Refresh immediately to show updated power
+                    // Force immediate refresh to show new power totals
+                    setTimeout(fetchState, 200);
                 } else {
-                    alert('Failed to toggle circuit: ' + data.message);
+                    alert('Error toggling circuit: ' + data.message);
                 }
             });
         }
@@ -736,6 +777,8 @@ HTML_TEMPLATE = """
                 if (data.status === 'success') {
                     console.log('Event triggered');
                     fetchState();
+                } else {
+                    alert('Error triggering event: ' + data.message);
                 }
             });
         }
@@ -747,6 +790,8 @@ HTML_TEMPLATE = """
                     if (data.status === 'success') {
                         console.log('Restored to normal');
                         fetchState();
+                    } else {
+                        alert('Error restoring: ' + data.message);
                     }
                 });
         }
@@ -787,9 +832,6 @@ def api_toggle_circuit():
                     _apply_curtailment_unlocked(ven_state["active_event"]["shed_kw"])
                 else:
                     _distribute_power_to_circuits_unlocked(ven_state["base_power_kw"])
-                
-                # Recalculate total current power from enabled circuits
-                ven_state["current_power_kw"] = round(sum(c["current_kw"] for c in circuits if c.get("enabled", False)), 2)
         
         # Publish shadow update outside the lock
         publish_shadow_update()
@@ -816,7 +858,7 @@ def api_trigger_event():
         print(f"   Shed: {shed_kw:.2f} kW")
         print(f"   Duration: {duration_sec} seconds")
         
-        # Apply curtailment and track event (all inside lock)
+        # Apply curtailment and set event atomically
         with state_lock:
             actual_shed = _apply_curtailment_unlocked(shed_kw)
             
@@ -843,14 +885,18 @@ def api_trigger_event():
 def api_restore():
     try:
         print("\n🔄 RESTORE TRIGGERED VIA UI")
+        
         with state_lock:
             _distribute_power_to_circuits_unlocked(ven_state["base_power_kw"])
             ven_state["shed_kw"] = 0.0
             ven_state["current_power_kw"] = ven_state["base_power_kw"]
             ven_state["active_event"] = None
         
-        publish_shadow_update()
         print("✅ All circuits restored to normal operation")
+        
+        # Publish shadow update outside the lock
+        publish_shadow_update()
+        
         return jsonify({"status": "success"})
     except Exception as e:
         print(f"❌ Error restoring: {e}")
@@ -858,54 +904,47 @@ def api_restore():
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/api/panel/configure', methods=['POST'])
-def api_configure_panel():
-    """Change panel amperage rating"""
+@app.route('/api/panel/change', methods=['POST'])
+def api_change_panel():
     try:
         data = request.json
         new_amperage = int(data.get('amperage', 200))
         
         if new_amperage not in [100, 150, 200]:
-            return jsonify({"status": "error", "message": "Panel must be 100A, 150A, or 200A"}), 400
+            return jsonify({"status": "error", "message": "Invalid panel amperage. Must be 100, 150, or 200"}), 400
+        
+        print(f"\n🔧 CHANGING PANEL TO {new_amperage}A")
         
         with state_lock:
             # Update panel configuration
             ven_state["panel_amperage"] = new_amperage
-            ven_state["panel_max_kw"] = round((new_amperage * ven_state["panel_voltage"]) / 1000.0, 2)
+            ven_state["panel_max_kw"] = calculate_panel_max_kw(new_amperage)
             
-            # Adjust base power to 40% of new panel capacity
-            new_base_power = round(ven_state["panel_max_kw"] * 0.40, 2)
-            ven_state["base_power_kw"] = new_base_power
+            # Update circuits based on new panel capacity
+            global circuits
+            circuits = get_available_circuits_for_panel(new_amperage)
+            ven_state["circuits"] = circuits
             
-            # Disable circuits that exceed panel capacity
-            # For 100A panel (24 kW), disable EV charger if other high-load circuits are on
-            total_breaker_amps = sum(c["breaker_amps"] for c in circuits if c.get("enabled", False))
+            # Recalculate base power (40% of new panel capacity)
+            ven_state["base_power_kw"] = round(ven_state["panel_max_kw"] * 0.40, 2)
             
-            if total_breaker_amps > new_amperage * 0.8:  # 80% NEC rule
-                # Disable non-critical high-amp circuits
-                for c in circuits:
-                    if not c.get("critical", False) and c["breaker_amps"] >= 40:
-                        if c.get("enabled", False):
-                            c["enabled"] = False
-                            print(f"⚠️  Disabled {c['name']} - exceeds panel capacity")
+            # Redistribute power to available circuits
+            _distribute_power_to_circuits_unlocked(ven_state["base_power_kw"])
+            ven_state["current_power_kw"] = calculate_total_power()
             
-            # Recalculate power distribution
-            if ven_state["active_event"]:
-                _apply_curtailment_unlocked(ven_state["active_event"]["shed_kw"])
-            else:
-                _distribute_power_to_circuits_unlocked(ven_state["base_power_kw"])
+        print(f"✅ Panel changed to {new_amperage}A ({ven_state['panel_max_kw']:.1f} kW max)")
         
+        # Publish shadow update outside the lock
         publish_shadow_update()
-        print(f"✅ Panel reconfigured to {new_amperage}A ({ven_state['panel_max_kw']} kW max)")
         
         return jsonify({
             "status": "success",
             "panel_amperage": new_amperage,
             "panel_max_kw": ven_state["panel_max_kw"],
-            "base_power_kw": ven_state["base_power_kw"]
+            "unavailable_circuits": [c["name"] for c in circuits if not c.get("available", True)]
         })
     except Exception as e:
-        print(f"❌ Error configuring panel: {e}")
+        print(f"❌ Error changing panel: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
