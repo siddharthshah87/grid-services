@@ -52,28 +52,54 @@ SHADOW_DELTA_TOPIC = f"$aws/things/{CLIENT_ID}/shadow/update/delta"
 
 state_lock = threading.Lock()
 
-# Circuit definitions (from device_simulator.py)
+# US Electrical Panel Configuration
+PANEL_VOLTAGE = 240  # Standard US residential voltage (120/240V split-phase)
+PANEL_AMPERAGE = int(os.getenv("PANEL_AMPERAGE", "200"))  # 100A, 150A, or 200A panel
+PANEL_MAX_KW = (PANEL_AMPERAGE * PANEL_VOLTAGE) / 1000.0  # Convert to kW
+
+# Circuit definitions with realistic breaker sizes
+# Breaker sizes: 15A, 20A, 30A, 40A, 50A (standard US breaker sizes)
+# rated_kw = (breaker_amps * voltage) / 1000
 circuits = [
     {"id": "hvac1", "name": "HVAC", "type": "hvac", "enabled": True, "connected": True, 
-     "rated_kw": 3.5, "current_kw": 0.0, "critical": True, "mode": "dynamic"},
-    {"id": "heater1", "name": "Heater", "type": "heater", "enabled": True, "connected": True,
-     "rated_kw": 1.5, "current_kw": 0.0, "critical": False, "mode": "dynamic"},
+     "breaker_amps": 30, "rated_kw": (30 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
+     "critical": True, "mode": "dynamic"},
+    {"id": "heater1", "name": "Water Heater", "type": "heater", "enabled": True, "connected": True,
+     "breaker_amps": 30, "rated_kw": (30 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
+     "critical": False, "mode": "dynamic"},
     {"id": "ev1", "name": "EV Charger", "type": "ev", "enabled": False, "connected": True,
-     "rated_kw": 7.2, "current_kw": 0.0, "critical": False, "mode": "dynamic"},
-    {"id": "lights1", "name": "Lights", "type": "lights", "enabled": True, "connected": True,
-     "rated_kw": 0.4, "current_kw": 0.0, "critical": False, "mode": "dynamic"},
-    {"id": "fridge1", "name": "Fridge", "type": "fridge", "enabled": True, "connected": True,
-     "rated_kw": 0.2, "current_kw": 0.0, "critical": True, "mode": "dynamic"},
-    {"id": "misc1", "name": "House Load", "type": "misc", "enabled": True, "connected": True,
-     "rated_kw": 1.0, "current_kw": 0.0, "critical": False, "mode": "dynamic"},
+     "breaker_amps": 50, "rated_kw": (50 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
+     "critical": False, "mode": "dynamic"},
+    {"id": "dryer1", "name": "Dryer", "type": "dryer", "enabled": True, "connected": True,
+     "breaker_amps": 30, "rated_kw": (30 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
+     "critical": False, "mode": "dynamic"},
+    {"id": "range1", "name": "Electric Range", "type": "range", "enabled": True, "connected": True,
+     "breaker_amps": 40, "rated_kw": (40 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
+     "critical": False, "mode": "dynamic"},
+    {"id": "lights1", "name": "Lighting Circuits", "type": "lights", "enabled": True, "connected": True,
+     "breaker_amps": 15, "rated_kw": (15 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
+     "critical": False, "mode": "dynamic"},
+    {"id": "outlets1", "name": "General Outlets", "type": "outlets", "enabled": True, "connected": True,
+     "breaker_amps": 20, "rated_kw": (20 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
+     "critical": False, "mode": "dynamic"},
+    {"id": "fridge1", "name": "Refrigerator", "type": "fridge", "enabled": True, "connected": True,
+     "breaker_amps": 15, "rated_kw": (15 * PANEL_VOLTAGE) / 1000.0, "current_kw": 0.0, 
+     "critical": True, "mode": "dynamic"},
 ]
+
+# Calculate realistic base power (typical home usage: 30-50% of panel capacity)
+BASE_POWER_PERCENTAGE = 0.40  # 40% of panel capacity
+BASE_POWER_KW = round(PANEL_MAX_KW * BASE_POWER_PERCENTAGE, 2)
 
 # Global state
 ven_state = {
     "connected": False,
     "message_count": 0,
-    "base_power_kw": 10.0,  # Base power before any curtailment
-    "current_power_kw": 10.0,
+    "panel_amperage": PANEL_AMPERAGE,
+    "panel_voltage": PANEL_VOLTAGE,
+    "panel_max_kw": PANEL_MAX_KW,
+    "base_power_kw": BASE_POWER_KW,
+    "current_power_kw": BASE_POWER_KW,
     "shed_kw": 0.0,
     "active_event": None,  # {"event_id": "evt-123", "shed_kw": 2.0, "end_ts": 123456}
     "circuits": circuits,
@@ -131,8 +157,10 @@ def simulate_base_power():
     with state_lock:
         jitter = random.uniform(-0.5, 0.5)
         ven_state["base_power_kw"] = round(ven_state["base_power_kw"] + jitter, 2)
-        # Keep between 8-12 kW
-        ven_state["base_power_kw"] = max(8.0, min(12.0, ven_state["base_power_kw"]))
+        # Keep between 30-60% of panel capacity
+        min_power = round(PANEL_MAX_KW * 0.30, 2)
+        max_power = round(PANEL_MAX_KW * 0.60, 2)
+        ven_state["base_power_kw"] = max(min_power, min(max_power, ven_state["base_power_kw"]))
         return ven_state["base_power_kw"]
 
 # ============================================================================
@@ -144,14 +172,16 @@ def _apply_curtailment_unlocked(shed_kw):
     target_shed = shed_kw
     actual_shed = 0.0
     
-    # Priority order for shedding (non-critical first)
+    # Priority order for shedding (non-critical first, highest power users prioritized)
     shed_order = [
-        ("heater1", 1.0),   # Can shed 100% of heater
-        ("lights1", 0.7),   # Can shed 70% of lights
-        ("misc1", 0.6),     # Can shed 60% of house load
-        ("ev1", 1.0),       # Can shed 100% of EV
-        ("hvac1", 0.2),     # Can shed 20% of HVAC (critical, keep 80%)
-        ("fridge1", 0.2),   # Can shed 20% of fridge (critical, keep 80%)
+        ("ev1", 1.0),        # Can shed 100% of EV charger (50A breaker)
+        ("heater1", 1.0),    # Can shed 100% of water heater (30A breaker)
+        ("dryer1", 0.8),     # Can shed 80% of dryer (30A breaker)
+        ("range1", 0.5),     # Can shed 50% of range (40A breaker)
+        ("outlets1", 0.6),   # Can shed 60% of general outlets (20A breaker)
+        ("lights1", 0.7),    # Can shed 70% of lights (15A breaker)
+        ("hvac1", 0.2),      # Can shed 20% of HVAC (critical, 30A breaker)
+        ("fridge1", 0.1),    # Can shed 10% of fridge (critical, 15A breaker)
     ]
     
     # Store original power for restoration
@@ -223,12 +253,17 @@ def publish_shadow_update():
                 "power_kw": ven_state["current_power_kw"],
                 "shed_kw": ven_state["shed_kw"],
                 "base_power_kw": ven_state["base_power_kw"],
+                "panel_amperage": ven_state["panel_amperage"],
+                "panel_voltage": ven_state["panel_voltage"],
+                "panel_max_kw": ven_state["panel_max_kw"],
                 "circuits": [
                     {
                         "id": c["id"],
                         "name": c["name"],
                         "enabled": c["enabled"],
                         "current_kw": c["current_kw"],
+                        "breaker_amps": c["breaker_amps"],
+                        "current_amps": round((c["current_kw"] * 1000) / PANEL_VOLTAGE, 2),
                         "critical": c["critical"]
                     }
                     for c in circuits
@@ -499,24 +534,44 @@ HTML_TEMPLATE = """
         
         <div class="grid">
             <div class="card">
-                <h2>📊 Power Status</h2>
+                <h2>⚡ Panel Status</h2>
+                <div class="stat">
+                    <div class="stat-label">Panel Rating</div>
+                    <div class="stat-value" id="panel-rating">-- A</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Voltage</div>
+                    <div class="stat-value" id="panel-voltage">-- V</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Max Capacity</div>
+                    <div class="stat-value" id="panel-max">-- kW</div>
+                </div>
                 <div class="stat">
                     <div class="stat-label">Connection</div>
                     <div>
                         <span class="status" id="conn-status">Disconnected</span>
                     </div>
                 </div>
+            </div>
+            
+            <div class="card">
+                <h2>📊 Current Usage</h2>
                 <div class="stat">
-                    <div class="stat-label">Current Power</div>
+                    <div class="stat-label">Power (kW)</div>
                     <div class="stat-value power" id="current-power">-- kW</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Current (A)</div>
+                    <div class="stat-value power" id="current-amps">-- A</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Panel Utilization</div>
+                    <div class="stat-value" id="panel-util">--%</div>
                 </div>
                 <div class="stat">
                     <div class="stat-label">Load Shed</div>
                     <div class="stat-value shed" id="shed-power">-- kW</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Base Power</div>
-                    <div class="stat-value" id="base-power">-- kW</div>
                 </div>
             </div>
             
@@ -573,10 +628,19 @@ HTML_TEMPLATE = """
                         connStatus.textContent = 'Disconnected';
                     }
                     
-                    // Update power stats
+                    // Update panel info
+                    document.getElementById('panel-rating').textContent = data.panel_amperage + ' A';
+                    document.getElementById('panel-voltage').textContent = data.panel_voltage + ' V';
+                    document.getElementById('panel-max').textContent = data.panel_max_kw.toFixed(1) + ' kW';
+                    
+                    // Calculate and update current usage
+                    const currentAmps = ((data.current_power_kw * 1000) / data.panel_voltage).toFixed(1);
+                    const panelUtil = ((data.current_power_kw / data.panel_max_kw) * 100).toFixed(1);
+                    
                     document.getElementById('current-power').textContent = data.current_power_kw.toFixed(2) + ' kW';
+                    document.getElementById('current-amps').textContent = currentAmps + ' A';
+                    document.getElementById('panel-util').textContent = panelUtil + '%';
                     document.getElementById('shed-power').textContent = data.shed_kw.toFixed(2) + ' kW';
-                    document.getElementById('base-power').textContent = data.base_power_kw.toFixed(2) + ' kW';
                     
                     // Update event status
                     const eventCard = document.getElementById('event-card');
@@ -597,16 +661,21 @@ HTML_TEMPLATE = """
                         activeEvent.style.display = 'none';
                     }
                     
-                    // Update circuits
+                    // Update circuits with breaker info
                     const circuitsList = document.getElementById('circuits-list');
-                    circuitsList.innerHTML = data.circuits.map(c => `
+                    circuitsList.innerHTML = data.circuits.map(c => {
+                        const currentAmps = ((c.current_kw * 1000) / data.panel_voltage).toFixed(1);
+                        const utilPercent = ((currentAmps / c.breaker_amps) * 100).toFixed(0);
+                        return `
                         <div class="circuit">
                             <div class="circuit-info">
                                 <div>
                                     <span class="circuit-name">${c.name}</span>
                                     ${c.critical ? '<span class="circuit-critical">⚠️ Critical</span>' : ''}
                                 </div>
-                                <div class="circuit-power">${c.current_kw.toFixed(2)} kW / ${c.rated_kw.toFixed(1)} kW rated</div>
+                                <div class="circuit-power">
+                                    ${c.current_kw.toFixed(2)} kW (${currentAmps} A) / ${c.breaker_amps}A breaker (${utilPercent}%)
+                                </div>
                             </div>
                             <label class="toggle">
                                 <input type="checkbox" ${c.enabled ? 'checked' : ''} 
@@ -614,7 +683,7 @@ HTML_TEMPLATE = """
                                 <span class="slider"></span>
                             </label>
                         </div>
-                    `).join('');
+                    `}).join('');
                 });
         }
         
@@ -782,6 +851,11 @@ def telemetry_loop():
                 
                 # Publish telemetry
                 ven_state["message_count"] += 1
+                
+                # Calculate current amperage
+                current_amps = round((ven_state["current_power_kw"] * 1000) / PANEL_VOLTAGE, 2)
+                panel_utilization = round((ven_state["current_power_kw"] / ven_state["panel_max_kw"]) * 100, 1)
+                
                 telemetry = {
                     "venId": CLIENT_ID,
                     "timestamp": current_ts,
@@ -791,6 +865,25 @@ def telemetry_loop():
                     "eventId": ven_state["active_event"]["event_id"] if ven_state["active_event"] else None,
                     "baselinePowerKw": baseline_kw,
                     "message_num": ven_state["message_count"],
+                    # Panel information
+                    "panelAmperageRating": ven_state["panel_amperage"],
+                    "panelVoltage": ven_state["panel_voltage"],
+                    "panelMaxKw": ven_state["panel_max_kw"],
+                    "currentAmps": current_amps,
+                    "panelUtilizationPercent": panel_utilization,
+                    # Circuit details with breaker info
+                    "circuits": [
+                        {
+                            "id": c["id"],
+                            "name": c["name"],
+                            "breakerAmps": c["breaker_amps"],
+                            "currentKw": c["current_kw"],
+                            "currentAmps": round((c["current_kw"] * 1000) / PANEL_VOLTAGE, 2),
+                            "enabled": c["enabled"],
+                            "critical": c["critical"]
+                        }
+                        for c in circuits if c.get("enabled", False)
+                    ],
                     # Legacy fields for backward compatibility
                     "power_kw": ven_state["current_power_kw"],
                     "shed_kw": ven_state["shed_kw"],
