@@ -802,10 +802,10 @@ def main():
     # Initialize power distribution
     distribute_power_to_circuits(ven_state["base_power_kw"])
     
-    # Create MQTT client
-    # Use a persistent session so AWS IoT will queue QoS1 messages while we're temporarily offline.
-    # This helps avoid missing commands that were published while the VEN was restarting.
-    mqtt_client = mqtt.Client(client_id=CLIENT_ID, clean_session=False, protocol=mqtt.MQTTv311)
+    # Create MQTT client with clean session (default)
+    # Note: We use clean_session=True to avoid AWS IoT session conflicts when restarting quickly.
+    # This means we won't receive messages published while offline, but ensures reliable reconnection.
+    mqtt_client = mqtt.Client(client_id=CLIENT_ID, clean_session=True, protocol=mqtt.MQTTv311)
     mqtt_client.on_connect = on_connect
     mqtt_client.on_disconnect = on_disconnect
     mqtt_client.on_message = on_message
