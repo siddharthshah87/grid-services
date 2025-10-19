@@ -313,11 +313,15 @@ class MQTTConsumer:
                     logger.error("Failed to auto-register VEN", extra={"ven_id": model.ven_id, "error": str(e)})
                     return
 
+        # Use modern field names with fallback to legacy names
+        used_power = model.used_power_kw if model.used_power_kw is not None else model.legacy_power_kw
+        shed_power = model.shed_power_kw if model.shed_power_kw is not None else model.legacy_shed_kw
+
         reading = VenTelemetry(
             ven_id=model.ven_id,
             timestamp=timestamp,
-            used_power_kw=model.used_power_kw,
-            shed_power_kw=model.shed_power_kw,
+            used_power_kw=used_power,
+            shed_power_kw=shed_power,
             requested_reduction_kw=model.requested_reduction_kw,
             event_id=model.event_id,
             battery_soc=model.battery_soc,

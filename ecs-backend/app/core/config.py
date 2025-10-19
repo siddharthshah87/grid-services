@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     mqtt_topic_responses: str | None = Field("openadr/response", alias="MQTT_TOPIC_RESPONSES")
     backend_loads_topic: str | None = Field(None, alias="BACKEND_LOADS_TOPIC")
     mqtt_additional_topics: list[str] = Field(default_factory=list, alias="MQTT_TOPICS")
+    
+    # Event Command Service settings
+    event_command_enabled: bool = Field(True, alias="EVENT_COMMAND_ENABLED")
+    iot_endpoint: str | None = Field(None, alias="IOT_ENDPOINT")
 
     model_config = {
         "env_prefix": "",

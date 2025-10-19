@@ -301,7 +301,7 @@ module "ecs_service_backend" {
   # TODO: Re-enable VPC endpoint once SNI configuration is fully tested
   # mqtt_host            = data.aws_vpc_endpoint.iot_data.dns_entry[0].dns_name
   # mqtt_tls_server_name = module.iot_core.endpoint
-  mqtt_host            = module.iot_core.endpoint  # Temporarily use public endpoint
+  mqtt_host = module.iot_core.endpoint # Temporarily use public endpoint
 
   # TLS certificates for AWS IoT Core authentication
   # Backend uses its own certificate (different from VOLTTRON VEN)

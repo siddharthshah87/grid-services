@@ -35,8 +35,18 @@ class TelemetryPayload(BaseModel):
     event_id: str | None = Field(None, alias="eventId")
     battery_soc: float | None = Field(None, alias="batterySoc")
     loads: list[TelemetryLoadPayload] = Field(default_factory=list, alias="loads")
+    
+    # Legacy fields for backward compatibility
     legacy_power_kw: float | None = Field(None, alias="power_kw")
     legacy_shed_kw: float | None = Field(None, alias="shed_kw")
+    
+    # Panel information (optional, for US electrical panel-based VENs)
+    panel_amperage_rating: int | None = Field(None, alias="panelAmperageRating")
+    panel_voltage: int | None = Field(None, alias="panelVoltage")
+    panel_max_kw: float | None = Field(None, alias="panelMaxKw")
+    current_amps: float | None = Field(None, alias="currentAmps")
+    panel_utilization_percent: float | None = Field(None, alias="panelUtilizationPercent")
+    circuits: list[dict[str, Any]] | None = Field(None, alias="circuits")  # Circuit breaker details
 
     def dump_raw(self) -> dict[str, Any]:
         return self.model_dump(mode="json", by_alias=True)
