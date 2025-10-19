@@ -2,22 +2,27 @@
 
 ## Overview
 
-The enhanced local VEN (`ven_local_enhanced.py`) adds three major capabilities:
+The enhanced local VEN (`ven_local_enhanced.py`) provides:
 
 1. **Device Shadow Sync** - AWS IoT Device Shadow integration
 2. **Local Web UI** - Browser-based control panel  
-3. **DR Event Handling** - Load curtailment with circuit-level control
+3. **DR Event Handling** - Priority-based load curtailment
 
 ## Quick Start
 
 ```bash
+# Use unified control script (recommended)
+./scripts/ven_control.sh start
+
+# Or run directly
 cd volttron-ven
 ./run_enhanced.sh
 ```
 
-The VEN will start and display:
-- MQTT connection status
-- Web UI URL: `http://localhost:8080`
+The VEN will start with:
+- MQTT connection to AWS IoT Core
+- Web UI at `http://localhost:8080`
+- Thing name: `volttron_thing`
 
 ## 1. Device Shadow Sync
 
@@ -76,10 +81,13 @@ AWS IoT Device Shadow is a cloud-based representation of your device state. It a
 ### View Shadow
 
 ```bash
-# Get current shadow from AWS IoT
+# Using control script (easiest)
+./scripts/ven_control.sh shadow
+
+# Or directly via AWS CLI
 aws iot-data get-thing-shadow \
-  --thing-name volttron_local_1234567890 \
-  /tmp/shadow.json && cat /tmp/shadow.json | jq
+  --thing-name volttron_thing \
+  /dev/stdout | jq '.state.reported'
 ```
 
 ### Update Shadow (Remote Control)
@@ -87,9 +95,9 @@ aws iot-data get-thing-shadow \
 ```bash
 # Disable HVAC remotely via shadow
 aws iot-data update-thing-shadow \
-  --thing-name volttron_local_1234567890 \
+  --thing-name volttron_thing \
   --payload '{"state":{"desired":{"circuits":[{"id":"hvac1","enabled":false}]}}}' \
-  /tmp/shadow-update.json
+  /dev/stdout
 ```
 
 The VEN will receive the delta and automatically disable the HVAC circuit.

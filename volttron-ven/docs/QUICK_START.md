@@ -1,109 +1,102 @@
 # VEN Quick Start
 
-## 🚀 Run the VEN
+## 🚀 Run the Enhanced VEN (Recommended)
 
-We have two VEN implementations to choose from:
-
-### Basic VEN - Lightweight & Simple
-
-**File**: `ven_local.py` (~173 lines)
-**Run**: `./run.sh`
+**Use the unified control script for all VEN operations:**
 
 ```bash
-cd volttron-ven
-./run.sh
+# Start VEN in background
+./scripts/ven_control.sh start
+
+# Check status
+./scripts/ven_control.sh status
+
+# View logs
+./scripts/ven_control.sh logs
 ```
 
-**Features**:
-- ✅ MQTT connection to AWS IoT Core
-- ✅ Telemetry publishing (every 5s)
-- ✅ Ping command handling
-- ✅ Minimal resource usage
-
-**Best for**: Simple telemetry and monitoring
-
-### Enhanced VEN - Full Featured ⭐
+### What You Get
 
 **File**: `ven_local_enhanced.py` (~900 lines)
-**Run**: `./run_enhanced.sh`
 
-```bash
-cd volttron-ven
-./run_enhanced.sh
-```
-
-**Features**: Everything in Basic PLUS:
+**Features**:
+- ✅ MQTT connection to AWS IoT Core with auto-reconnect
 - 🌐 Web UI at `http://localhost:8080`
 - 📱 AWS IoT Device Shadow sync
 - ⚡ DR event handling with intelligent load curtailment
 - 🎛️ Circuit-level control (HVAC, EV, lights, etc.)
 - 🔄 Remote control via shadow updates
+- 📊 Telemetry publishing every 5 seconds
+- ⚙️ Persistent session (messages queued during disconnects)
 
-**Best for**: Full DR event testing and demonstrations
+### Configuration
 
-### Both Versions Include
+The VEN runs with:
+- **Thing Name**: `volttron_thing` (matches AWS IoT certificates)
+- **Telemetry Topic**: `volttron/metering` (shared topic for all VENs)
+- **Command Topic**: `ven/cmd/volttron_thing`
+- **Web UI Port**: 8080
 
-- Auto-fetch TLS certificates from AWS Secrets Manager
-- Connect to AWS IoT Core with unique timestamp-based client ID
-- Publish telemetry every 5 seconds
-- Handle MQTT reconnections gracefully
+**Important**: Thing name is fixed to `volttron_thing` because certificates are pre-registered to this AWS IoT Thing.
 
-## 📊 Monitor Telemetry
+## 🧪 Test DR Event Flow
 
-In another terminal:
+### Send Event Command
 ```bash
-# Get the client ID from VEN output, then:
-python3 ../scripts/ven_telemetry_listen.py \
-  --ven-id volttron_local_<timestamp> \
-  --endpoint a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com
+# Shed 2 kW for 5 minutes
+./scripts/ven_control.sh send-event --shed-kw 2.0 --duration 300 --event-id evt-test-001
 ```
 
-## 🧪 Test Commands
+**Expected**:
+- VEN receives command within 2 seconds
+- Loads are curtailed (heater, lights reduced first)
+- Power drops by ~2 kW
+- Acknowledgment sent to `ven/ack/volttron_thing`
+- Shadow updated with active event
 
+### Monitor Results
 ```bash
-# Send ping
-python3 ../scripts/ven_cmd_publish.py \
-  --op ping \
-  --ven-id volttron_local_<timestamp> \
-  --endpoint a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com \
-  --corr-id test-001
+# View VEN logs
+./scripts/ven_control.sh logs
 
-# Monitor acks
-python3 ../scripts/ven_acks_listen.py \
-  --ven-id volttron_local_<timestamp> \
-  --endpoint a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com
+# Check IoT Shadow
+./scripts/ven_control.sh shadow
+
+# Monitor telemetry
+./scripts/ven_control.sh telemetry
+```
+
+### Restore Loads
+```bash
+./scripts/ven_control.sh restore
 ```
 
 ## 🛑 Stop the VEN
 
-Press `Ctrl+C` in the VEN terminal
+```bash
+./scripts/ven_control.sh stop
+```
 
 ## 📁 Key Files
 
-- `ven_local.py` - Basic VEN implementation (~173 lines)
 - `ven_local_enhanced.py` - Enhanced VEN with UI and DR (~900 lines)
-- `run.sh` - Basic VEN runner with cert setup
-- `run_enhanced.sh` - Enhanced VEN runner with Flask install
-- `test.sh` - Automated test script
-- `device_simulator.py` - Device simulation logic
+- `run_enhanced.sh` - VEN startup script (supports `--background`)
+- `certs/` - AWS IoT certificates (auto-downloaded from Secrets Manager)
+- `../scripts/ven_control.sh` - Unified control script (start/stop/status/events)
 
 ## 📚 More Info
 
-- **Detailed Setup & Troubleshooting**: [LOCAL_VEN.md](LOCAL_VEN.md)
-- **Enhanced Features Guide**: [ENHANCED_FEATURES.md](ENHANCED_FEATURES.md)
+- **Detailed Features**: [ENHANCED_FEATURES.md](ENHANCED_FEATURES.md)
+- **Operations Guide**: [/docs/VEN_OPERATIONS.md](/docs/VEN_OPERATIONS.md)
 - **Project Overview**: [../README.md](../README.md)
-- **Migration History**: [CHANGES.md](CHANGES.md)
 
-## ✅ Status
+## ✅ Validated E2E Flow
 
-**Basic VEN**:
-- ✅ Stable MQTT connection (zero rc=7 disconnects)
-- ✅ Telemetry publishing (every 5s)
-- ✅ Ping command handling
-
-**Enhanced VEN**:
-- ✅ All basic VEN features
-- ✅ Web UI on port 8080
-- ✅ DR event handling with load curtailment
-- ✅ Device Shadow sync
-- ✅ Circuit-level control
+The VEN has been tested end-to-end:
+- ✅ MQTT connection with persistent session
+- ✅ Telemetry publishing to shared `volttron/metering` topic
+- ✅ DR event command reception and acknowledgment
+- ✅ Load curtailment (priority-based circuit shedding)
+- ✅ Device Shadow updates during events
+- ✅ Restore command and load recovery
+- ✅ Web UI real-time state display

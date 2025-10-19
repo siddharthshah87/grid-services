@@ -2,11 +2,16 @@
 """Publish VEN backend commands over AWS IoT (boto3 iot-data).
 
 Examples:
+  # Dispatch DR event with load shedding
+  ./scripts/ven_cmd_publish.py --ven-id volttron_thing --op event \
+    --shed-kw 2.0 --duration 300 --event-id evt-test-001
+
+  # Send generic command with custom data
   ./scripts/ven_cmd_publish.py --ven-id volttron_thing --op setConfig \
     --data '{"report_interval_seconds":30,"target_power_kw":1.2}'
 
-  ./scripts/ven_cmd_publish.py --ven-id volttron_thing --op shedLoad \
-    --data '{"loadId":"ev1","reduceKw":2.0,"durationS":900,"eventId":"evt-9"}'
+  # Restore command
+  ./scripts/ven_cmd_publish.py --ven-id volttron_thing --op restore
 
 Requires AWS credentials and the IoT Data ATS endpoint. Set via:
   - env IOT_ENDPOINT (e.g. a1xxxxxxxxx-ats.iot.us-west-2.amazonaws.com)
@@ -29,11 +34,14 @@ except Exception as e:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ven-id", required=True, help="VEN/Thing name")
+    ap.add_argument("--ven-id", required=True, help="VEN/Thing name (e.g., volttron_thing)")
     ap.add_argument("--region", default=os.getenv("AWS_REGION", "us-west-2"))
     ap.add_argument("--endpoint", default=os.getenv("IOT_ENDPOINT"), help="ATS IoT Data endpoint (host only)")
-    ap.add_argument("--op", required=True, help="Command op: set|setConfig|setLoad|shedLoad|shedPanel|get|event|ping")
-    ap.add_argument("--data", help="JSON data for the op")
+    ap.add_argument("--op", required=True, help="Command op: event|restore|setConfig|ping")
+    ap.add_argument("--shed-kw", type=float, help="For 'event' op: kW to shed")
+    ap.add_argument("--duration", type=int, help="For 'event' op: duration in seconds")
+    ap.add_argument("--event-id", help="For 'event' op: event ID")
+    ap.add_argument("--data", help="JSON data for the op (alternative to specific flags)")
     ap.add_argument("--corr-id", default=None, help="Correlation ID to include in the command")
     args = ap.parse_args()
 
@@ -46,6 +54,17 @@ def main():
         "venId": args.ven_id,
         "correlationId": args.corr_id or f"corr-{int(time.time())}",
     }
+    
+    # Handle 'event' operation with specific parameters
+    if args.op == "event":
+        if not args.shed_kw or not args.duration:
+            print("For 'event' op, --shed-kw and --duration are required", file=sys.stderr)
+            sys.exit(2)
+        payload["shed_kw"] = args.shed_kw
+        payload["duration_sec"] = args.duration
+        payload["event_id"] = args.event_id or f"evt-{int(time.time())}"
+    
+    # Add custom data if provided
     if args.data:
         try:
             payload["data"] = json.loads(args.data)
@@ -61,9 +80,11 @@ def main():
 
     topic = f"ven/cmd/{args.ven_id}"
     iotd.publish(topic=topic, qos=1, payload=json.dumps(payload).encode("utf-8"))
-    print(f"Published to {topic}:\n{json.dumps(payload, indent=2)}")
+    print(f"✅ Published to {topic}:")
+    print(json.dumps(payload, indent=2))
 
 
 if __name__ == "__main__":
     main()
+
 

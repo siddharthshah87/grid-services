@@ -14,6 +14,12 @@ import threading
 from datetime import datetime
 from flask import Flask, render_template_string, jsonify, request
 import paho.mqtt.client as mqtt
+import logging
+
+# Configure basic logging for MQTT lifecycle visibility
+logging.basicConfig(level=logging.INFO)
+mqtt_logger = logging.getLogger("paho")
+mqtt_logger.setLevel(logging.DEBUG)
 
 # Environment variables
 IOT_ENDPOINT = os.getenv("IOT_ENDPOINT", "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com")
@@ -797,10 +803,19 @@ def main():
     distribute_power_to_circuits(ven_state["base_power_kw"])
     
     # Create MQTT client
-    mqtt_client = mqtt.Client(client_id=CLIENT_ID, protocol=mqtt.MQTTv311)
+    # Use a persistent session so AWS IoT will queue QoS1 messages while we're temporarily offline.
+    # This helps avoid missing commands that were published while the VEN was restarting.
+    mqtt_client = mqtt.Client(client_id=CLIENT_ID, clean_session=False, protocol=mqtt.MQTTv311)
     mqtt_client.on_connect = on_connect
     mqtt_client.on_disconnect = on_disconnect
     mqtt_client.on_message = on_message
+    # Add verbose logging callback
+    def _on_log(client, userdata, level, buf):
+        try:
+            print(f"MQTT LOG[{level}]: {buf}")
+        except Exception:
+            pass
+    mqtt_client.on_log = _on_log
     
     # Configure TLS
     try:
@@ -809,7 +824,8 @@ def main():
             certfile=CLIENT_CERT,
             keyfile=PRIVATE_KEY,
             cert_reqs=ssl.CERT_REQUIRED,
-            tls_version=ssl.PROTOCOL_TLSv1_2
+            # Allow the system to negotiate the best TLS version; AWS supports TLSv1.2/1.3
+            tls_version=ssl.PROTOCOL_TLS_CLIENT
         )
         print("✓ TLS configured")
     except Exception as e:
@@ -824,23 +840,32 @@ def main():
         print(f"❌ Connection failed: {e}")
         return 1
     
-    # Start network loop
+    # Configure reconnect/backoff behavior and start network loop so the client auto-reconnects
+    try:
+        # Control how the client backs off when reconnecting
+        mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
+    except Exception:
+        # Older paho versions may not have reconnect_delay_set; ignore if unavailable
+        pass
+
+    # Start network loop (background thread). This enables automatic reconnection handling.
     mqtt_client.loop_start()
     
     # Start web server in separate thread
     web_thread = threading.Thread(target=run_web_server, daemon=True)
     web_thread.start()
     
-    # Wait for connection
-    print("⏳ Waiting for MQTT connection...")
-    for i in range(10):
+    # Wait for connection (give more time for TLS handshake and potential reconnects)
+    print("⏳ Waiting for MQTT connection (up to 30s)...")
+    for i in range(30):
         if ven_state["connected"]:
             break
         time.sleep(1)
-    
+
     if not ven_state["connected"]:
-        print("❌ Failed to connect after 10 seconds")
-        mqtt_client.loop_stop()
+        print("❌ Failed to connect after 30 seconds")
+        # keep the network loop running to allow background reconnect attempts, but surface failure
+        # Return non-zero so callers know startup didn't complete; the client will still try to reconnect.
         return 1
     
     print("✅ MQTT connection established!\n")
