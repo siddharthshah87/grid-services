@@ -537,7 +537,13 @@ HTML_TEMPLATE = """
                 <h2>⚡ Panel Status</h2>
                 <div class="stat">
                     <div class="stat-label">Panel Rating</div>
-                    <div class="stat-value" id="panel-rating">-- A</div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <select id="panel-selector" onchange="changePanel()" style="padding: 8px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; font-size: 16px; font-weight: 600;">
+                            <option value="100">100 A</option>
+                            <option value="150">150 A</option>
+                            <option value="200" selected>200 A</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="stat">
                     <div class="stat-label">Voltage</div>
@@ -628,12 +634,12 @@ HTML_TEMPLATE = """
                         connStatus.textContent = 'Disconnected';
                     }
                     
-                    // Update panel info
-                    document.getElementById('panel-rating').textContent = data.panel_amperage + ' A';
+                    // Update panel info and sync selector
+                    document.getElementById('panel-selector').value = data.panel_amperage;
                     document.getElementById('panel-voltage').textContent = data.panel_voltage + ' V';
                     document.getElementById('panel-max').textContent = data.panel_max_kw.toFixed(1) + ' kW';
                     
-                    // Calculate and update current usage
+                    // Calculate and update current usage (dynamically from enabled circuits)
                     const currentAmps = ((data.current_power_kw * 1000) / data.panel_voltage).toFixed(1);
                     const panelUtil = ((data.current_power_kw / data.panel_max_kw) * 100).toFixed(1);
                     
@@ -687,6 +693,22 @@ HTML_TEMPLATE = """
                 });
         }
         
+        function changePanel() {
+            const amperage = parseInt(document.getElementById('panel-selector').value);
+            fetch('/api/panel/configure', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({amperage: amperage})
+            }).then(r => r.json()).then(data => {
+                if (data.status === 'success') {
+                    console.log('Panel changed to', amperage, 'A');
+                    fetchState();  // Refresh immediately
+                } else {
+                    alert('Failed to change panel: ' + data.message);
+                }
+            });
+        }
+        
         function toggleCircuit(circuitId, enabled) {
             fetch('/api/circuit/toggle', {
                 method: 'POST',
@@ -695,6 +717,9 @@ HTML_TEMPLATE = """
             }).then(r => r.json()).then(data => {
                 if (data.status === 'success') {
                     console.log('Circuit toggled:', circuitId, enabled);
+                    fetchState();  // Refresh immediately to show updated power
+                } else {
+                    alert('Failed to toggle circuit: ' + data.message);
                 }
             });
         }
@@ -762,6 +787,9 @@ def api_toggle_circuit():
                     _apply_curtailment_unlocked(ven_state["active_event"]["shed_kw"])
                 else:
                     _distribute_power_to_circuits_unlocked(ven_state["base_power_kw"])
+                
+                # Recalculate total current power from enabled circuits
+                ven_state["current_power_kw"] = round(sum(c["current_kw"] for c in circuits if c.get("enabled", False)), 2)
         
         # Publish shadow update outside the lock
         publish_shadow_update()
@@ -779,36 +807,108 @@ def api_toggle_circuit():
 
 @app.route('/api/event/trigger', methods=['POST'])
 def api_trigger_event():
-    data = request.json
-    shed_kw = float(data.get('shed_kw', 0.0))
-    duration_sec = int(data.get('duration_sec', 300))
-    
-    print(f"\n🚨 DR EVENT TRIGGERED VIA UI")
-    print(f"   Shed: {shed_kw:.2f} kW")
-    print(f"   Duration: {duration_sec} seconds")
-    
-    # Apply curtailment
-    actual_shed = apply_curtailment(shed_kw)
-    
-    # Track active event
-    event_id = f"ui-evt-{int(time.time())}"
-    ven_state["active_event"] = {
-        "event_id": event_id,
-        "shed_kw": shed_kw,
-        "actual_shed_kw": actual_shed,
-        "end_ts": int(time.time()) + duration_sec
-    }
-    
-    publish_shadow_update()
-    
-    return jsonify({"status": "success", "event_id": event_id, "actual_shed_kw": actual_shed})
+    try:
+        data = request.json
+        shed_kw = float(data.get('shed_kw', 0.0))
+        duration_sec = int(data.get('duration_sec', 300))
+        
+        print(f"\n🚨 DR EVENT TRIGGERED VIA UI")
+        print(f"   Shed: {shed_kw:.2f} kW")
+        print(f"   Duration: {duration_sec} seconds")
+        
+        # Apply curtailment and track event (all inside lock)
+        with state_lock:
+            actual_shed = _apply_curtailment_unlocked(shed_kw)
+            
+            # Track active event
+            event_id = f"ui-evt-{int(time.time())}"
+            ven_state["active_event"] = {
+                "event_id": event_id,
+                "shed_kw": shed_kw,
+                "actual_shed_kw": actual_shed,
+                "end_ts": int(time.time()) + duration_sec
+            }
+        
+        # Publish shadow update outside the lock
+        publish_shadow_update()
+        
+        return jsonify({"status": "success", "event_id": event_id, "actual_shed_kw": actual_shed})
+    except Exception as e:
+        print(f"❌ Error triggering event: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/event/restore', methods=['POST'])
 def api_restore():
-    print("\n🔄 RESTORE TRIGGERED VIA UI")
-    restore_circuits()
-    publish_shadow_update()
-    return jsonify({"status": "success"})
+    try:
+        print("\n🔄 RESTORE TRIGGERED VIA UI")
+        with state_lock:
+            _distribute_power_to_circuits_unlocked(ven_state["base_power_kw"])
+            ven_state["shed_kw"] = 0.0
+            ven_state["current_power_kw"] = ven_state["base_power_kw"]
+            ven_state["active_event"] = None
+        
+        publish_shadow_update()
+        print("✅ All circuits restored to normal operation")
+        return jsonify({"status": "success"})
+    except Exception as e:
+        print(f"❌ Error restoring: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/panel/configure', methods=['POST'])
+def api_configure_panel():
+    """Change panel amperage rating"""
+    try:
+        data = request.json
+        new_amperage = int(data.get('amperage', 200))
+        
+        if new_amperage not in [100, 150, 200]:
+            return jsonify({"status": "error", "message": "Panel must be 100A, 150A, or 200A"}), 400
+        
+        with state_lock:
+            # Update panel configuration
+            ven_state["panel_amperage"] = new_amperage
+            ven_state["panel_max_kw"] = round((new_amperage * ven_state["panel_voltage"]) / 1000.0, 2)
+            
+            # Adjust base power to 40% of new panel capacity
+            new_base_power = round(ven_state["panel_max_kw"] * 0.40, 2)
+            ven_state["base_power_kw"] = new_base_power
+            
+            # Disable circuits that exceed panel capacity
+            # For 100A panel (24 kW), disable EV charger if other high-load circuits are on
+            total_breaker_amps = sum(c["breaker_amps"] for c in circuits if c.get("enabled", False))
+            
+            if total_breaker_amps > new_amperage * 0.8:  # 80% NEC rule
+                # Disable non-critical high-amp circuits
+                for c in circuits:
+                    if not c.get("critical", False) and c["breaker_amps"] >= 40:
+                        if c.get("enabled", False):
+                            c["enabled"] = False
+                            print(f"⚠️  Disabled {c['name']} - exceeds panel capacity")
+            
+            # Recalculate power distribution
+            if ven_state["active_event"]:
+                _apply_curtailment_unlocked(ven_state["active_event"]["shed_kw"])
+            else:
+                _distribute_power_to_circuits_unlocked(ven_state["base_power_kw"])
+        
+        publish_shadow_update()
+        print(f"✅ Panel reconfigured to {new_amperage}A ({ven_state['panel_max_kw']} kW max)")
+        
+        return jsonify({
+            "status": "success",
+            "panel_amperage": new_amperage,
+            "panel_max_kw": ven_state["panel_max_kw"],
+            "base_power_kw": ven_state["base_power_kw"]
+        })
+    except Exception as e:
+        print(f"❌ Error configuring panel: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 def run_web_server():
     """Run Flask web server in a separate thread"""
