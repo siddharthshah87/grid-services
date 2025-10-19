@@ -7,20 +7,17 @@ CLUSTER="hems-ecs-cluster"
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Build and push the Docker images for all services
-cd "$REPO_DIR/grid-event-gateway"
-./build_and_push.sh
-
+# Build and push the Docker images for active services only
 cd "$REPO_DIR/ecs-backend"
 ./build_and_push.sh
 
 cd "$REPO_DIR/ecs-frontend"
 ./build_and_push.sh
 
-cd "$REPO_DIR/volttron-ven"
-./build_and_push.sh
+# Note: volttron-ven runs locally (not containerized), no build needed
+# Note: grid-event-gateway is deprecated/removed
 
-for svc in ecs-backend grid-event-gateway volttron-ven ecs-frontend; do
+for svc in ecs-backend ecs-frontend; do
   echo "🔁 Forcing redeploy of $svc"
   aws ecs update-service \
     --cluster "$CLUSTER" \

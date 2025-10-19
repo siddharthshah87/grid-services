@@ -1,21 +1,20 @@
 
 # Grid Services Infrastructure
 
-This repository contains Terraform modules and Dockerized applications to deploy an OpenADR VTN server and a Volttron VEN agent on AWS. It provides example configurations for a development environment and helper scripts for setting up prerequisites.
+This repository contains Terraform modules and applications to deploy a demand response (DR) system on AWS with a local Virtual End Node (VEN) for testing.
 
 ## Repository Structure
 
-- `envs/` – Terraform environments. The `dev` folder is a working example that provisions the required AWS resources.
+- `envs/` – Terraform environments. The `dev` folder provisions the required AWS resources.
 - `modules/` – Reusable Terraform modules (VPC, ECS cluster, ECR repositories, security groups, IAM roles, IoT Core and more).
-- `grid-event-gateway/` – Source code and Dockerfile for the Grid-Event Gateway (OpenADR VTN) server.
-- `volttron-ven/` – Source code and Dockerfile for a simple Volttron VEN agent.
-- `ecs-backend/` – FastAPI backend providing the administration API.
-- `scripts/` – Helper scripts to install dependencies, authenticate to AWS, create Terraform backend resources, push Docker images, and verify Terraform formatting.
-- `.github/workflows/` – GitHub Actions pipelines for linting, testing, security scanning and Terraform operations.
+- `volttron-ven/` – Local VEN implementation with DR event handling and web UI.
+- `ecs-backend/` – FastAPI backend providing the administration API and event command service.
+- `ecs-frontend/` – React/Vite frontend dashboard.
+- `scripts/` – Helper scripts for infrastructure, deployment, and VEN control.
+- `docs/` – Comprehensive documentation for architecture, operations, and testing.
+- `.github/workflows/` – GitHub Actions pipelines for linting, testing, and security scanning.
 
-See `docs/testing.md` for end‑to‑end testing of the VEN control plane, including
-scripts to publish commands, listen for acks, poll the `/live` endpoint, and
-inspect the Thing Shadow.
+See `docs/VEN_OPERATIONS.md` for VEN operations and `docs/testing.md` for end-to-end testing.
 
 ## Prerequisites
 
@@ -44,15 +43,7 @@ This script uses your current AWS credentials to create a bucket named `tf-state
    ./scripts/ecr-login.sh
    ```
 
-2. Build and push the Grid-Event Gateway image:
-
-   ```bash
-   cd grid-event-gateway
-   ./build_and_push.sh
-   cd ..
-   ```
-
-3. Build and push the ECS Backend image:
+2. Build and push the ECS Backend image:
 
    ```bash
    cd ecs-backend
@@ -60,15 +51,7 @@ This script uses your current AWS credentials to create a bucket named `tf-state
    cd ..
    ```
 
-4. Build and push the Volttron VEN image:
-
-   ```bash
-   cd volttron-ven
-   ./build_and_push.sh
-   cd ..
-   ```
-
-5. Build and push the frontend dashboard image. Optionally set
+3. Build and push the frontend dashboard image. Optionally set
    `BACKEND_API_URL` to inject the backend endpoint during the build:
 
    ```bash
@@ -76,6 +59,8 @@ This script uses your current AWS credentials to create a bucket named `tf-state
    ./build_and_push.sh
    cd ..
    ```
+
+**Note**: The VEN runs locally (not containerized). See `docs/VEN_OPERATIONS.md` for VEN setup.
 
 The scripts obtain your AWS account ID automatically and push the `latest` tag to ECR. Set
 `AWS_PROFILE` to use a different credentials profile (defaults to `AdministratorAccess-923675928909`).
@@ -92,12 +77,13 @@ cd envs/dev
 This environment creates:
 
 - A VPC with public subnets
-- ECR repositories for the images above
-- An IoT Core thing, policy and certificates
+- ECR repositories for backend and frontend images
+- An IoT Core thing, policy and certificates for VEN
 - An ECS cluster and related IAM roles
-- Fargate services for the VTN and VEN containers
-- An Application Load Balancer exposing the VTN on port 80
-- An IoT topic rule logging messages to S3 bucket `mqtt-forward-mqtt-logs` and Kinesis stream `mqtt-forward-mqtt-stream`
+- Fargate services for backend and frontend
+- Application Load Balancers for backend and frontend
+- An IoT topic rule forwarding telemetry to S3 bucket `mqtt-forward-mqtt-logs` and Kinesis stream `mqtt-forward-mqtt-stream`
+- RDS PostgreSQL database for backend data storage
 
 Adjust variables and module parameters in `envs/dev/main.tf` as needed (e.g., MQTT topic or IoT endpoint).
 
