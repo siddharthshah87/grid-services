@@ -331,3 +331,27 @@ export PYTHONPATH=ecs-backend
 ./scripts/check_terraform.sh
 pytest
 ```
+
+# TLDR
+## Deploy Infra
+```bash
+cd envs/dev
+./terraform_init.sh
+```
+## Build & Deploy Services 
+```bash
+# Backend
+cd ecs-backend && ./build_and_push.sh
+
+# Frontend  
+cd ecs-frontend && ./build_and_push.sh
+
+# Redeploy both
+./redeploy_service.sh
+```
+
+## Run VEN Locally
+./scripts/ven_control.sh start
+./scripts/ven_control.sh send-event --shed-kw 2.0 --duration 300
+./scripts/ven_control.sh restore
+./scripts/ven_control.sh stop
