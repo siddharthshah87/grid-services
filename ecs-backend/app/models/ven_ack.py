@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, Text
-from sqlalchemy.ext.declarative import declarative_base
 
-Base = declarative_base()
+from . import Base
 
 
 class VenAck(Base):
