@@ -63,6 +63,14 @@ resource "aws_ecs_task_definition" "this" {
         {
           name  = "MQTT_TLS_SERVER_NAME"
           value = var.mqtt_tls_server_name != null ? var.mqtt_tls_server_name : ""
+        },
+        {
+          name  = "EVENT_COMMAND_ENABLED"
+          value = "true"
+        },
+        {
+          name  = "IOT_ENDPOINT"
+          value = var.mqtt_host
         }
       ]
       secrets = [

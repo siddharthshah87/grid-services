@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any, AsyncIterator, Callable
 from uuid import uuid4
@@ -317,6 +318,7 @@ class EventCommandService:
             logger.error(f"Unexpected error publishing command: {e}")
             raise
 
+    @asynccontextmanager
     async def _session_scope(self):
         """Create a database session context."""
         async with self._session_factory() as session:
