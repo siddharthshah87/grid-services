@@ -197,6 +197,10 @@ class MQTTConsumer:
         assert self._config.mqtt_topics
         for topic in self._config.mqtt_topics:
             client.subscribe(topic, qos=1)
+        
+        # Subscribe to all VEN ACK topics (wildcard)
+        client.subscribe("ven/ack/+", qos=1)
+        logger.info("Subscribed to VEN ACK topic: ven/ack/+")
 
     def _on_subscribe(self, client: gmqtt.Client, mid: int, qos: list[int], properties: Any) -> None:
         logger.info("MQTT client subscribed", extra={"mid": mid, "qos": qos})
@@ -249,6 +253,9 @@ class MQTTConsumer:
             await self._persist_metering(data)
         elif topic == self._config.backend_loads_topic:
             await self._persist_load_snapshot(data)
+        elif topic.startswith("ven/ack/"):
+            # Handle VEN ACK messages (ven/ack/{venId})
+            await self._persist_ven_ack(topic, data)
         else:
             logger.debug("Unhandled MQTT topic", extra={"topic": topic})
 
@@ -384,6 +391,70 @@ class MQTTConsumer:
             session.add_all(records)
 
         logger.debug("Persisted load snapshot", extra={"ven": model.ven_id, "count": len(records)})
+
+    async def _persist_ven_ack(self, topic: str, payload: dict[str, Any]) -> None:
+        """
+        Persist VEN acknowledgment messages.
+        
+        Topic format: ven/ack/{venId}
+        Payload: {op, status, event_id, requested_shed_kw, actual_shed_kw, circuits_curtailed, ...}
+        """
+        # Extract VEN ID from topic
+        ven_id = topic.split("/")[-1] if "/" in topic else None
+        if not ven_id:
+            logger.warning("Cannot extract VEN ID from ACK topic", extra={"topic": topic})
+            return
+        
+        # Extract fields from payload
+        op = payload.get("op")
+        status = payload.get("status")
+        event_id = payload.get("event_id")
+        correlation_id = payload.get("correlationId")
+        timestamp_value = payload.get("ts") or payload.get("timestamp")
+        
+        if not op or not status:
+            logger.warning("ACK missing required fields", extra={"ven_id": ven_id, "payload": payload})
+            return
+        
+        timestamp = _coerce_timestamp(timestamp_value)
+        if not timestamp:
+            timestamp = datetime.now(timezone.utc)
+        
+        # Extract shed information
+        requested_shed_kw = payload.get("requested_shed_kw")
+        actual_shed_kw = payload.get("actual_shed_kw")
+        circuits_curtailed = payload.get("circuits_curtailed")
+        
+        # Import the VenAck model
+        from app.models.ven_ack import VenAck
+        
+        ack_record = VenAck(
+            ven_id=ven_id,
+            event_id=event_id,
+            correlation_id=correlation_id,
+            op=op,
+            status=status,
+            timestamp=timestamp,
+            requested_shed_kw=requested_shed_kw,
+            actual_shed_kw=actual_shed_kw,
+            circuits_curtailed=circuits_curtailed,
+            raw_payload=json.dumps(payload),
+        )
+        
+        async with self._session_scope() as session:
+            session.add(ack_record)
+        
+        logger.info(
+            "Persisted VEN ACK",
+            extra={
+                "ven_id": ven_id,
+                "event_id": event_id,
+                "op": op,
+                "status": status,
+                "actual_shed_kw": actual_shed_kw,
+                "circuits_count": len(circuits_curtailed) if circuits_curtailed else 0,
+            }
+        )
 
 
 def _coerce_timestamp(value: Any) -> datetime | None:

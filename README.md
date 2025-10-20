@@ -356,4 +356,9 @@ cd ecs-frontend && ./build_and_push.sh
 ./scripts/ven_control.sh restore
 ./scripts/ven_control.sh stop
 
+## Local DER Event
+
 curl -X POST http://localhost:8080/api/event/trigger -H "Content-Type: application/json" -d '{"shed_kw": 5.0, "duration_sec": 60}'
+
+
+## Backend DER Event 
