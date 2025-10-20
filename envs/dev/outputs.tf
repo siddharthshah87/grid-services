@@ -87,3 +87,24 @@ output "ecr_volttron_repository_url" {
 #  value       = module.ecr_grid_event_gateway.repository_url
 #}
 
+# RDS Database Outputs
+output "db_host" {
+  description = "RDS Aurora cluster endpoint"
+  value       = module.aurora_postgresql.db_host
+}
+
+output "db_name" {
+  description = "Database name"
+  value       = module.aurora_postgresql.db_name
+}
+
+output "db_user" {
+  description = "Database username"
+  value       = module.aurora_postgresql.db_user
+}
+
+output "db_password" {
+  description = "Database password"
+  value       = module.aurora_postgresql.db_password
+  sensitive   = true
+}
