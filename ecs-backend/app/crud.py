@@ -43,6 +43,8 @@ async def create_ven(
     latitude: float | None = None,
     longitude: float | None = None,
 ) -> VEN:
+    from datetime import datetime, timezone
+    
     ven = VEN(
         ven_id=ven_id,
         name=name,
@@ -50,6 +52,7 @@ async def create_ven(
         registration_id=registration_id,
         latitude=latitude,
         longitude=longitude,
+        last_heartbeat=datetime.now(timezone.utc) if status == "online" else None,
     )
     session.add(ven)
     await session.commit()

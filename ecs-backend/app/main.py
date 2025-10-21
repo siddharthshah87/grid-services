@@ -10,6 +10,7 @@ from app.routers import health
 from app.routers import stats as api_stats
 from app.routers import ven
 from app.services import MQTTConsumer, EventCommandService
+from app.services.ven_heartbeat_monitor import VenHeartbeatMonitor
 from app.core.config import settings
 from app.dependencies import get_session
 
@@ -25,6 +26,7 @@ logger = logging.getLogger("uvicorn")
 # Global service instances
 mqtt_consumer = MQTTConsumer(config=settings, session_factory=get_session)
 event_command_service = EventCommandService(config=settings, session_factory=get_session)
+ven_heartbeat_monitor = VenHeartbeatMonitor(session_factory=get_session, config=settings)
 
 
 @asynccontextmanager
@@ -38,9 +40,17 @@ async def lifespan(app: FastAPI):
     await event_command_service.start()
     logger.info("Event command service started")
     
+    logger.info("Starting VEN heartbeat monitor...")
+    await ven_heartbeat_monitor.start()
+    logger.info("VEN heartbeat monitor started")
+    
     yield
     
     # Shutdown
+    logger.info("Stopping VEN heartbeat monitor...")
+    await ven_heartbeat_monitor.stop()
+    logger.info("VEN heartbeat monitor stopped")
+    
     logger.info("Stopping event command service...")
     await event_command_service.stop()
     logger.info("Event command service stopped")

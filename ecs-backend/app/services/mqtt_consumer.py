@@ -305,6 +305,8 @@ class MQTTConsumer:
 
         async with self._session_scope() as session:
             from app import crud
+            from datetime import datetime, timezone
+            
             ven = await crud.get_ven(session, model.ven_id)
             if ven is None:
                 logger.info("Auto-registering new VEN", extra={"ven_id": model.ven_id})
@@ -319,6 +321,13 @@ class MQTTConsumer:
                 except Exception as e:
                     logger.error("Failed to auto-register VEN", extra={"ven_id": model.ven_id, "error": str(e)})
                     return
+            else:
+                # Update heartbeat and status for existing VEN
+                ven.last_heartbeat = datetime.now(timezone.utc)
+                if ven.status != "online":
+                    ven.status = "online"
+                    logger.info(f"VEN {model.ven_id} came back online")
+                await session.commit()
 
         # Use modern field names with fallback to legacy names
         used_power = model.used_power_kw if model.used_power_kw is not None else model.legacy_power_kw

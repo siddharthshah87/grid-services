@@ -362,3 +362,22 @@ curl -X POST http://localhost:8080/api/event/trigger -H "Content-Type: applicati
 
 
 ## Backend DER Event 
+### Create an active DR event (starts immediately, runs for 1 hour)
+curl -X POST "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/events/" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"startTime\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+    \"endTime\": \"$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)\",
+    \"requestedReductionKw\": 5.0,
+    \"status\": \"active\"
+  }"
+
+### Create a scheduled DR event (starts in 5 minutes)
+curl -X POST "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/events/" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"startTime\": \"$(date -u -d '+5 minutes' +%Y-%m-%dT%H:%M:%SZ)\",
+    \"endTime\": \"$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)\",
+    \"requestedReductionKw\": 10.0,
+    \"status\": \"scheduled\"
+  }"

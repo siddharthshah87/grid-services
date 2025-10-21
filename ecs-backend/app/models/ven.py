@@ -14,3 +14,4 @@ class VEN(Base):
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_heartbeat = Column(DateTime(timezone=True), nullable=True)  # Updated when telemetry received
