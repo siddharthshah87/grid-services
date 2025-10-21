@@ -321,5 +321,12 @@ class EventCommandService:
     @asynccontextmanager
     async def _session_scope(self):
         """Create a database session context."""
-        async with self._session_factory() as session:
+        gen = self._session_factory()
+        session = await anext(gen)
+        try:
             yield session
+        finally:
+            try:
+                await anext(gen)
+            except StopAsyncIteration:
+                pass
