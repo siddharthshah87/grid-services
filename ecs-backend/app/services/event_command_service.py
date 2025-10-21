@@ -207,11 +207,16 @@ class EventCommandService:
         # Dispatch command to each VEN
         for ven in vens:
             try:
+                # Ensure both times are timezone-aware for subtraction
+                start_time = event.start_time.replace(tzinfo=UTC) if event.start_time.tzinfo is None else event.start_time
+                end_time = event.end_time.replace(tzinfo=UTC) if event.end_time.tzinfo is None else event.end_time
+                duration_s = int((end_time - start_time).total_seconds())
+                
                 await self._send_shed_panel_command(
                     ven_id=ven.registration_id,
                     event_id=event.event_id,
                     requested_reduction_kw=reduction_per_ven,
-                    duration_s=int((event.end_time - event.start_time).total_seconds()),
+                    duration_s=duration_s,
                 )
                 logger.info(f"Dispatched shedPanel command to VEN {ven.registration_id}")
             except Exception as e:
