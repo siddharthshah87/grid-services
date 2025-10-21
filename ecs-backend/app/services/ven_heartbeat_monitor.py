@@ -97,7 +97,11 @@ class VenHeartbeatMonitor:
 
     async def _check_stale_vens(self) -> None:
         """Check for VENs that haven't sent telemetry recently and mark them offline."""
-        async with self._session_factory() as session:
+        # Get session from async generator
+        gen = self._session_factory()
+        session = await anext(gen)
+        
+        try:
             # Calculate cutoff time
             cutoff_time = datetime.now(UTC) - timedelta(seconds=self._heartbeat_timeout)
             
@@ -144,3 +148,9 @@ class VenHeartbeatMonitor:
                     ven.status = "offline"
                 
                 await session.commit()
+        finally:
+            # Clean up the async generator
+            try:
+                await anext(gen)
+            except StopAsyncIteration:
+                pass
