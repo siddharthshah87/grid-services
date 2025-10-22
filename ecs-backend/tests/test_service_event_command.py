@@ -1,38 +1,12 @@
 """Tests for event command service."""
 import pytest
+import pytest_asyncio
 import asyncio
 from datetime import datetime, timedelta, UTC
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.models import Base
 from app.services.event_command_service import EventCommandService, EventCommandServiceError
 from app.core.config import Settings
-
-
-@pytest.fixture
-async def test_engine():
-    """Create in-memory test database engine."""
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    await engine.dispose()
-
-
-@pytest.fixture
-async def test_session(test_engine):
-    """Create test database session."""
-    async_session = async_sessionmaker(
-        test_engine, class_=AsyncSession, expire_on_commit=False
-    )
-    async with async_session() as session:
-        yield session
 
 
 @pytest.fixture
@@ -45,7 +19,7 @@ def mock_config():
     return config
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def session_factory(test_session):
     """Create session factory for service."""
     async def _factory():

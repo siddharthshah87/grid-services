@@ -1,50 +1,8 @@
 """Tests for VEN router endpoints."""
 import pytest
 from datetime import datetime, timedelta, UTC
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from app.main import app
-from app.models import Base
-from app.dependencies import get_session
-
-
-@pytest.fixture
-async def test_engine():
-    """Create in-memory test database engine."""
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    await engine.dispose()
-
-
-@pytest.fixture
-async def test_session(test_engine):
-    """Create test database session."""
-    async_session = async_sessionmaker(
-        test_engine, class_=AsyncSession, expire_on_commit=False
-    )
-    async with async_session() as session:
-        yield session
-
-
-@pytest.fixture
-async def client(test_session):
-    """Create test HTTP client with database override."""
-    async def override_get_session():
-        yield test_session
-    
-    app.dependency_overrides[get_session] = override_get_session
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-    app.dependency_overrides.clear()
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.mark.asyncio
@@ -237,7 +195,7 @@ async def test_list_ven_loads_empty(client: AsyncClient):
 async def test_list_ven_loads_with_telemetry(client: AsyncClient, test_session: AsyncSession):
     """Test listing loads for a VEN with telemetry data."""
     from app import crud
-    from app.models.telemetry import VenTelemetry, LoadSample
+    from app.models.telemetry import VenTelemetry, VenLoadSample
     
     # Create VEN
     ven = await crud.create_ven(
@@ -261,7 +219,7 @@ async def test_list_ven_loads_with_telemetry(client: AsyncClient, test_session: 
     test_session.add(telemetry)
     await test_session.flush()
     
-    load = LoadSample(
+    load = VenLoadSample(
         telemetry_id=telemetry.id,
         load_id="load-1",
         name="HVAC",
@@ -287,7 +245,7 @@ async def test_list_ven_loads_with_telemetry(client: AsyncClient, test_session: 
 async def test_get_ven_load(client: AsyncClient, test_session: AsyncSession):
     """Test getting a specific load for a VEN."""
     from app import crud
-    from app.models.telemetry import VenTelemetry, LoadSample
+    from app.models.telemetry import VenTelemetry, VenLoadSample
     
     # Create VEN
     ven = await crud.create_ven(
@@ -311,7 +269,7 @@ async def test_get_ven_load(client: AsyncClient, test_session: AsyncSession):
     test_session.add(telemetry)
     await test_session.flush()
     
-    load = LoadSample(
+    load = VenLoadSample(
         telemetry_id=telemetry.id,
         load_id="specific-load",
         name="EV Charger",
