@@ -910,6 +910,11 @@ HTML_TEMPLATE = """
         // Auto-refresh every 2 seconds
         setInterval(fetchState, 2000);
         fetchState();
+        
+        // Auto-refresh event history every 10 seconds
+        setInterval(fetchEventHistory, 10000);
+        // Fetch event history on initial page load
+        fetchEventHistory();
     </script>
 </body>
 </html>
