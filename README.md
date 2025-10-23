@@ -381,3 +381,10 @@ curl -X POST "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/event
     \"requestedReductionKw\": 10.0,
     \"status\": \"scheduled\"
   }"
+
+### Example: Get VEN Event History
+
+```bash
+curl -X GET "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/events"
+```
+
