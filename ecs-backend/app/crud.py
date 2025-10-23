@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.event import Event
 from app.models.telemetry import VenStatus, VenTelemetry
 from app.models.ven import VEN
+from app.models.ven_ack import VenAck
 
 
 # ---------------------------------------------------------------------------
@@ -223,3 +224,29 @@ async def telemetry_for_ven(
 async def delete_telemetry_for_event(session: AsyncSession, event_id: str) -> None:
     await session.execute(delete(VenTelemetry).where(VenTelemetry.event_id == event_id))
     await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# VEN Ack helpers
+
+
+async def get_ven_acks(
+    session: AsyncSession,
+    ven_id: str,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    limit: int = 100,
+) -> list[VenAck]:
+    """Return acknowledgments for a VEN, optionally filtered by time range."""
+    
+    stmt = (
+        select(VenAck)
+        .where(VenAck.ven_id == ven_id)
+    )
+    if start is not None:
+        stmt = stmt.where(VenAck.timestamp >= start)
+    if end is not None:
+        stmt = stmt.where(VenAck.timestamp <= end)
+    stmt = stmt.order_by(VenAck.timestamp.desc()).limit(limit)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())

@@ -124,3 +124,28 @@ class EventWithMetrics(Event):
     currentReductionKw: Optional[float] = None
     vensResponding: Optional[int] = None
     avgResponseMs: Optional[int] = None
+
+
+class CircuitCurtailment(BaseModel):
+    """Details about a specific circuit that was curtailed."""
+    id: str
+    name: str
+    breaker_amps: int
+    original_kw: float
+    curtailed_kw: float
+    final_kw: float
+    critical: bool
+
+
+class VenEventAck(BaseModel):
+    """VEN acknowledgment of a DR event."""
+    id: int
+    venId: str
+    eventId: str
+    correlationId: Optional[str] = None
+    op: str
+    status: str
+    timestamp: datetime
+    requestedShedKw: Optional[float] = None
+    actualShedKw: Optional[float] = None
+    circuitsCurtailed: Optional[list[CircuitCurtailment]] = None

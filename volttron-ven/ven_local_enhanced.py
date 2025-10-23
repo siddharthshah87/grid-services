@@ -24,6 +24,7 @@ mqtt_logger.setLevel(logging.DEBUG)
 
 # Environment variables
 IOT_ENDPOINT = os.getenv("IOT_ENDPOINT", "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend-alb-948465488.us-west-2.elb.amazonaws.com")
 
 # Use IOT_THING_NAME if provided (for consistent identity), otherwise use CLIENT_ID
 # This ensures VEN has same ID across restarts when IOT_THING_NAME is set
@@ -846,6 +847,64 @@ HTML_TEMPLATE = """
             document.getElementById('der-tab').style.display = tab === 'der' ? 'block' : 'none';
             document.getElementById('tab-overview').className = tab === 'overview' ? 'btn btn-primary' : 'btn';
             document.getElementById('tab-der').className = tab === 'der' ? 'btn btn-primary' : 'btn';
+            
+            // Fetch event history when switching to DER tab
+            if (tab === 'der') {
+                fetchEventHistory();
+            }
+        }
+        
+        function fetchEventHistory() {
+            fetch('/api/events')
+                .then(r => r.json())
+                .then(events => {
+                    const historyDiv = document.getElementById('event-history');
+                    if (!events || events.length === 0) {
+                        historyDiv.innerHTML = '<p style="color:#94a3b8">No events yet</p>';
+                        return;
+                    }
+                    
+                    // Sort events by timestamp descending (newest first)
+                    events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    
+                    const eventsHtml = events.map(evt => {
+                        const timestamp = new Date(evt.timestamp).toLocaleString();
+                        const statusColor = evt.status === 'accepted' ? '#22c55e' : '#f59e0b';
+                        const circuitsCount = evt.circuitsCurtailed ? evt.circuitsCurtailed.length : 0;
+                        
+                        let circuitsHtml = '';
+                        if (evt.circuitsCurtailed && evt.circuitsCurtailed.length > 0) {
+                            circuitsHtml = '<div style="margin-top:8px; padding:8px; background:#0f172a; border-radius:4px; font-size:11px;">' +
+                                evt.circuitsCurtailed.map(c => 
+                                    `<div>${c.name}: ${c.curtailed_kw.toFixed(2)} kW (${c.original_kw.toFixed(2)} → ${c.final_kw.toFixed(2)} kW)</div>`
+                                ).join('') +
+                                '</div>';
+                        }
+                        
+                        return `
+                            <div style="background:#0f172a; padding:12px; border-radius:6px; margin-bottom:10px; border-left:3px solid ${statusColor}">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                                    <strong style="font-size:13px;">${evt.eventId}</strong>
+                                    <span style="color:${statusColor}; font-size:12px; font-weight:600;">${evt.status.toUpperCase()}</span>
+                                </div>
+                                <div style="font-size:12px; color:#94a3b8; margin-bottom:4px;">${timestamp}</div>
+                                <div style="font-size:12px;">
+                                    Requested: <strong>${evt.requestedShedKw ? evt.requestedShedKw.toFixed(2) : 'N/A'} kW</strong> | 
+                                    Actual: <strong style="color:#22c55e">${evt.actualShedKw ? evt.actualShedKw.toFixed(2) : 'N/A'} kW</strong> | 
+                                    Circuits: <strong>${circuitsCount}</strong>
+                                </div>
+                                ${circuitsHtml}
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    historyDiv.innerHTML = eventsHtml;
+                })
+                .catch(err => {
+                    console.error('Error fetching event history:', err);
+                    document.getElementById('event-history').innerHTML = 
+                        '<p style="color:#ef4444">Error loading event history</p>';
+                });
         }
         
         // Auto-refresh every 2 seconds
@@ -864,6 +923,28 @@ def index():
 def api_state():
     with state_lock:
         return jsonify(ven_state)
+
+@app.route('/api/events')
+def api_events():
+    """Fetch DR event history from backend API."""
+    try:
+        # Call backend API to get events for this VEN
+        url = f"{BACKEND_URL}/api/vens/{CLIENT_ID}/events"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        elif response.status_code == 404:
+            # VEN not found in backend, return empty list
+            return jsonify([])
+        else:
+            print(f"❌ Error fetching events from backend: {response.status_code}")
+            return jsonify({"error": f"Backend returned {response.status_code}"}), 500
+    except Exception as e:
+        print(f"❌ Error fetching events: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/circuit/toggle', methods=['POST'])
 def api_toggle_circuit():
