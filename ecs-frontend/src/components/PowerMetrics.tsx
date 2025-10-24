@@ -102,7 +102,7 @@ export const PowerMetrics = ({ networkStats }: PowerMetricsProps) => {
       </Card>
 
       {/* Grid Impact */}
-      <Card>
+      {/* <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <Zap className="h-4 w-4 text-warning" />
@@ -141,7 +141,7 @@ export const PowerMetrics = ({ networkStats }: PowerMetricsProps) => {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 };
