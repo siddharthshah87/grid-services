@@ -406,3 +406,16 @@ Get last 5 minutes of specific circuit usage:
 curl -X GET "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?load_id=heater1&start=$(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%SZ)"
 ```
 
+### Circuit History API
+Get historical power usage data for individual circuits/loads:
+
+```bash
+# Get last 10 circuit snapshots for volttron_thing
+curl -s "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?limit=10" | jq '.'
+
+# Get specific circuit history
+curl -s "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?load_id=hvac1&limit=20" | jq '.'
+
+# Get history within time range (ISO 8601 timestamps)
+curl -s "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?start=2025-10-23T00:00:00Z&end=2025-10-24T00:00:00Z" | jq '.'
+```

@@ -91,6 +91,31 @@ The VEN uses consistent identity via `IOT_THING_NAME`:
 ./scripts/ven_control.sh stop
 ```
 
+### Circuit History API
+Get historical power usage data for individual circuits/loads:
+
+```bash
+# Get last 10 circuit snapshots for volttron_thing
+curl -s "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?limit=10" | jq '.'
+
+# Get specific circuit history
+curl -s "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?load_id=hvac1&limit=20" | jq '.'
+
+# Get history within time range (ISO 8601 timestamps)
+curl -s "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?start=2025-10-23T00:00:00Z&end=2025-10-24T00:00:00Z" | jq '.'
+```
+
+**Response includes:**
+- `timestamp`: When the snapshot was taken
+- `loadId`: Circuit identifier (hvac1, heater1, ev1, etc.)
+- `name`: Human-readable name
+- `type`: Circuit type (hvac, heater, ev, etc.)
+- `capacityKw`: Maximum circuit capacity
+- `currentPowerKw`: Current power draw
+- `shedCapabilityKw`: How much power can be shed (0 for critical loads)
+- `enabled`: Whether circuit is enabled
+- `priority`: Load priority (1=critical, 5=flexible)
+
 **Expected Results:**
 - VEN connects within 30 seconds
 - Event command received within 2 seconds
@@ -99,6 +124,7 @@ The VEN uses consistent identity via `IOT_THING_NAME`:
 - Shadow shows active event and reduced power
 - Telemetry includes event marker
 - Restore command returns loads to normal
+- Circuit history updated every 5 seconds
 
 ## Documentation
 

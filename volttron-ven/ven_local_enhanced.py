@@ -721,11 +721,27 @@ HTML_TEMPLATE = """
                         <p style="color:#94a3b8">No events yet</p>
                     </div>
                 </div>
+                <div class="card">
+                    <h2>📊 Circuit History (Last 60s)</h2>
+                    <div style="margin-bottom: 15px;">
+                        <label for="circuit-select" style="color: #94a3b8; font-size: 13px;">Select Circuit:</label>
+                        <select id="circuit-select" onchange="fetchCircuitHistory()" style="width: 100%; padding: 8px; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px; margin-top: 5px;">
+                            <option value="">All Circuits</option>
+                        </select>
+                    </div>
+                    <canvas id="circuit-chart" style="max-height: 300px;"></canvas>
+                    <div id="circuit-history-stats" style="margin-top: 15px; padding: 10px; background: #0f172a; border-radius: 6px; font-size: 13px; color: #94a3b8;">
+                        <p>Loading circuit data...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
+        let circuitChart = null;
+        
         function fetchState() {
             fetch('/api/state')
                 .then(r => r.json())
@@ -888,9 +904,10 @@ HTML_TEMPLATE = """
             document.getElementById('tab-overview').className = tab === 'overview' ? 'btn btn-primary' : 'btn';
             document.getElementById('tab-der').className = tab === 'der' ? 'btn btn-primary' : 'btn';
             
-            // Fetch event history when switching to DER tab
+            // Fetch event and circuit history when switching to DER tab
             if (tab === 'der') {
                 fetchEventHistory();
+                fetchCircuitHistory();
             }
         }
         
@@ -958,6 +975,153 @@ HTML_TEMPLATE = """
                 });
         }
         
+        function fetchCircuitHistory() {
+            console.log('Fetching circuit history...');
+            const loadId = document.getElementById('circuit-select').value;
+            const statsDiv = document.getElementById('circuit-history-stats');
+            
+            // Build URL with query params
+            let url = '/api/circuit-history?limit=12'; // Last 60s at 5s intervals
+            if (loadId) {
+                url += `&load_id=${loadId}`;
+            }
+            
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    console.log('Received circuit history:', data);
+                    
+                    if (!data.snapshots || data.snapshots.length === 0) {
+                        statsDiv.innerHTML = '<p>No circuit data available yet</p>';
+                        if (circuitChart) {
+                            circuitChart.destroy();
+                            circuitChart = null;
+                        }
+                        return;
+                    }
+                    
+                    // Group by loadId and extract time series
+                    const circuitData = {};
+                    data.snapshots.forEach(snap => {
+                        if (!circuitData[snap.loadId]) {
+                            circuitData[snap.loadId] = {
+                                name: snap.name || snap.loadId,
+                                type: snap.type,
+                                data: [],
+                                timestamps: []
+                            };
+                        }
+                        circuitData[snap.loadId].data.push(snap.currentPowerKw);
+                        circuitData[snap.loadId].timestamps.push(new Date(snap.timestamp));
+                    });
+                    
+                    // Create datasets for chart
+                    const colors = [
+                        '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', 
+                        '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'
+                    ];
+                    
+                    const datasets = Object.entries(circuitData).map(([loadId, circuit], idx) => ({
+                        label: circuit.name,
+                        data: circuit.data,
+                        borderColor: colors[idx % colors.length],
+                        backgroundColor: colors[idx % colors.length] + '20',
+                        tension: 0.4,
+                        fill: true
+                    }));
+                    
+                    // Get timestamps (use first circuit's timestamps)
+                    const timestamps = Object.values(circuitData)[0].timestamps.map(t => 
+                        t.toLocaleTimeString('en-US', { hour12: false })
+                    );
+                    
+                    // Create or update chart
+                    const ctx = document.getElementById('circuit-chart').getContext('2d');
+                    
+                    if (circuitChart) {
+                        circuitChart.destroy();
+                    }
+                    
+                    circuitChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: timestamps,
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            plugins: {
+                                legend: {
+                                    labels: {
+                                        color: '#e2e8f0',
+                                        font: { size: 11 }
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: '#0f172a',
+                                    titleColor: '#e2e8f0',
+                                    bodyColor: '#e2e8f0',
+                                    borderColor: '#334155',
+                                    borderWidth: 1
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: { 
+                                        color: '#94a3b8',
+                                        maxRotation: 45,
+                                        minRotation: 45
+                                    },
+                                    grid: { color: '#1e293b' }
+                                },
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { 
+                                        color: '#94a3b8',
+                                        callback: function(value) {
+                                            return value.toFixed(2) + ' kW';
+                                        }
+                                    },
+                                    grid: { color: '#1e293b' }
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Update stats
+                    const latest = data.snapshots[0];
+                    const totalCircuits = Object.keys(circuitData).length;
+                    const totalPower = Object.values(circuitData).reduce((sum, c) => sum + c.data[c.data.length - 1], 0);
+                    
+                    statsDiv.innerHTML = `
+                        <div><strong>Total Circuits:</strong> ${totalCircuits}</div>
+                        <div><strong>Current Total Power:</strong> ${totalPower.toFixed(2)} kW</div>
+                        <div><strong>Data Points:</strong> ${data.totalCount}</div>
+                        <div><strong>Latest:</strong> ${new Date(latest.timestamp).toLocaleString()}</div>
+                    `;
+                    
+                    // Populate circuit selector if empty
+                    const selector = document.getElementById('circuit-select');
+                    if (selector.options.length === 1) { // Only has "All Circuits"
+                        Object.entries(circuitData).forEach(([loadId, circuit]) => {
+                            const option = document.createElement('option');
+                            option.value = loadId;
+                            option.textContent = `${circuit.name} (${circuit.type})`;
+                            selector.appendChild(option);
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching circuit history:', err);
+                    statsDiv.innerHTML = `<p style="color:#ef4444">Error: ${err.message}</p>`;
+                });
+        }
+        
         // Auto-refresh every 2 seconds
         setInterval(fetchState, 2000);
         fetchState();
@@ -966,6 +1130,11 @@ HTML_TEMPLATE = """
         setInterval(fetchEventHistory, 10000);
         // Fetch event history on initial page load
         fetchEventHistory();
+        
+        // Auto-refresh circuit history every 10 seconds
+        setInterval(fetchCircuitHistory, 10000);
+        // Fetch circuit history on initial page load
+        fetchCircuitHistory();
     </script>
 </body>
 </html>
@@ -1002,6 +1171,38 @@ def api_events():
             return jsonify({"error": f"Backend returned {response.status_code}"}), 500
     except Exception as e:
         print(f"❌ Error fetching events: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/circuit-history')
+def api_circuit_history():
+    """Fetch circuit history from backend API."""
+    try:
+        # Build query params
+        params = {
+            'limit': request.args.get('limit', '20')
+        }
+        if request.args.get('load_id'):
+            params['load_id'] = request.args.get('load_id')
+        if request.args.get('start'):
+            params['start'] = request.args.get('start')
+        if request.args.get('end'):
+            params['end'] = request.args.get('end')
+        
+        # Call backend API
+        url = f"{BACKEND_URL}/api/vens/{CLIENT_ID}/circuits/history"
+        response = requests.get(url, params=params, timeout=5)
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        elif response.status_code == 404:
+            return jsonify({"snapshots": [], "totalCount": 0})
+        else:
+            print(f"❌ Error fetching circuit history: {response.status_code}")
+            return jsonify({"error": f"Backend returned {response.status_code}"}), 500
+    except Exception as e:
+        print(f"❌ Error fetching circuit history: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
