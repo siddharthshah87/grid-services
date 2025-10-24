@@ -4,9 +4,6 @@ WORKDIR /app
 COPY package.json bun.lockb ./
 RUN npm install
 COPY . .
-ARG BACKEND_API_URL
-ENV VITE_BACKEND_API_URL=$BACKEND_API_URL \
-    VITE_API_BASE_URL=$BACKEND_API_URL
 RUN npm run build
 
 # Run stage

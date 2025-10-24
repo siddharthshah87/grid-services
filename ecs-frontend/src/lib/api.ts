@@ -1,21 +1,15 @@
-// Use same-origin base and rely on Nginx to proxy /api to backend (avoids mixed content)
-export const API_BASE: string = "";
+// Default to backend ALB, but allow override via VITE_API_BASE_URL environment variable
+// For local development, set VITE_API_BASE_URL=http://localhost:8000 in .env file
+const DEFAULT_BACKEND_URL = "http://backend-alb-948465488.us-west-2.elb.amazonaws.com";
+export const API_BASE: string = import.meta.env.VITE_API_BASE_URL || DEFAULT_BACKEND_URL;
 
 // Debug: print which backend URL the frontend resolved
-try {
-  const rawBack = undefined as any;
-  const rawAlt = undefined as any;
-  if (typeof window !== "undefined") {
-    // eslint-disable-next-line no-console
-    console.info("[Frontend] Using same-origin API base with Nginx /api proxy");
-    // eslint-disable-next-line no-console
-    console.info("[Frontend] VITE_API_BASE_URL:", rawAlt);
-    // eslint-disable-next-line no-console
-    console.info("[Frontend] API_BASE (resolved):", API_BASE);
-    // Expose for quick checks in dev tools
-    (window as any).__API_BASE__ = API_BASE;
-  }
-} catch {}
+if (typeof window !== "undefined") {
+  // eslint-disable-next-line no-console
+  console.info("[Frontend] API_BASE:", API_BASE);
+  // Expose for quick checks in dev tools
+  (window as any).__API_BASE__ = API_BASE;
+}
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
