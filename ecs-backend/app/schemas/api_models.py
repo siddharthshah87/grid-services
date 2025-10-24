@@ -149,3 +149,24 @@ class VenEventAck(BaseModel):
     requestedShedKw: Optional[float] = None
     actualShedKw: Optional[float] = None
     circuitsCurtailed: Optional[list[CircuitCurtailment]] = None
+
+
+class CircuitSnapshot(BaseModel):
+    """Historical snapshot of a circuit/load at a specific time."""
+    timestamp: datetime
+    loadId: str
+    name: Optional[str] = None
+    type: Optional[str] = None
+    capacityKw: Optional[float] = None
+    currentPowerKw: Optional[float] = None
+    shedCapabilityKw: Optional[float] = None
+    enabled: Optional[bool] = None
+    priority: Optional[int] = None
+
+
+class CircuitHistoryResponse(BaseModel):
+    """Time-series data for one or more circuits."""
+    venId: str
+    loadId: Optional[str] = None  # If querying single circuit
+    snapshots: list[CircuitSnapshot]
+    totalCount: int

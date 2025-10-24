@@ -39,6 +39,7 @@ PRIVATE_KEY = os.getenv("PRIVATE_KEY", "./certs/client.key")
 # This is the main topic the backend MQTT consumer processes for telemetry
 TELEMETRY_TOPIC = os.getenv("TELEMETRY_TOPIC", f"ven/telemetry/{CLIENT_ID}")  # Legacy, for monitoring
 METERING_TOPIC = os.getenv("METERING_TOPIC", "volttron/metering")  # Backend topic (IoT Rule forwards this)
+LOADS_TOPIC = os.getenv("LOADS_TOPIC", f"ven/loads/{CLIENT_ID}")  # Load snapshots for circuit history
 CMD_TOPIC = os.getenv("CMD_TOPIC", f"ven/cmd/{CLIENT_ID}")
 ACK_TOPIC = os.getenv("ACK_TOPIC", f"ven/ack/{CLIENT_ID}")
 WEB_PORT = int(os.getenv("WEB_PORT", "8080"))
@@ -283,7 +284,7 @@ def publish_shadow_update():
                 "panel_amperage": ven_state["panel_amperage"],
                 "panel_voltage": ven_state["panel_voltage"],
                 "panel_max_kw": ven_state["panel_max_kw"],
-                "circuits": [
+                "loads": [
                     {
                         "id": c["id"],
                         "name": c["name"],
@@ -317,19 +318,56 @@ def publish_shadow_update():
         import traceback
         traceback.print_exc()
 
+def publish_load_snapshot():
+    """Publish load snapshot for circuit history tracking"""
+    try:
+        with state_lock:
+            circuits = ven_state["circuits"]
+            
+        loads = [
+            {
+                "loadId": c["id"],
+                "name": c["name"],
+                "type": c.get("type", "circuit"),
+                "capacityKw": c["breaker_amps"] * PANEL_VOLTAGE / 1000,
+                "currentPowerKw": c["current_kw"],
+                "shedCapabilityKw": c["shed_capability_kw"],
+                "enabled": c["enabled"],
+                "priority": c.get("priority", 5),
+            }
+            for c in circuits
+        ]
+        
+        snapshot = {
+            "schemaVersion": "1.0",
+            "venId": CLIENT_ID,
+            "timestamp": int(time.time()),
+            "loads": loads,
+        }
+        
+        result = mqtt_client.publish(LOADS_TOPIC, json.dumps(snapshot), qos=1)
+        if result.rc == mqtt.MQTT_ERR_SUCCESS:
+            print(f"📊 Load snapshot published: {len(loads)} circuits")
+        else:
+            print(f"⚠️ Load snapshot publish failed with rc={result.rc}")
+    except Exception as e:
+        print(f"❌ Load snapshot publish failed: {e}")
+        import traceback
+        traceback.print_exc()
+
 def handle_shadow_delta(payload):
     """Handle shadow delta (desired vs reported state difference)"""
     try:
         state = payload.get("state", {})
         
-        # Handle circuit enable/disable from shadow desired state
-        if "circuits" in state:
+        # Handle load enable/disable from shadow desired state
+        if "loads" in state:
             with state_lock:
-                for desired_circuit in state["circuits"]:
-                    circuit_id = desired_circuit.get("id")
-                    circuit = next((c for c in circuits if c["id"] == circuit_id), None)
-                    if circuit and "enabled" in desired_circuit:
-                        circuit["enabled"] = desired_circuit["enabled"]
+                for desired_load in state["loads"]:
+                    load_id = desired_load.get("id")
+                    circuit = next((c for c in circuits if c["id"] == load_id), None)
+                    if circuit and "enabled" in desired_load:
+                        circuit["enabled"] = desired_load["enabled"]
                         print(f"🔄 Circuit {circuit['name']} {'enabled' if circuit['enabled'] else 'disabled'} via shadow")
             
             # Recalculate power based on enabled circuits
@@ -1169,18 +1207,19 @@ def telemetry_loop():
                     "panelMaxKw": ven_state["panel_max_kw"],
                     "currentAmps": current_amps,
                     "panelUtilizationPercent": panel_utilization,
-                    # Circuit details with breaker info
-                    "circuits": [
+                    # Loads array - standardized OpenADR format for all systems
+                    "loads": [
                         {
-                            "id": c["id"],
+                            "loadId": c["id"],
                             "name": c["name"],
-                            "breakerAmps": c["breaker_amps"],
-                            "currentKw": c["current_kw"],
-                            "currentAmps": round((c["current_kw"] * 1000) / PANEL_VOLTAGE, 2),
+                            "type": c.get("type", "circuit"),
+                            "capacityKw": c.get("capacity_kw", c["breaker_amps"] * PANEL_VOLTAGE / 1000),
+                            "currentPowerKw": c["current_kw"],
+                            "shedCapabilityKw": c["current_kw"] if not c["critical"] else 0.0,
                             "enabled": c["enabled"],
-                            "critical": c["critical"]
+                            "priority": 1 if c["critical"] else 5
                         }
-                        for c in circuits if c.get("enabled", False)
+                        for c in circuits
                     ],
                     # Legacy fields for backward compatibility
                     "power_kw": ven_state["current_power_kw"],
@@ -1201,9 +1240,10 @@ def telemetry_loop():
                     print(f"✓ [{ven_state['message_count']}] Telemetry: {ven_state['current_power_kw']:.2f} kW "
                           f"(shed: {ven_state['shed_kw']:.2f} kW){event_marker}")
                 
-                # Update shadow every 30 seconds
+                # Update shadow and load snapshots every 30 seconds
                 if ven_state["message_count"] % 6 == 0:
                     publish_shadow_update()
+                    publish_load_snapshot()
             else:
                 print("⚠️  Not connected, waiting...")
             

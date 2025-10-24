@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.event import Event
-from app.models.telemetry import VenStatus, VenTelemetry
+from app.models.telemetry import LoadSnapshot, VenLoadSample, VenStatus, VenTelemetry
 from app.models.ven import VEN
 from app.models.ven_ack import VenAck
 
@@ -250,3 +250,40 @@ async def get_ven_acks(
     stmt = stmt.order_by(VenAck.timestamp.desc()).limit(limit)
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+# ---------------------------------------------------------------------------
+# Load Snapshot helpers
+
+
+async def get_load_snapshots(
+    session: AsyncSession,
+    ven_id: str,
+    load_id: str | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    limit: int = 1000,
+) -> list[tuple[VenLoadSample, datetime]]:
+    """
+    Get historical load/circuit snapshots for a VEN from VenLoadSample table.
+    
+    Returns time-series data for circuit power usage by joining VenLoadSample
+    with VenTelemetry to get timestamps. Optionally filter by specific load_id
+    (circuit) and time range.
+    
+    Returns list of (VenLoadSample, timestamp) tuples.
+    """
+    stmt = (
+        select(VenLoadSample, VenTelemetry.timestamp)
+        .join(VenTelemetry, VenLoadSample.telemetry_id == VenTelemetry.id)
+        .where(VenTelemetry.ven_id == ven_id)
+    )
+    if load_id is not None:
+        stmt = stmt.where(VenLoadSample.load_id == load_id)
+    if start is not None:
+        stmt = stmt.where(VenTelemetry.timestamp >= start)
+    if end is not None:
+        stmt = stmt.where(VenTelemetry.timestamp <= end)
+    stmt = stmt.order_by(VenTelemetry.timestamp.desc()).limit(limit)
+    result = await session.execute(stmt)
+    return list(result.all())
