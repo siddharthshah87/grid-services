@@ -626,6 +626,11 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
             </div>
+            
+            <div class="card">
+                <h2>🔌 Circuits</h2>
+                <div id="circuits-list"></div>
+            </div>
         </div>
 
         <!-- DER Tab -->
@@ -678,11 +683,6 @@ HTML_TEMPLATE = """
                         <p style="color:#94a3b8">No events yet</p>
                     </div>
                 </div>
-            </div>
-            
-            <div class="card">
-                <h2>🔌 Circuits</h2>
-                <div id="circuits-list"></div>
             </div>
         </div>
     </div>
