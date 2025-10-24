@@ -331,7 +331,7 @@ def publish_load_snapshot():
                 "type": c.get("type", "circuit"),
                 "capacityKw": c["breaker_amps"] * PANEL_VOLTAGE / 1000,
                 "currentPowerKw": c["current_kw"],
-                "shedCapabilityKw": c["shed_capability_kw"],
+                "shedCapabilityKw": c["current_kw"] if not c.get("critical", False) else 0.0,
                 "enabled": c["enabled"],
                 "priority": c.get("priority", 5),
             }
