@@ -1,11 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { apiGet } from '@/lib/api';
 import { useState } from 'react';
-import type { Ven } from '@/hooks/useApi';
 import {
   MapPin, 
   Zap, 
@@ -15,22 +11,16 @@ import {
   Activity
 } from 'lucide-react';
 import { useVenSummary } from '@/hooks/useApi';
+import { VenDetailDialog } from './VenDetailDialog';
 
 export const VenList = () => {
   const { data: vens, isLoading } = useVenSummary();
-  const [open, setOpen] = useState(false);
-  const [detail, setDetail] = useState<Ven | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [selectedVenId, setSelectedVenId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
-  const handleDetails = async (id: string) => {
-    try {
-      setLoadingDetail(true);
-      const ven = await apiGet<Ven>(`/api/vens/${id}`);
-      setDetail(ven);
-      setOpen(true);
-    } finally {
-      setLoadingDetail(false);
-    }
+  const handleDetails = (id: string) => {
+    setSelectedVenId(id);
+    setDetailOpen(true);
   };
 
   const getStatusIcon = (status: string) => {
@@ -61,7 +51,7 @@ export const VenList = () => {
   };
 
   return (
-    <ScrollArea className="h-[500px]">
+    <>
       <div className="p-4 space-y-3">
         {(vens || []).map((ven) => (
           <Card key={ven.id} className="transition-all duration-200 hover:shadow-energy border-l-4 border-l-primary/30">
@@ -137,46 +127,15 @@ export const VenList = () => {
           <div className="p-4 text-sm text-muted-foreground">Loading VENs…</div>
         )}
       </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>VEN Details</DialogTitle>
-            <DialogDescription>Full information for the selected VEN</DialogDescription>
-          </DialogHeader>
-          {loadingDetail && <div className="text-sm text-muted-foreground">Loading…</div>}
-          {detail && (
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-2">
-                <div><span className="text-muted-foreground">Name</span><div className="font-medium">{detail.name}</div></div>
-                <div><span className="text-muted-foreground">ID</span><div className="font-medium">{detail.id}</div></div>
-                <div><span className="text-muted-foreground">Status</span><div className="font-medium capitalize">{detail.status}</div></div>
-                <div><span className="text-muted-foreground">Location</span><div className="font-medium">{detail.location.lat.toFixed(4)}, {detail.location.lon.toFixed(4)}</div></div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div><span className="text-muted-foreground">Current Power</span><div className="font-medium">{detail.metrics.currentPowerKw.toFixed(1)} kW</div></div>
-                <div><span className="text-muted-foreground">Controllable</span><div className="font-medium">{detail.metrics.shedAvailabilityKw.toFixed(1)} kW</div></div>
-              </div>
-              <div className="pt-2 border-t">
-                <div className="font-semibold mb-2">Loads</div>
-                <div className="space-y-1">
-                  {(detail.loads || []).map(l => (
-                    <div key={l.id} className="grid grid-cols-5 gap-2 text-xs bg-muted/20 p-2 rounded">
-                      <div className="font-medium">{l.type}</div>
-                      <div><span className="text-muted-foreground">Cap</span> {l.capacityKw} kW</div>
-                      <div><span className="text-muted-foreground">Shed</span> {l.shedCapabilityKw} kW</div>
-                      <div><span className="text-muted-foreground">Now</span> {l.currentPowerKw} kW</div>
-                      <div className="truncate">{l.name || ''}</div>
-                    </div>
-                  ))}
-                  {(detail.loads || []).length === 0 && (
-                    <div className="text-muted-foreground text-xs">No loads available</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </ScrollArea>
+      
+      <VenDetailDialog 
+        venId={selectedVenId}
+        open={detailOpen}
+        onOpenChange={(open) => {
+          setDetailOpen(open);
+          if (!open) setSelectedVenId(null);
+        }}
+      />
+    </>
   );
 };

@@ -122,3 +122,74 @@ export function useStopEvent() {
     },
   });
 }
+
+// VEN Details
+export interface CircuitHistory {
+  timestamp: string;
+  loadId: string;
+  currentPowerKw: number;
+  shedCapabilityKw: number;
+  enabled: boolean;
+}
+
+export interface VenEventAck {
+  eventId: string;
+  venId: string;
+  timestamp: string;
+  status: string;
+  circuits: Array<{
+    loadId: string;
+    curtailedKw: number;
+  }>;
+}
+
+export function useVenDetail(venId: string | null) {
+  return useQuery({
+    queryKey: ["ven", venId],
+    queryFn: () => apiGet<Ven>(`/api/vens/${venId}`),
+    enabled: !!venId,
+    refetchInterval: 10000,
+  });
+}
+
+export function useVenCircuitHistory(venId: string | null, params?: { loadId?: string; start?: string; end?: string; limit?: number }) {
+  const qp: string[] = [];
+  if (params?.loadId) qp.push(`load_id=${encodeURIComponent(params.loadId)}`);
+  if (params?.start) qp.push(`start=${encodeURIComponent(params.start)}`);
+  if (params?.end) qp.push(`end=${encodeURIComponent(params.end)}`);
+  if (params?.limit) qp.push(`limit=${params.limit}`);
+  const qs = qp.length ? `?${qp.join("&")}` : "";
+  
+  return useQuery({
+    queryKey: ["venCircuitHistory", venId, params],
+    queryFn: () => apiGet<CircuitHistory[]>(`/api/vens/${venId}/circuits/history${qs}`),
+    enabled: !!venId,
+  });
+}
+
+export function useVenEventHistory(venId: string | null) {
+  return useQuery({
+    queryKey: ["venEventHistory", venId],
+    queryFn: () => apiGet<VenEventAck[]>(`/api/vens/${venId}/events`),
+    enabled: !!venId,
+  });
+}
+
+// Event Details
+export interface EventDetail extends Event {
+  vens?: Array<{
+    venId: string;
+    venName: string;
+    shedKw: number;
+    status: string;
+  }>;
+}
+
+export function useEventDetail(eventId: string | null) {
+  return useQuery({
+    queryKey: ["event", eventId],
+    queryFn: () => apiGet<EventDetail>(`/api/events/${eventId}`),
+    enabled: !!eventId,
+    refetchInterval: 10000,
+  });
+}

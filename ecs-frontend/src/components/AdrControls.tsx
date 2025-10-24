@@ -18,7 +18,7 @@ import {
   Target
 } from 'lucide-react';
 import { useCreateEvent, useCurrentEvent, useStopEvent, useEventsHistory, Event } from '@/hooks/useApi';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { EventDetailDialog } from './EventDetailDialog';
 
 export const AdrControls = () => {
   const { toast } = useToast();
@@ -30,12 +30,12 @@ export const AdrControls = () => {
   const createEvent = useCreateEvent();
   const stopEvent = useStopEvent();
   const { data: eventsHistory } = useEventsHistory();
-  const [eventModalOpen, setEventModalOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [eventDetailOpen, setEventDetailOpen] = useState(false);
 
-  const openEventModal = (evt: Event) => {
-    setSelectedEvent(evt);
-    setEventModalOpen(true);
+  const openEventDetail = (eventId: string) => {
+    setSelectedEventId(eventId);
+    setEventDetailOpen(true);
   };
 
   const isEventActive = !!currentEvent && currentEvent.status !== 'completed' && currentEvent.status !== 'cancelled';
@@ -221,8 +221,8 @@ export const AdrControls = () => {
               return (
                 <button
                   key={evt.id}
-                  className="w-full text-left flex justify-between items-center text-xs bg-muted/20 hover:bg-muted/30 p-2 rounded"
-                  onClick={() => openEventModal(evt)}
+                  className="w-full text-left flex justify-between items-center text-xs bg-muted/20 hover:bg-muted/30 p-2 rounded transition-colors cursor-pointer"
+                  onClick={() => openEventDetail(evt.id)}
                 >
                   <span className="flex items-center gap-1">
                     {icon}
@@ -240,33 +240,14 @@ export const AdrControls = () => {
           </div>
         </div>
 
-        <Dialog open={eventModalOpen} onOpenChange={setEventModalOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>ADR Event Details</DialogTitle>
-              <DialogDescription>Summary of the selected event</DialogDescription>
-            </DialogHeader>
-            {selectedEvent && (
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">ID</span><span className="font-medium">{selectedEvent.id}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="font-medium capitalize">{selectedEvent.status}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Start</span><span className="font-medium">{new Date(selectedEvent.startTime).toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">End</span><span className="font-medium">{new Date(selectedEvent.endTime).toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Requested</span><span className="font-medium">{(selectedEvent.requestedReductionKw/1000).toFixed(1)} MW</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Actual</span><span className="font-medium">{(selectedEvent.actualReductionKw/1000).toFixed(1)} MW</span></div>
-                {typeof selectedEvent.currentReductionKw === 'number' && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">Current Reduction</span><span className="font-medium">{(selectedEvent.currentReductionKw/1000).toFixed(1)} MW</span></div>
-                )}
-                {typeof selectedEvent.vensResponding === 'number' && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">VENs Responding</span><span className="font-medium">{selectedEvent.vensResponding}</span></div>
-                )}
-                {typeof selectedEvent.avgResponseMs === 'number' && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">Avg Response</span><span className="font-medium">{selectedEvent.avgResponseMs} ms</span></div>
-                )}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        <EventDetailDialog 
+          eventId={selectedEventId}
+          open={eventDetailOpen}
+          onOpenChange={(open) => {
+            setEventDetailOpen(open);
+            if (!open) setSelectedEventId(null);
+          }}
+        />
       </CardContent>
     </Card>
   );
