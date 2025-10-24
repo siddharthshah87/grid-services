@@ -326,7 +326,7 @@ def publish_load_snapshot():
             
         loads = [
             {
-                "loadId": c["id"],
+                "id": c["id"],
                 "name": c["name"],
                 "type": c.get("type", "circuit"),
                 "capacityKw": c["breaker_amps"] * PANEL_VOLTAGE / 1000,
@@ -1210,7 +1210,7 @@ def telemetry_loop():
                     # Loads array - standardized OpenADR format for all systems
                     "loads": [
                         {
-                            "loadId": c["id"],
+                            "id": c["id"],
                             "name": c["name"],
                             "type": c.get("type", "circuit"),
                             "capacityKw": c.get("capacity_kw", c["breaker_amps"] * PANEL_VOLTAGE / 1000),
