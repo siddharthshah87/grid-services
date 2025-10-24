@@ -35,3 +35,6 @@ hypothesis==6.140.3
 
 # Code quality
 flake8==7.3.0
+
+# Additional MQTT client
+gmqtt==0.7.0

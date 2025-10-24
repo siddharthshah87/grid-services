@@ -125,8 +125,8 @@ async def patch_ven_v2(
     data = update.model_dump(exclude_unset=True)
     location = data.pop("location", None)
     if location:
-        data["latitude"] = location.lat
-        data["longitude"] = location.lon
+        data["latitude"] = location["lat"]
+        data["longitude"] = location["lon"]
     registration = data.pop("registrationId", None)
     if registration is not None:
         data["registration_id"] = registration

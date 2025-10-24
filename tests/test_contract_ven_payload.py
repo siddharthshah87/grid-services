@@ -1,5 +1,5 @@
 from hypothesis import given, strategies as st
-from datetime import datetime
+from datetime import datetime, timezone
 @given(
     st.fixed_dictionaries({
         "id": st.text(min_size=1, max_size=20),
@@ -15,7 +15,7 @@ from datetime import datetime
             "activeEventId": st.text(min_size=0, max_size=20),
             "shedLoadIds": st.lists(st.text(min_size=1, max_size=10), max_size=10),
         }),
-        "createdAt": st.just(datetime.utcnow().isoformat()),
+        "createdAt": st.just(datetime.now(timezone.utc).isoformat()),
         "loads": st.lists(
             st.fixed_dictionaries({
                 "id": st.text(min_size=1, max_size=10),

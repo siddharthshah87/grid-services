@@ -11,3 +11,11 @@ ecs-frontend/node_modules/
 ecs-frontend/dist/
 .hypothesis/
 .vscode/
+
+# Test reports (generated, not source controlled)
+TEST_*.md
+*_COVERAGE_*.md
+*_SUMMARY.md
+htmlcov/
+.coverage
+.pytest_cache/

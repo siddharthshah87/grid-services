@@ -4,11 +4,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import pytest
 from hypothesis import given, strategies as st, settings
 from app.models.ven import VEN
+from app.models import Base
 from app.crud import create_ven, update_ven, delete_ven, list_vens
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import text
-from datetime import datetime
 
 @settings(max_examples=10)
 @given(
@@ -35,18 +34,11 @@ async def test_update_delete_list_ven_property(
     DATABASE_URL = "sqlite+aiosqlite:///:memory:"
     engine = create_async_engine(DATABASE_URL, echo=False)
     AsyncSessionLocal = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    
+    # Use Base.metadata.create_all to create schema with all current columns
     async with engine.begin() as conn:
-        await conn.run_sync(lambda c: c.execute(text('''
-            CREATE TABLE vens (
-                ven_id VARCHAR PRIMARY KEY,
-                name VARCHAR NOT NULL,
-                status VARCHAR NOT NULL,
-                registration_id VARCHAR,
-                latitude FLOAT,
-                longitude FLOAT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')))
+        await conn.run_sync(Base.metadata.create_all)
+    
     async with AsyncSessionLocal() as db_session:
         ven = await create_ven(
             db_session,
