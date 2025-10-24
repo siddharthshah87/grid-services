@@ -11,11 +11,15 @@ from app import crud
 from app.dependencies import get_session
 from app.routers.utils import build_history_response, build_ven_payload
 from app.schemas.api_models import (
+    CircuitCurtailment,
+    CircuitHistoryResponse,
+    CircuitSnapshot,
     HistoryResponse,
     Load,
     ShedCommand,
     Ven,
     VenCreate,
+    VenEventAck,
     VenSummary,
     VenUpdate,
 )
@@ -211,3 +215,103 @@ async def ven_load_history(
                 )
             )
     return build_history_response(filtered, granularity)
+
+
+@router.get("/{ven_id}/events", response_model=list[VenEventAck])
+async def get_ven_events(
+    ven_id: str,
+    session: AsyncSession = Depends(get_session),
+    start: datetime | None = Query(default=None, description="Start time filter (ISO format)"),
+    end: datetime | None = Query(default=None, description="End time filter (ISO format)"),
+    limit: int = Query(default=100, description="Maximum number of events to return"),
+):
+    """
+    Get DR event acknowledgments for a VEN.
+    
+    Returns the history of DR events that this VEN has responded to,
+    including detailed circuit curtailment information.
+    """
+    await _ensure_ven(session, ven_id)
+    acks = await crud.get_ven_acks(session, ven_id, start=start, end=end, limit=limit)
+    
+    # Convert to response models
+    result = []
+    for ack in acks:
+        circuits = None
+        if ack.circuits_curtailed:
+            circuits = [
+                CircuitCurtailment(
+                    id=c["id"],
+                    name=c["name"],
+                    breaker_amps=c["breaker_amps"],
+                    original_kw=c["original_kw"],
+                    curtailed_kw=c["curtailed_kw"],
+                    final_kw=c["final_kw"],
+                    critical=c["critical"],
+                )
+                for c in ack.circuits_curtailed
+            ]
+        
+        result.append(
+            VenEventAck(
+                id=ack.id,
+                venId=ack.ven_id,
+                eventId=ack.event_id,
+                correlationId=ack.correlation_id,
+                op=ack.op,
+                status=ack.status,
+                timestamp=ack.timestamp,
+                requestedShedKw=ack.requested_shed_kw,
+                actualShedKw=ack.actual_shed_kw,
+                circuitsCurtailed=circuits,
+            )
+        )
+    
+    return result
+
+
+@router.get("/{ven_id}/circuits/history", response_model=CircuitHistoryResponse)
+async def get_circuit_history(
+    ven_id: str,
+    session: AsyncSession = Depends(get_session),
+    load_id: str | None = Query(default=None, description="Filter by specific circuit/load ID"),
+    start: datetime | None = Query(default=None, description="Start time filter (ISO format)"),
+    end: datetime | None = Query(default=None, description="End time filter (ISO format)"),
+    limit: int = Query(default=1000, le=5000, description="Maximum number of snapshots to return"),
+):
+    """
+    Get historical circuit power usage data for a VEN.
+    
+    Returns time-series snapshots of circuit/load power consumption from VenLoadSample table.
+    Data is captured every 5 seconds as part of the regular telemetry flow.
+    
+    Example:
+    - Last 5 minutes of all circuits: `?start=2025-10-23T12:00:00Z`
+    - Last hour of specific circuit: `?load_id=circuit_3&start=2025-10-23T11:00:00Z`
+    """
+    await _ensure_ven(session, ven_id)
+    snapshots = await crud.get_load_snapshots(
+        session, ven_id, load_id=load_id, start=start, end=end, limit=limit
+    )
+    
+    result = [
+        CircuitSnapshot(
+            timestamp=timestamp,
+            loadId=snap.load_id,
+            name=snap.name,
+            type=snap.type,
+            capacityKw=snap.capacity_kw,
+            currentPowerKw=snap.current_power_kw,
+            shedCapabilityKw=snap.shed_capability_kw,
+            enabled=snap.enabled,
+            priority=snap.priority,
+        )
+        for snap, timestamp in snapshots
+    ]
+    
+    return CircuitHistoryResponse(
+        venId=ven_id,
+        loadId=load_id,
+        snapshots=result,
+        totalCount=len(result),
+    )

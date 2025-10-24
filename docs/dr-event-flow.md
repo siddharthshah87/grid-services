@@ -2,6 +2,11 @@
 
 This document explains the complete demand response (DR) event flow with detailed circuit curtailment tracking.
 
+> **See also**:
+> - [MQTT Topics Architecture](mqtt-topics-architecture.md) - Complete MQTT topic reference and data flow
+> - [Backend API](backend-api.md) - REST API endpoints for event management
+> - [VEN Contract](ven-contract.md) - MQTT payload schemas
+
 ## Architecture Overview
 
 ```

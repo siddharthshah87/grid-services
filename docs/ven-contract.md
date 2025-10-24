@@ -3,6 +3,8 @@
 This document defines the MQTT command/ack envelopes, telemetry payloads, and IoT
 Thing Shadow schema that the Backend uses to control and observe a VEN.
 
+> **See also**: [MQTT Topics Architecture](mqtt-topics-architecture.md) for complete topic reference and data flow diagrams.
+
 ## Identifiers and Versioning
 
 - `venId`: the AWS IoT Thing Name (also exported as env `IOT_THING_NAME`).
@@ -12,9 +14,9 @@ Thing Shadow schema that the Backend uses to control and observe a VEN.
 
 - Commands to VEN (Backend → VEN): `ven/cmd/{venId}`
 - Acks from VEN (VEN → Backend): `ven/ack/{venId}`
-- Metering telemetry (VEN → Backend): `oadr/meter/{venId}` (existing)
-- Optional detailed loads snapshot (VEN → Backend): `ven/loads/{venId}` (set
-  `BACKEND_LOADS_TOPIC` or it defaults to `ven/loads/{thing}`)
+- **Primary telemetry** (VEN → Backend): `volttron/metering` (shared topic, all VENs)
+- Per-VEN telemetry (VEN → Monitoring): `ven/telemetry/{venId}` (not stored by backend)
+- ~~Optional detailed loads snapshot~~: `ven/loads/{venId}` (**DEPRECATED** - use loads array in telemetry instead)
 
 ## Command Envelope
 
@@ -73,9 +75,13 @@ Ack from VEN on `ven/ack/{venId}`:
 
 - `ping` → Ack: `{ pong: true, ts }`
 
-## Telemetry Payload (oadr/meter/{venId})
+## Telemetry Payload (volttron/metering)
 
-Emitted every report interval.
+**Published to**: `volttron/metering` (shared topic for all VENs)  
+**Frequency**: Every 5 seconds (or configured `report_interval_seconds`)  
+**QoS**: 1 (at-least-once delivery)
+
+Emitted every report interval with full circuit details.
 
 ```json
 {
@@ -86,8 +92,20 @@ Emitted every report interval.
   "shedPowerKw": 0.62,
   "requestedReductionKw": 1.0,
   "eventId": "evt-9",
+  "baselinePowerKw": 3.35,
   "batterySoc": 0.54,
-  "loads": [ {"id": "hvac1", "currentPowerKw": 0.82 }, ... ],
+  "loads": [
+    {
+      "loadId": "hvac1",
+      "name": "HVAC",
+      "type": "hvac",
+      "capacityKw": 3.5,
+      "currentPowerKw": 0.82,
+      "shedCapabilityKw": 0.5,
+      "enabled": true,
+      "priority": 1
+    }
+  ],
   
   // Back-compat legacy keys:
   "power_kw": 2.73
@@ -98,10 +116,13 @@ Notes:
 - `usedPowerKw` = net grid import (positive). PV generation appears as a negative
   per-load `currentPowerKw` for the PV circuit in the `loads` array.
 - `shedPowerKw` is present when an event is active and baseline is computed.
+- `loads` array contains full circuit details - no separate snapshot topic needed
 
-## Optional Loads Snapshot (ven/loads/{venId})
+## ~~Optional Loads Snapshot (ven/loads/{venId})~~ [DEPRECATED]
 
-Published occasionally (every `LOADS_PUBLISH_EVERY` intervals; default 6).
+**Status**: DEPRECATED - circuit data is included in `volttron/metering` telemetry every 5 seconds.
+
+~~Published occasionally (every `LOADS_PUBLISH_EVERY` intervals; default 6).~~
 
 ```json
 {

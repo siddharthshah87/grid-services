@@ -14,7 +14,13 @@ This repository contains Terraform modules and applications to deploy a demand r
 - `docs/` – Comprehensive documentation for architecture, operations, and testing.
 - `.github/workflows/` – GitHub Actions pipelines for linting, testing, and security scanning.
 
-See `docs/VEN_OPERATIONS.md` for VEN operations and `docs/testing.md` for end-to-end testing.
+## Documentation
+
+- **[VEN Operations](docs/VEN_OPERATIONS.md)** – VEN lifecycle, control, and testing
+- **[Testing Guide](docs/testing.md)** – End-to-end testing procedures
+- **[MQTT Topics Architecture](docs/mqtt-topics-architecture.md)** – Complete MQTT topic reference and data flow
+- **[Infrastructure Architecture](docs/infrastructure-architecture.md)** – AWS resources and architecture
+- **[Backend API](docs/backend-api.md)** – REST API reference
 
 ## Prerequisites
 
@@ -362,12 +368,12 @@ curl -X POST http://localhost:8080/api/event/trigger -H "Content-Type: applicati
 
 
 ## Backend DER Event 
-### Create an active DR event (starts immediately, runs for 1 hour)
+### Create an active DR event (starts immediately, runs for 2 min)
 curl -X POST "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/events/" \
   -H "Content-Type: application/json" \
   -d "{
     \"startTime\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
-    \"endTime\": \"$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)\",
+    \"endTime\": \"$(date -u -d '+2 minutes' +%Y-%m-%dT%H:%M:%SZ)\",
     \"requestedReductionKw\": 5.0,
     \"status\": \"active\"
   }"
@@ -381,3 +387,35 @@ curl -X POST "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/event
     \"requestedReductionKw\": 10.0,
     \"status\": \"scheduled\"
   }"
+
+### Example: Get VEN Event History
+
+```bash
+curl -X GET "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/events"
+```
+
+### Example: Get Circuit Historical Usage
+
+Get power usage history for all circuits (last 1000 samples):
+```bash
+curl -X GET "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history"
+```
+
+Get last 5 minutes of specific circuit usage:
+```bash
+curl -X GET "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?load_id=heater1&start=$(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+### Circuit History API
+Get historical power usage data for individual circuits/loads:
+
+```bash
+# Get last 10 circuit snapshots for volttron_thing
+curl -s "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?limit=10" | jq '.'
+
+# Get specific circuit history
+curl -s "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?load_id=hvac1&limit=20" | jq '.'
+
+# Get history within time range (ISO 8601 timestamps)
+curl -s "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/circuits/history?start=2025-10-23T00:00:00Z&end=2025-10-24T00:00:00Z" | jq '.'
+```
