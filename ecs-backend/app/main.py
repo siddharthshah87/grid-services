@@ -76,6 +76,7 @@ app.add_middleware(
         "https://gridcircuit.link",
         "http://localhost:3000",  # For local development
         "http://localhost:5173",  # For Vite dev server
+        "http://localhost:8080",  # For Vite dev server (default port)
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
