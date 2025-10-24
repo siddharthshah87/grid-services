@@ -6,7 +6,7 @@ Includes detailed circuit curtailment information.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, Text
 
 from . import Base
@@ -29,7 +29,7 @@ class VenAck(Base):
     # ACK metadata
     op = Column(String(50), nullable=False)  # "event", "restore", "ping"
     status = Column(String(50), nullable=False)  # "accepted", "rejected", "success"
-    timestamp = Column(DateTime, nullable=False, index=True)
+    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     
     # Shed information
     requested_shed_kw = Column(Float, nullable=True)
@@ -43,7 +43,7 @@ class VenAck(Base):
     raw_payload = Column(Text, nullable=True)
     
     # Timestamps
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     
     def __repr__(self):
         return (

@@ -89,10 +89,19 @@ The service exposes REST endpoints to manage VENs and events. See `docs/backend-
 - `GET /api/stats/network` – network metrics
 - `GET /api/vens` – list VENs
 - `POST /api/vens` – create VEN
+- `GET /api/vens/{ven_id}/events` – get event history for a VEN
 - `GET /api/events` – list events
 - `POST /api/events` – create event
 - `DELETE /api/vens/{ven_id}` – remove VEN
 - `DELETE /api/events/{event_id}` – remove event
+
+### Example: Get VEN Event History
+
+```bash
+curl -X GET "http://backend-alb-948465488.us-west-2.elb.amazonaws.com/api/vens/volttron_thing/events"
+```
+
+This endpoint returns all DR event acknowledgments for the specified VEN, including detailed circuit curtailment information.
 
 Refer to the API documentation for all supported endpoints, request/response formats, and data models.
 

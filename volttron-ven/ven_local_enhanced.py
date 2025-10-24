@@ -24,6 +24,7 @@ mqtt_logger.setLevel(logging.DEBUG)
 
 # Environment variables
 IOT_ENDPOINT = os.getenv("IOT_ENDPOINT", "a1mgxpe8mg484j-ats.iot.us-west-2.amazonaws.com")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend-alb-948465488.us-west-2.elb.amazonaws.com")
 
 # Use IOT_THING_NAME if provided (for consistent identity), otherwise use CLIENT_ID
 # This ensures VEN has same ID across restarts when IOT_THING_NAME is set
@@ -38,6 +39,7 @@ PRIVATE_KEY = os.getenv("PRIVATE_KEY", "./certs/client.key")
 # This is the main topic the backend MQTT consumer processes for telemetry
 TELEMETRY_TOPIC = os.getenv("TELEMETRY_TOPIC", f"ven/telemetry/{CLIENT_ID}")  # Legacy, for monitoring
 METERING_TOPIC = os.getenv("METERING_TOPIC", "volttron/metering")  # Backend topic (IoT Rule forwards this)
+LOADS_TOPIC = os.getenv("LOADS_TOPIC", f"ven/loads/{CLIENT_ID}")  # Load snapshots for circuit history
 CMD_TOPIC = os.getenv("CMD_TOPIC", f"ven/cmd/{CLIENT_ID}")
 ACK_TOPIC = os.getenv("ACK_TOPIC", f"ven/ack/{CLIENT_ID}")
 WEB_PORT = int(os.getenv("WEB_PORT", "8080"))
@@ -282,7 +284,7 @@ def publish_shadow_update():
                 "panel_amperage": ven_state["panel_amperage"],
                 "panel_voltage": ven_state["panel_voltage"],
                 "panel_max_kw": ven_state["panel_max_kw"],
-                "circuits": [
+                "loads": [
                     {
                         "id": c["id"],
                         "name": c["name"],
@@ -316,19 +318,56 @@ def publish_shadow_update():
         import traceback
         traceback.print_exc()
 
+def publish_load_snapshot():
+    """Publish load snapshot for circuit history tracking"""
+    try:
+        with state_lock:
+            circuits = ven_state["circuits"]
+            
+        loads = [
+            {
+                "id": c["id"],
+                "name": c["name"],
+                "type": c.get("type", "circuit"),
+                "capacityKw": c["breaker_amps"] * PANEL_VOLTAGE / 1000,
+                "currentPowerKw": c["current_kw"],
+                "shedCapabilityKw": c["current_kw"] if not c.get("critical", False) else 0.0,
+                "enabled": c["enabled"],
+                "priority": c.get("priority", 5),
+            }
+            for c in circuits
+        ]
+        
+        snapshot = {
+            "schemaVersion": "1.0",
+            "venId": CLIENT_ID,
+            "timestamp": int(time.time()),
+            "loads": loads,
+        }
+        
+        result = mqtt_client.publish(LOADS_TOPIC, json.dumps(snapshot), qos=1)
+        if result.rc == mqtt.MQTT_ERR_SUCCESS:
+            print(f"📊 Load snapshot published: {len(loads)} circuits")
+        else:
+            print(f"⚠️ Load snapshot publish failed with rc={result.rc}")
+    except Exception as e:
+        print(f"❌ Load snapshot publish failed: {e}")
+        import traceback
+        traceback.print_exc()
+
 def handle_shadow_delta(payload):
     """Handle shadow delta (desired vs reported state difference)"""
     try:
         state = payload.get("state", {})
         
-        # Handle circuit enable/disable from shadow desired state
-        if "circuits" in state:
+        # Handle load enable/disable from shadow desired state
+        if "loads" in state:
             with state_lock:
-                for desired_circuit in state["circuits"]:
-                    circuit_id = desired_circuit.get("id")
-                    circuit = next((c for c in circuits if c["id"] == circuit_id), None)
-                    if circuit and "enabled" in desired_circuit:
-                        circuit["enabled"] = desired_circuit["enabled"]
+                for desired_load in state["loads"]:
+                    load_id = desired_load.get("id")
+                    circuit = next((c for c in circuits if c["id"] == load_id), None)
+                    if circuit and "enabled" in desired_load:
+                        circuit["enabled"] = desired_load["enabled"]
                         print(f"🔄 Circuit {circuit['name']} {'enabled' if circuit['enabled'] else 'disabled'} via shadow")
             
             # Recalculate power based on enabled circuits
@@ -568,65 +607,72 @@ HTML_TEMPLATE = """
         <p class="subtitle">Real-time monitoring and control</p>
         
         <div style="display:flex; gap:12px; margin-bottom:18px;">
-            <button class="btn btn-primary" id="tab-overview" onclick="switchTab('overview')">Overview</button>
-            <button class="btn" id="tab-der" onclick="switchTab('der')">DER / Events</button>
+            <button class="btn" id="tab-overview" onclick="switchTab('overview')">Overview</button>
+            <button class="btn btn-primary" id="tab-der" onclick="switchTab('der')">DER / Events</button>
         </div>
 
-        <div id="overview-tab">
-        <div class="grid">
-            <div class="card">
-                <h2>⚡ Panel Configuration</h2>
-                <div class="input-group">
-                    <label>Panel Size</label>
-                    <select id="panel-select" onchange="changePanel()">
-                        <option value="100">100A Panel (24 kW max)</option>
-                        <option value="150">150A Panel (36 kW max)</option>
-                        <option value="200" selected>200A Panel (48 kW max)</option>
-                    </select>
+        <!-- Overview Tab -->
+        <div id="overview-tab" style="display:none;">
+            <div class="grid">
+                <div class="card">
+                    <h2>⚡ Panel Configuration</h2>
+                    <div class="input-group">
+                        <label>Panel Size</label>
+                        <select id="panel-select" onchange="changePanel()">
+                            <option value="100">100A Panel (24 kW max)</option>
+                            <option value="150">150A Panel (36 kW max)</option>
+                            <option value="200" selected>200A Panel (48 kW max)</option>
+                        </select>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Current Panel</div>
+                        <div class="stat-value" id="panel-rating">-- A</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Voltage</div>
+                        <div class="stat-value" id="panel-voltage">-- V</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Max Capacity</div>
+                        <div class="stat-value" id="panel-max">-- kW</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Connection</div>
+                        <div>
+                            <span class="status" id="conn-status">Disconnected</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat">
-                    <div class="stat-label">Current Panel</div>
-                    <div class="stat-value" id="panel-rating">-- A</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Voltage</div>
-                    <div class="stat-value" id="panel-voltage">-- V</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Max Capacity</div>
-                    <div class="stat-value" id="panel-max">-- kW</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Connection</div>
-                    <div>
-                        <span class="status" id="conn-status">Disconnected</span>
+                
+                <div class="card">
+                    <h2>📊 Current Usage</h2>
+                    <div class="stat">
+                        <div class="stat-label">Power (kW)</div>
+                        <div class="stat-value power" id="current-power">-- kW</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Current (A)</div>
+                        <div class="stat-value power" id="current-amps">-- A</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Panel Utilization</div>
+                        <div class="stat-value" id="panel-util">--%</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Load Shed</div>
+                        <div class="stat-value shed" id="shed-power">-- kW</div>
                     </div>
                 </div>
             </div>
             
             <div class="card">
-                <h2>📊 Current Usage</h2>
-                <div class="stat">
-                    <div class="stat-label">Power (kW)</div>
-                    <div class="stat-value power" id="current-power">-- kW</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Current (A)</div>
-                    <div class="stat-value power" id="current-amps">-- A</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Panel Utilization</div>
-                    <div class="stat-value" id="panel-util">--%</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Load Shed</div>
-                    <div class="stat-value shed" id="shed-power">-- kW</div>
-                </div>
+                <h2>🔌 Circuits</h2>
+                <div id="circuits-list"></div>
             </div>
         </div>
 
-        <!-- DER tab -->
-        <div id="der-tab" style="display:none;">
+        <!-- DER Tab -->
+        <div id="der-tab" style="display:block;">
             <div class="grid">
                 <div class="card" id="event-card">
                     <h2>🚨 DR Event Control</h2>
@@ -675,16 +721,27 @@ HTML_TEMPLATE = """
                         <p style="color:#94a3b8">No events yet</p>
                     </div>
                 </div>
+                <div class="card">
+                    <h2>📊 Circuit History (Last 60s)</h2>
+                    <div style="margin-bottom: 15px;">
+                        <label for="circuit-select" style="color: #94a3b8; font-size: 13px;">Select Circuit:</label>
+                        <select id="circuit-select" onchange="fetchCircuitHistory()" style="width: 100%; padding: 8px; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px; margin-top: 5px;">
+                            <option value="">All Circuits</option>
+                        </select>
+                    </div>
+                    <canvas id="circuit-chart" style="max-height: 300px;"></canvas>
+                    <div id="circuit-history-stats" style="margin-top: 15px; padding: 10px; background: #0f172a; border-radius: 6px; font-size: 13px; color: #94a3b8;">
+                        <p>Loading circuit data...</p>
+                    </div>
+                </div>
             </div>
-        </div>
-        
-        <div class="card">
-            <h2>🔌 Circuits</h2>
-            <div id="circuits-list"></div>
         </div>
     </div>
     
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
+        let circuitChart = null;
+        
         function fetchState() {
             fetch('/api/state')
                 .then(r => r.json())
@@ -846,11 +903,238 @@ HTML_TEMPLATE = """
             document.getElementById('der-tab').style.display = tab === 'der' ? 'block' : 'none';
             document.getElementById('tab-overview').className = tab === 'overview' ? 'btn btn-primary' : 'btn';
             document.getElementById('tab-der').className = tab === 'der' ? 'btn btn-primary' : 'btn';
+            
+            // Fetch event and circuit history when switching to DER tab
+            if (tab === 'der') {
+                fetchEventHistory();
+                fetchCircuitHistory();
+            }
+        }
+        
+        function fetchEventHistory() {
+            console.log('Fetching event history...');
+            const historyDiv = document.getElementById('event-history');
+            historyDiv.innerHTML = '<p style="color:#94a3b8">Loading events...</p>';
+            
+            fetch('/api/events')
+                .then(r => {
+                    console.log('Response status:', r.status);
+                    return r.json();
+                })
+                .then(events => {
+                    console.log('Received events:', events);
+                    console.log('Events count:', events ? events.length : 0);
+                    
+                    if (!events || events.length === 0) {
+                        historyDiv.innerHTML = '<p style="color:#94a3b8">No events yet</p>';
+                        return;
+                    }
+                    
+                    // Sort events by timestamp descending (newest first)
+                    events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    
+                    const eventsHtml = events.map(evt => {
+                        const timestamp = new Date(evt.timestamp).toLocaleString();
+                        const statusColor = evt.status === 'accepted' ? '#22c55e' : '#f59e0b';
+                        const circuitsCount = evt.circuitsCurtailed ? evt.circuitsCurtailed.length : 0;
+                        
+                        let circuitsHtml = '';
+                        if (evt.circuitsCurtailed && evt.circuitsCurtailed.length > 0) {
+                            circuitsHtml = '<div style="margin-top:8px; padding:8px; background:#0f172a; border-radius:4px; font-size:11px;">' +
+                                evt.circuitsCurtailed.map(c => 
+                                    `<div>${c.name}: ${c.curtailed_kw.toFixed(2)} kW (${c.original_kw.toFixed(2)} → ${c.final_kw.toFixed(2)} kW)</div>`
+                                ).join('') +
+                                '</div>';
+                        }
+                        
+                        return `
+                            <div style="background:#0f172a; padding:12px; border-radius:6px; margin-bottom:10px; border-left:3px solid ${statusColor}">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                                    <strong style="font-size:13px;">${evt.eventId}</strong>
+                                    <span style="color:${statusColor}; font-size:12px; font-weight:600;">${evt.status.toUpperCase()}</span>
+                                </div>
+                                <div style="font-size:12px; color:#94a3b8; margin-bottom:4px;">${timestamp}</div>
+                                <div style="font-size:12px;">
+                                    Requested: <strong>${evt.requestedShedKw ? evt.requestedShedKw.toFixed(2) : 'N/A'} kW</strong> | 
+                                    Actual: <strong style="color:#22c55e">${evt.actualShedKw ? evt.actualShedKw.toFixed(2) : 'N/A'} kW</strong> | 
+                                    Circuits: <strong>${circuitsCount}</strong>
+                                </div>
+                                ${circuitsHtml}
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    historyDiv.innerHTML = eventsHtml;
+                    console.log('Event history rendered successfully');
+                })
+                .catch(err => {
+                    console.error('Error fetching event history:', err);
+                    const historyDiv = document.getElementById('event-history');
+                    historyDiv.innerHTML = 
+                        `<p style="color:#ef4444">Error loading event history: ${err.message}</p>`;
+                });
+        }
+        
+        function fetchCircuitHistory() {
+            console.log('Fetching circuit history...');
+            const loadId = document.getElementById('circuit-select').value;
+            const statsDiv = document.getElementById('circuit-history-stats');
+            
+            // Build URL with query params
+            let url = '/api/circuit-history?limit=12'; // Last 60s at 5s intervals
+            if (loadId) {
+                url += `&load_id=${loadId}`;
+            }
+            
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    console.log('Received circuit history:', data);
+                    
+                    if (!data.snapshots || data.snapshots.length === 0) {
+                        statsDiv.innerHTML = '<p>No circuit data available yet</p>';
+                        if (circuitChart) {
+                            circuitChart.destroy();
+                            circuitChart = null;
+                        }
+                        return;
+                    }
+                    
+                    // Group by loadId and extract time series
+                    const circuitData = {};
+                    data.snapshots.forEach(snap => {
+                        if (!circuitData[snap.loadId]) {
+                            circuitData[snap.loadId] = {
+                                name: snap.name || snap.loadId,
+                                type: snap.type,
+                                data: [],
+                                timestamps: []
+                            };
+                        }
+                        circuitData[snap.loadId].data.push(snap.currentPowerKw);
+                        circuitData[snap.loadId].timestamps.push(new Date(snap.timestamp));
+                    });
+                    
+                    // Create datasets for chart
+                    const colors = [
+                        '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', 
+                        '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'
+                    ];
+                    
+                    const datasets = Object.entries(circuitData).map(([loadId, circuit], idx) => ({
+                        label: circuit.name,
+                        data: circuit.data,
+                        borderColor: colors[idx % colors.length],
+                        backgroundColor: colors[idx % colors.length] + '20',
+                        tension: 0.4,
+                        fill: true
+                    }));
+                    
+                    // Get timestamps (use first circuit's timestamps)
+                    const timestamps = Object.values(circuitData)[0].timestamps.map(t => 
+                        t.toLocaleTimeString('en-US', { hour12: false })
+                    );
+                    
+                    // Create or update chart
+                    const ctx = document.getElementById('circuit-chart').getContext('2d');
+                    
+                    if (circuitChart) {
+                        circuitChart.destroy();
+                    }
+                    
+                    circuitChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: timestamps,
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            plugins: {
+                                legend: {
+                                    labels: {
+                                        color: '#e2e8f0',
+                                        font: { size: 11 }
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: '#0f172a',
+                                    titleColor: '#e2e8f0',
+                                    bodyColor: '#e2e8f0',
+                                    borderColor: '#334155',
+                                    borderWidth: 1
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: { 
+                                        color: '#94a3b8',
+                                        maxRotation: 45,
+                                        minRotation: 45
+                                    },
+                                    grid: { color: '#1e293b' }
+                                },
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { 
+                                        color: '#94a3b8',
+                                        callback: function(value) {
+                                            return value.toFixed(2) + ' kW';
+                                        }
+                                    },
+                                    grid: { color: '#1e293b' }
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Update stats
+                    const latest = data.snapshots[0];
+                    const totalCircuits = Object.keys(circuitData).length;
+                    const totalPower = Object.values(circuitData).reduce((sum, c) => sum + c.data[c.data.length - 1], 0);
+                    
+                    statsDiv.innerHTML = `
+                        <div><strong>Total Circuits:</strong> ${totalCircuits}</div>
+                        <div><strong>Current Total Power:</strong> ${totalPower.toFixed(2)} kW</div>
+                        <div><strong>Data Points:</strong> ${data.totalCount}</div>
+                        <div><strong>Latest:</strong> ${new Date(latest.timestamp).toLocaleString()}</div>
+                    `;
+                    
+                    // Populate circuit selector if empty
+                    const selector = document.getElementById('circuit-select');
+                    if (selector.options.length === 1) { // Only has "All Circuits"
+                        Object.entries(circuitData).forEach(([loadId, circuit]) => {
+                            const option = document.createElement('option');
+                            option.value = loadId;
+                            option.textContent = `${circuit.name} (${circuit.type})`;
+                            selector.appendChild(option);
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching circuit history:', err);
+                    statsDiv.innerHTML = `<p style="color:#ef4444">Error: ${err.message}</p>`;
+                });
         }
         
         // Auto-refresh every 2 seconds
         setInterval(fetchState, 2000);
         fetchState();
+        
+        // Auto-refresh event history every 10 seconds
+        setInterval(fetchEventHistory, 10000);
+        // Fetch event history on initial page load
+        fetchEventHistory();
+        
+        // Auto-refresh circuit history every 10 seconds
+        setInterval(fetchCircuitHistory, 10000);
+        // Fetch circuit history on initial page load
+        fetchCircuitHistory();
     </script>
 </body>
 </html>
@@ -858,12 +1142,70 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def index():
-    return render_template_string(HTML_TEMPLATE)
+    response = app.make_response(render_template_string(HTML_TEMPLATE))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/api/state')
 def api_state():
     with state_lock:
         return jsonify(ven_state)
+
+@app.route('/api/events')
+def api_events():
+    """Fetch DR event history from backend API."""
+    try:
+        # Call backend API to get events for this VEN
+        url = f"{BACKEND_URL}/api/vens/{CLIENT_ID}/events"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        elif response.status_code == 404:
+            # VEN not found in backend, return empty list
+            return jsonify([])
+        else:
+            print(f"❌ Error fetching events from backend: {response.status_code}")
+            return jsonify({"error": f"Backend returned {response.status_code}"}), 500
+    except Exception as e:
+        print(f"❌ Error fetching events: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/circuit-history')
+def api_circuit_history():
+    """Fetch circuit history from backend API."""
+    try:
+        # Build query params
+        params = {
+            'limit': request.args.get('limit', '20')
+        }
+        if request.args.get('load_id'):
+            params['load_id'] = request.args.get('load_id')
+        if request.args.get('start'):
+            params['start'] = request.args.get('start')
+        if request.args.get('end'):
+            params['end'] = request.args.get('end')
+        
+        # Call backend API
+        url = f"{BACKEND_URL}/api/vens/{CLIENT_ID}/circuits/history"
+        response = requests.get(url, params=params, timeout=5)
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        elif response.status_code == 404:
+            return jsonify({"snapshots": [], "totalCount": 0})
+        else:
+            print(f"❌ Error fetching circuit history: {response.status_code}")
+            return jsonify({"error": f"Backend returned {response.status_code}"}), 500
+    except Exception as e:
+        print(f"❌ Error fetching circuit history: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/circuit/toggle', methods=['POST'])
 def api_toggle_circuit():
@@ -1066,18 +1408,19 @@ def telemetry_loop():
                     "panelMaxKw": ven_state["panel_max_kw"],
                     "currentAmps": current_amps,
                     "panelUtilizationPercent": panel_utilization,
-                    # Circuit details with breaker info
-                    "circuits": [
+                    # Loads array - standardized OpenADR format for all systems
+                    "loads": [
                         {
                             "id": c["id"],
                             "name": c["name"],
-                            "breakerAmps": c["breaker_amps"],
-                            "currentKw": c["current_kw"],
-                            "currentAmps": round((c["current_kw"] * 1000) / PANEL_VOLTAGE, 2),
+                            "type": c.get("type", "circuit"),
+                            "capacityKw": c.get("capacity_kw", c["breaker_amps"] * PANEL_VOLTAGE / 1000),
+                            "currentPowerKw": c["current_kw"],
+                            "shedCapabilityKw": c["current_kw"] if not c["critical"] else 0.0,
                             "enabled": c["enabled"],
-                            "critical": c["critical"]
+                            "priority": 1 if c["critical"] else 5
                         }
-                        for c in circuits if c.get("enabled", False)
+                        for c in circuits
                     ],
                     # Legacy fields for backward compatibility
                     "power_kw": ven_state["current_power_kw"],
@@ -1098,9 +1441,10 @@ def telemetry_loop():
                     print(f"✓ [{ven_state['message_count']}] Telemetry: {ven_state['current_power_kw']:.2f} kW "
                           f"(shed: {ven_state['shed_kw']:.2f} kW){event_marker}")
                 
-                # Update shadow every 30 seconds
+                # Update shadow and load snapshots every 30 seconds
                 if ven_state["message_count"] % 6 == 0:
                     publish_shadow_update()
+                    publish_load_snapshot()
             else:
                 print("⚠️  Not connected, waiting...")
             
@@ -1135,7 +1479,13 @@ def main():
     # Create MQTT client with clean session (default)
     # Note: We use clean_session=True to avoid AWS IoT session conflicts when restarting quickly.
     # This means we won't receive messages published while offline, but ensures reliable reconnection.
-    mqtt_client = mqtt.Client(client_id=CLIENT_ID, clean_session=True, protocol=mqtt.MQTTv311)
+    # Using CallbackAPIVersion.VERSION1 for compatibility with existing callback signatures
+    mqtt_client = mqtt.Client(
+        client_id=CLIENT_ID,
+        clean_session=True,
+        protocol=mqtt.MQTTv311,
+        callback_api_version=mqtt.CallbackAPIVersion.VERSION1
+    )
     mqtt_client.on_connect = on_connect
     mqtt_client.on_disconnect = on_disconnect
     mqtt_client.on_message = on_message

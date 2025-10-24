@@ -124,3 +124,49 @@ class EventWithMetrics(Event):
     currentReductionKw: Optional[float] = None
     vensResponding: Optional[int] = None
     avgResponseMs: Optional[int] = None
+
+
+class CircuitCurtailment(BaseModel):
+    """Details about a specific circuit that was curtailed."""
+    id: str
+    name: str
+    breaker_amps: int
+    original_kw: float
+    curtailed_kw: float
+    final_kw: float
+    critical: bool
+
+
+class VenEventAck(BaseModel):
+    """VEN acknowledgment of a DR event."""
+    id: int
+    venId: str
+    eventId: str
+    correlationId: Optional[str] = None
+    op: str
+    status: str
+    timestamp: datetime
+    requestedShedKw: Optional[float] = None
+    actualShedKw: Optional[float] = None
+    circuitsCurtailed: Optional[list[CircuitCurtailment]] = None
+
+
+class CircuitSnapshot(BaseModel):
+    """Historical snapshot of a circuit/load at a specific time."""
+    timestamp: datetime
+    loadId: str
+    name: Optional[str] = None
+    type: Optional[str] = None
+    capacityKw: Optional[float] = None
+    currentPowerKw: Optional[float] = None
+    shedCapabilityKw: Optional[float] = None
+    enabled: Optional[bool] = None
+    priority: Optional[int] = None
+
+
+class CircuitHistoryResponse(BaseModel):
+    """Time-series data for one or more circuits."""
+    venId: str
+    loadId: Optional[str] = None  # If querying single circuit
+    snapshots: list[CircuitSnapshot]
+    totalCount: int
