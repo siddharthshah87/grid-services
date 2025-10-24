@@ -3,31 +3,53 @@
 ## Overview
 This document tracks the implementation of MQTT telemetry consumption, load shedding automation, and historical data analysis for the OpenADR VEN system.
 
-## Current Status (October 13, 2025)
+> **See also**:
+> - [MQTT Topics Architecture](mqtt-topics-architecture.md) - Complete MQTT topic reference
+> - [DR Event Flow](dr-event-flow.md) - End-to-end event flow documentation
+> - [VEN Contract](ven-contract.md) - MQTT payload schemas and contracts
+
+## Current Status (Updated October 23, 2025)
 
 ### ✅ Completed
 1. **Backend MQTT Consumer** - Fully functional
    - TLS certificate handling from AWS Secrets Manager
    - Auto-registration of VENs on first telemetry
-   - Database persistence of telemetry data
+   - Database persistence of telemetry data (`VenTelemetry` + `VenLoadSample` tables)
+   - Event acknowledgment storage (`VenAck` table with circuit curtailment details)
    - Lifespan-based startup with proper error handling
+   - Subscribes to: `volttron/metering`, `ven/ack/+`
 
-2. **Security Configuration**
+2. **MQTT Telemetry Flow**
+   - VEN publishes to `volttron/metering` every 5 seconds with full circuit details
+   - Backend ingests and stores in database
+   - Per-circuit data extracted into `VenLoadSample` table
+   - Event context (eventId, shed amounts) included during DR events
+
+3. **Event Acknowledgment Flow**
+   - VEN sends detailed ACKs to `ven/ack/{venId}` topic
+   - Includes which circuits were curtailed and by how much
+   - Backend stores in `VenAck` table for event history
+
+4. **REST API Endpoints**
+   - `GET /api/vens/{ven_id}/events` - Event history with circuit curtailment details
+   - `GET /api/vens/{ven_id}/circuits/history` - Circuit-level time-series data
+   - `GET /api/vens/{ven_id}/telemetry` - VEN telemetry history
+   - `GET /api/vens/{ven_id}/shadow` - Current Device Shadow state
+
+5. **Security Configuration**
    - VPC endpoint security group rules added for Secrets Manager access
    - IAM policies configured for IoT Core and Secrets Manager
 
-3. **VOLTTRON VEN Telemetry Publishing** - Code fixed
-   - Fixed critical bug where telemetry was constructed but never published
-   - Added proper MQTT publish call with QoS=1
-   - Added logging for telemetry publishing
-   - Shadow state updates integrated
+6. **VOLTTRON VEN Telemetry Publishing** - Fully operational
+   - Telemetry published to `volttron/metering` (backend) and `ven/telemetry/{venId}` (monitoring)
+   - Shadow state updates every 30 seconds
+   - Load snapshot publishing every 30 seconds (redundant, can be removed)
+   - Event acknowledgments with circuit curtailment tracking
 
-### 🔨 In Progress
-1. **Network Connectivity Issue**
-   - VOLTTRON VEN cannot connect to AWS IoT Core
-   - Error: `[Errno 101] Network is unreachable`
-   - **Root Cause**: Likely security group or VPC endpoint configuration
-   - **Impact**: Telemetry not flowing until resolved
+### ❌ Deprecated / Not Used
+1. **`ven/loads/{venId}` topic** - Backend does not subscribe (circuit data in `volttron/metering`)
+2. **`LoadSnapshot` table** - Not populated (use `VenLoadSample` instead)
+3. **`oadr/meter/{venId}` topic** - Never implemented (use `volttron/metering`)
 
 ### 📋 Pending Implementation
 
@@ -378,78 +400,37 @@ async def estimate_shed_capacity(
     }
 ```
 
-## Network Connectivity Issues
-
-### Problem
-VOLTTRON VEN cannot connect to AWS IoT Core:
-```
-MQTT connect failed (try 5/5): [Errno 101] Network is unreachable
-```
-
-### Possible Causes
-1. **Security Group Configuration**
-   - VPC endpoint for IoT Core might not allow access from VOLTTRON VEN security group
-   - Missing egress rules for port 8883 (MQTTS)
-
-2. **VPC Endpoint Configuration**
-   - IoT Core VPC endpoint might not be properly configured
-   - DNS resolution issues
-
-3. **Network ACLs**
-   - Network ACLs might be blocking outbound HTTPS/MQTTS traffic
-
-### Resolution Steps
-1. Check VOLTTRON VEN security group has egress rules for:
-   - Port 8883 (MQTTS) to IoT Core endpoint
-   - Port 443 (HTTPS) for AWS APIs
-
-2. Verify IoT Core VPC endpoint exists and is accessible:
-   ```bash
-   aws ec2 describe-vpc-endpoints --region us-west-2 \
-     --filters Name=service-name,Values=com.amazonaws.us-west-2.iot.data
-   ```
-
-3. Check VPC endpoint security group allows inbound on port 8883 from VEN security group
-
-4. Verify VOLTTRON task has proper network configuration (public IP or NAT gateway)
-
 ## Testing Strategy
 
-### Once Network Issues Resolved:
+See [Testing Guide](testing.md) for comprehensive testing procedures including:
+- End-to-end DR event flow testing with `scripts/test_e2e_event_flow.py`
+- MQTT telemetry validation with `scripts/test_mqtt_telemetry.py`
+- VEN control and monitoring with `scripts/ven_control.sh`
+
+### Quick Tests
 
 1. **Telemetry Flow Test**
    ```bash
-   # Monitor backend MQTT consumer logs
-   aws logs tail /ecs/ecs-backend --follow --filter-pattern "telemetry"
-   
-   # Check database for new telemetry
-   psql -c "SELECT ven_id, timestamp, used_power_kw FROM ven_telemetry ORDER BY timestamp DESC LIMIT 10;"
+   # Check recent telemetry in database
+   curl "http://backend-alb.../api/vens/volttron_thing/telemetry?limit=10"
    ```
 
-2. **Auto-Registration Test**
+2. **Event History Test**
    ```bash
-   # Check if volttron_thing was auto-registered
-   curl https://backend-alb.../api/vens/ | jq '.[] | select(.ven_id=="volttron_thing")'
+   # View event acknowledgments with circuit curtailment details
+   curl "http://backend-alb.../api/vens/volttron_thing/events"
    ```
 
-3. **Load Shedding Test**
+3. **Circuit History Test**
    ```bash
-   # Send test event via backend command topic
-   python scripts/send_event.py --ven-id volttron_thing --shed-kw 2.0 --duration 300
-   
-   # Monitor VOLTTRON response
-   aws logs tail /ecs/volttron-ven --follow --filter-pattern "shed"
-   
-   # Check telemetry reflects reduced power
-   curl https://backend-alb.../api/vens/volttron_thing/latest
+   # Get circuit-level power history
+   curl "http://backend-alb.../api/vens/volttron_thing/circuits/history?limit=20"
    ```
 
-4. **Performance Calculation Test**
+4. **Shadow State Test**
    ```bash
-   # After event ends, calculate performance
-   curl https://backend-alb.../api/events/{event_id}/performance
-   
-   # Verify metrics match expectations
+   # Get current Device Shadow
+   curl "http://backend-alb.../api/vens/volttron_thing/shadow"
    ```
 
 ## Future Enhancements
