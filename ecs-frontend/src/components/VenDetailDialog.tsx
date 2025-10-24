@@ -47,18 +47,29 @@ export const VenDetailDialog = ({ venId, open, onOpenChange }: VenDetailDialogPr
     );
   };
 
-  // Prepare chart data
-  const powerChartData = circuitHistory?.map(ch => ({
-    time: format(new Date(ch.timestamp), 'HH:mm:ss'),
-    power: ch.currentPowerKw,
-    capacity: ch.shedCapabilityKw,
-  })) || [];
+  // Prepare chart data with error handling
+  const powerChartData = circuitHistory?.snapshots?.map(ch => {
+    try {
+      return {
+        time: format(new Date(ch.timestamp), 'HH:mm:ss'),
+        power: ch.currentPowerKw || 0,
+        capacity: ch.shedCapabilityKw || 0,
+      };
+    } catch (error) {
+      console.error('Error formatting circuit history:', error, ch);
+      return {
+        time: 'Invalid',
+        power: 0,
+        capacity: 0,
+      };
+    }
+  }).filter(d => d.time !== 'Invalid') || [];
 
   const loadBreakdown = ven?.loads?.map(load => ({
-    name: load.type,
-    current: load.currentPowerKw,
-    capacity: load.capacityKw,
-    shedCapability: load.shedCapabilityKw,
+    name: load.type || 'Unknown',
+    current: load.currentPowerKw || 0,
+    capacity: load.capacityKw || 0,
+    shedCapability: load.shedCapabilityKw || 0,
   })) || [];
 
   return (
@@ -102,15 +113,15 @@ export const VenDetailDialog = ({ venId, open, onOpenChange }: VenDetailDialogPr
                   <CardContent className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Current Power</span>
-                      <span className="font-medium text-success">{ven.metrics.currentPowerKw.toFixed(2)} kW</span>
+                      <span className="font-medium text-success">{(ven.metrics?.currentPowerKw || 0).toFixed(2)} kW</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Shed Capability</span>
-                      <span className="font-medium text-primary">{ven.metrics.shedAvailabilityKw.toFixed(2)} kW</span>
+                      <span className="font-medium text-primary">{(ven.metrics?.shedAvailabilityKw || 0).toFixed(2)} kW</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Active Event</span>
-                      <span className="font-medium">{ven.metrics.activeEventId || 'None'}</span>
+                      <span className="font-medium">{ven.metrics?.activeEventId || 'None'}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -125,15 +136,17 @@ export const VenDetailDialog = ({ venId, open, onOpenChange }: VenDetailDialogPr
                   <CardContent className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Latitude</span>
-                      <span className="font-medium">{ven.location.lat.toFixed(4)}</span>
+                      <span className="font-medium">{ven.location?.lat?.toFixed(4) || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Longitude</span>
-                      <span className="font-medium">{ven.location.lon.toFixed(4)}</span>
+                      <span className="font-medium">{ven.location?.lon?.toFixed(4) || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Created</span>
-                      <span className="font-medium text-xs">{format(new Date(ven.createdAt), 'MMM d, yyyy')}</span>
+                      <span className="font-medium text-xs">
+                        {ven.createdAt ? format(new Date(ven.createdAt), 'MMM d, yyyy') : 'N/A'}
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
@@ -238,9 +251,11 @@ export const VenDetailDialog = ({ venId, open, onOpenChange }: VenDetailDialogPr
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">{format(new Date(evt.timestamp), 'MMM d, yyyy HH:mm:ss')}</span>
+                            <span className="text-sm font-medium">
+                              {evt.timestamp ? format(new Date(evt.timestamp), 'MMM d, yyyy HH:mm:ss') : 'N/A'}
+                            </span>
                           </div>
-                          <Badge variant="outline" className="text-xs">{evt.status}</Badge>
+                          <Badge variant="outline" className="text-xs">{evt.status || 'unknown'}</Badge>
                         </div>
                         <div className="text-xs text-muted-foreground mb-2 font-mono">Event: {evt.eventId}</div>
                         {evt.circuits && evt.circuits.length > 0 && (
@@ -250,7 +265,7 @@ export const VenDetailDialog = ({ venId, open, onOpenChange }: VenDetailDialogPr
                               {evt.circuits.map((circuit, idx) => (
                                 <div key={idx} className="flex justify-between text-xs bg-muted/30 p-2 rounded">
                                   <span className="text-muted-foreground">{circuit.loadId}</span>
-                                  <span className="font-medium text-warning">{circuit.curtailedKw.toFixed(2)} kW</span>
+                                  <span className="font-medium text-warning">{(circuit.curtailedKw || 0).toFixed(2)} kW</span>
                                 </div>
                               ))}
                             </div>

@@ -124,12 +124,23 @@ export function useStopEvent() {
 }
 
 // VEN Details
-export interface CircuitHistory {
+export interface CircuitSnapshot {
   timestamp: string;
   loadId: string;
+  name?: string;
+  type?: string;
+  capacityKw?: number;
   currentPowerKw: number;
   shedCapabilityKw: number;
   enabled: boolean;
+  priority?: number;
+}
+
+export interface CircuitHistoryResponse {
+  venId: string;
+  loadId?: string;
+  snapshots: CircuitSnapshot[];
+  totalCount: number;
 }
 
 export interface VenEventAck {
@@ -162,7 +173,7 @@ export function useVenCircuitHistory(venId: string | null, params?: { loadId?: s
   
   return useQuery({
     queryKey: ["venCircuitHistory", venId, params],
-    queryFn: () => apiGet<CircuitHistory[]>(`/api/vens/${venId}/circuits/history${qs}`),
+    queryFn: () => apiGet<CircuitHistoryResponse>(`/api/vens/${venId}/circuits/history${qs}`),
     enabled: !!venId,
   });
 }

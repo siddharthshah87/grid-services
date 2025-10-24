@@ -126,6 +126,22 @@ class EventWithMetrics(Event):
     avgResponseMs: Optional[int] = None
 
 
+class VenParticipation(BaseModel):
+    """VEN participation in an event."""
+    venId: str
+    venName: str
+    shedKw: float
+    status: str
+
+
+class EventDetail(Event):
+    """Detailed event information with VEN participation."""
+    currentReductionKw: Optional[float] = None
+    vensResponding: Optional[int] = None
+    avgResponseMs: Optional[int] = None
+    vens: Optional[list[VenParticipation]] = None
+
+
 class CircuitCurtailment(BaseModel):
     """Details about a specific circuit that was curtailed."""
     id: str
