@@ -132,10 +132,10 @@ export const Dashboard = () => {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* VEN Management */}
         <div className="lg:col-span-2">
-          <Card className="flex flex-col">
+          <Card className="h-[calc(100vh-22rem)] flex flex-col">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -161,8 +161,8 @@ export const Dashboard = () => {
                 </Tabs>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[calc(100vh-24rem)]">
+            <CardContent className="p-0 flex-1 overflow-hidden">
+              <ScrollArea className="h-full">
                 {activeView === 'list' ? <VenList /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
               </ScrollArea>
             </CardContent>
@@ -170,12 +170,18 @@ export const Dashboard = () => {
         </div>
 
         {/* Sidebar Controls */}
-        <ScrollArea className="h-[calc(100vh-24rem)]">
-          <div className="space-y-6 pr-4">
-            <PowerMetrics networkStats={stats} />
-            <AdrControls />
-          </div>
-        </ScrollArea>
+        <div>
+          <Card className="h-[calc(100vh-22rem)] flex flex-col">
+            <CardContent className="p-4 flex-1 overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="space-y-6 pr-4">
+                  <PowerMetrics networkStats={stats} />
+                  <AdrControls />
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
