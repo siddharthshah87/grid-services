@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { VenList } from './VenList';
 import { MapView } from './MapView';
 import { PowerMetrics } from './PowerMetrics';
@@ -131,10 +132,10 @@ export const Dashboard = () => {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* VEN Management */}
         <div className="lg:col-span-2">
-          <Card className="h-full">
+          <Card className="flex flex-col">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -161,16 +162,20 @@ export const Dashboard = () => {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {activeView === 'list' ? <VenList /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
+              <ScrollArea className="h-[calc(100vh-24rem)]">
+                {activeView === 'list' ? <VenList /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
+              </ScrollArea>
             </CardContent>
           </Card>
         </div>
 
         {/* Sidebar Controls */}
-        <div className="space-y-6">
-          <PowerMetrics networkStats={stats} />
-          <AdrControls />
-        </div>
+        <ScrollArea className="h-[calc(100vh-24rem)]">
+          <div className="space-y-6 pr-4">
+            <PowerMetrics networkStats={stats} />
+            <AdrControls />
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );
