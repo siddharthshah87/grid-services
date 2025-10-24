@@ -569,65 +569,67 @@ HTML_TEMPLATE = """
         <p class="subtitle">Real-time monitoring and control</p>
         
         <div style="display:flex; gap:12px; margin-bottom:18px;">
-            <button class="btn btn-primary" id="tab-overview" onclick="switchTab('overview')">Overview</button>
-            <button class="btn" id="tab-der" onclick="switchTab('der')">DER / Events</button>
+            <button class="btn" id="tab-overview" onclick="switchTab('overview')">Overview</button>
+            <button class="btn btn-primary" id="tab-der" onclick="switchTab('der')">DER / Events</button>
         </div>
 
-        <div id="overview-tab">
-        <div class="grid">
-            <div class="card">
-                <h2>⚡ Panel Configuration</h2>
-                <div class="input-group">
-                    <label>Panel Size</label>
-                    <select id="panel-select" onchange="changePanel()">
-                        <option value="100">100A Panel (24 kW max)</option>
-                        <option value="150">150A Panel (36 kW max)</option>
-                        <option value="200" selected>200A Panel (48 kW max)</option>
-                    </select>
+        <!-- Overview Tab -->
+        <div id="overview-tab" style="display:none;">
+            <div class="grid">
+                <div class="card">
+                    <h2>⚡ Panel Configuration</h2>
+                    <div class="input-group">
+                        <label>Panel Size</label>
+                        <select id="panel-select" onchange="changePanel()">
+                            <option value="100">100A Panel (24 kW max)</option>
+                            <option value="150">150A Panel (36 kW max)</option>
+                            <option value="200" selected>200A Panel (48 kW max)</option>
+                        </select>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Current Panel</div>
+                        <div class="stat-value" id="panel-rating">-- A</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Voltage</div>
+                        <div class="stat-value" id="panel-voltage">-- V</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Max Capacity</div>
+                        <div class="stat-value" id="panel-max">-- kW</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Connection</div>
+                        <div>
+                            <span class="status" id="conn-status">Disconnected</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat">
-                    <div class="stat-label">Current Panel</div>
-                    <div class="stat-value" id="panel-rating">-- A</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Voltage</div>
-                    <div class="stat-value" id="panel-voltage">-- V</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Max Capacity</div>
-                    <div class="stat-value" id="panel-max">-- kW</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Connection</div>
-                    <div>
-                        <span class="status" id="conn-status">Disconnected</span>
+                
+                <div class="card">
+                    <h2>📊 Current Usage</h2>
+                    <div class="stat">
+                        <div class="stat-label">Power (kW)</div>
+                        <div class="stat-value power" id="current-power">-- kW</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Current (A)</div>
+                        <div class="stat-value power" id="current-amps">-- A</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Panel Utilization</div>
+                        <div class="stat-value" id="panel-util">--%</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Load Shed</div>
+                        <div class="stat-value shed" id="shed-power">-- kW</div>
                     </div>
                 </div>
             </div>
-            
-            <div class="card">
-                <h2>📊 Current Usage</h2>
-                <div class="stat">
-                    <div class="stat-label">Power (kW)</div>
-                    <div class="stat-value power" id="current-power">-- kW</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Current (A)</div>
-                    <div class="stat-value power" id="current-amps">-- A</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Panel Utilization</div>
-                    <div class="stat-value" id="panel-util">--%</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Load Shed</div>
-                    <div class="stat-value shed" id="shed-power">-- kW</div>
-                </div>
-            </div>
         </div>
 
-        <!-- DER tab -->
-        <div id="der-tab" style="display:none;">
+        <!-- DER Tab -->
+        <div id="der-tab" style="display:block;">
             <div class="grid">
                 <div class="card" id="event-card">
                     <h2>🚨 DR Event Control</h2>
@@ -677,11 +679,11 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="card">
-            <h2>🔌 Circuits</h2>
-            <div id="circuits-list"></div>
+            
+            <div class="card">
+                <h2>🔌 Circuits</h2>
+                <div id="circuits-list"></div>
+            </div>
         </div>
     </div>
     
@@ -855,10 +857,19 @@ HTML_TEMPLATE = """
         }
         
         function fetchEventHistory() {
+            console.log('Fetching event history...');
+            const historyDiv = document.getElementById('event-history');
+            historyDiv.innerHTML = '<p style="color:#94a3b8">Loading events...</p>';
+            
             fetch('/api/events')
-                .then(r => r.json())
+                .then(r => {
+                    console.log('Response status:', r.status);
+                    return r.json();
+                })
                 .then(events => {
-                    const historyDiv = document.getElementById('event-history');
+                    console.log('Received events:', events);
+                    console.log('Events count:', events ? events.length : 0);
+                    
                     if (!events || events.length === 0) {
                         historyDiv.innerHTML = '<p style="color:#94a3b8">No events yet</p>';
                         return;
@@ -899,11 +910,13 @@ HTML_TEMPLATE = """
                     }).join('');
                     
                     historyDiv.innerHTML = eventsHtml;
+                    console.log('Event history rendered successfully');
                 })
                 .catch(err => {
                     console.error('Error fetching event history:', err);
-                    document.getElementById('event-history').innerHTML = 
-                        '<p style="color:#ef4444">Error loading event history</p>';
+                    const historyDiv = document.getElementById('event-history');
+                    historyDiv.innerHTML = 
+                        `<p style="color:#ef4444">Error loading event history: ${err.message}</p>`;
                 });
         }
         
@@ -922,7 +935,11 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def index():
-    return render_template_string(HTML_TEMPLATE)
+    response = app.make_response(render_template_string(HTML_TEMPLATE))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/api/state')
 def api_state():
@@ -1221,7 +1238,13 @@ def main():
     # Create MQTT client with clean session (default)
     # Note: We use clean_session=True to avoid AWS IoT session conflicts when restarting quickly.
     # This means we won't receive messages published while offline, but ensures reliable reconnection.
-    mqtt_client = mqtt.Client(client_id=CLIENT_ID, clean_session=True, protocol=mqtt.MQTTv311)
+    # Using CallbackAPIVersion.VERSION1 for compatibility with existing callback signatures
+    mqtt_client = mqtt.Client(
+        client_id=CLIENT_ID,
+        clean_session=True,
+        protocol=mqtt.MQTTv311,
+        callback_api_version=mqtt.CallbackAPIVersion.VERSION1
+    )
     mqtt_client.on_connect = on_connect
     mqtt_client.on_disconnect = on_disconnect
     mqtt_client.on_message = on_message
