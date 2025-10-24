@@ -32,6 +32,9 @@ async def test_engine():
         poolclass=StaticPool,
     )
     async with engine.begin() as conn:
+        # Drop all tables first to ensure clean schema
+        await conn.run_sync(Base.metadata.drop_all)
+        # Create all tables with latest schema
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     await engine.dispose()
