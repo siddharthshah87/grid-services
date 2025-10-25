@@ -84,7 +84,7 @@ start_ven() {
     
     if pgrep -f "python3.*ven_local_enhanced" > /dev/null; then
         echo "✅ VEN started successfully"
-        echo "   Web UI: http://localhost:8080"
+        echo "   Web UI: http://localhost:8888"
     else
         echo "❌ Failed to start VEN"
         exit 1
@@ -119,8 +119,8 @@ show_status() {
     fi
     
     # Check web UI
-    if curl -s http://localhost:8080 > /dev/null 2>&1; then
-        echo "✅ Web UI: Accessible at http://localhost:8080"
+    if curl -s http://localhost:8888 > /dev/null 2>&1; then
+        echo "✅ Web UI: Accessible at http://localhost:8888"
     else
         echo "❌ Web UI: Not accessible"
     fi

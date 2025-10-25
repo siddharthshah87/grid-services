@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   MapPin, 
   Zap, 
@@ -11,16 +11,13 @@ import {
   Activity
 } from 'lucide-react';
 import { useVenSummary } from '@/hooks/useApi';
-import { VenDetailDialog } from './VenDetailDialog';
 
 export const VenList = () => {
+  const navigate = useNavigate();
   const { data: vens, isLoading } = useVenSummary();
-  const [selectedVenId, setSelectedVenId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
 
   const handleDetails = (id: string) => {
-    setSelectedVenId(id);
-    setDetailOpen(true);
+    navigate(`/vens/${id}`);
   };
 
   const getStatusIcon = (status: string) => {
@@ -127,15 +124,6 @@ export const VenList = () => {
           <div className="p-4 text-sm text-muted-foreground">Loading VENs…</div>
         )}
       </div>
-      
-      <VenDetailDialog 
-        venId={selectedVenId}
-        open={detailOpen}
-        onOpenChange={(open) => {
-          setDetailOpen(open);
-          if (!open) setSelectedVenId(null);
-        }}
-      />
     </>
   );
 };

@@ -62,7 +62,7 @@ export BACKEND_URL="${BACKEND_URL:-http://backend-alb-948465488.us-west-2.elb.am
 export CA_CERT="./certs/ca.pem"
 export CLIENT_CERT="./certs/client.crt"
 export PRIVATE_KEY="./certs/client.key"
-export WEB_PORT="8080"
+export WEB_PORT="8888"
 
 echo ""
 echo "Configuration:"

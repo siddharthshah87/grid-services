@@ -42,7 +42,7 @@ METERING_TOPIC = os.getenv("METERING_TOPIC", "volttron/metering")  # Backend top
 LOADS_TOPIC = os.getenv("LOADS_TOPIC", f"ven/loads/{CLIENT_ID}")  # Load snapshots for circuit history
 CMD_TOPIC = os.getenv("CMD_TOPIC", f"ven/cmd/{CLIENT_ID}")
 ACK_TOPIC = os.getenv("ACK_TOPIC", f"ven/ack/{CLIENT_ID}")
-WEB_PORT = int(os.getenv("WEB_PORT", "8080"))
+WEB_PORT = int(os.getenv("WEB_PORT", "8888"))
 
 # Device Shadow topics
 SHADOW_UPDATE_TOPIC = f"$aws/things/{CLIENT_ID}/shadow/update"

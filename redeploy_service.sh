@@ -11,13 +11,14 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$REPO_DIR/ecs-backend"
 ./build_and_push.sh
 
-cd "$REPO_DIR/ecs-frontend"
-./build_and_push.sh
+# cd "$REPO_DIR/ecs-frontend"
+# ./build_and_push.sh
 
 # Note: volttron-ven runs locally (not containerized), no build needed
 # Note: grid-event-gateway is deprecated/removed
 
-for svc in ecs-backend ecs-frontend; do
+# for svc in ecs-backend ecs-frontend; do
+for svc in ecs-backend; do
   echo "🔁 Forcing redeploy of $svc"
   aws ecs update-service \
     --cluster "$CLUSTER" \

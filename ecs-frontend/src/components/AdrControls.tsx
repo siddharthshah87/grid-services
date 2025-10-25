@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,9 +19,9 @@ import {
   Target
 } from 'lucide-react';
 import { useCreateEvent, useCurrentEvent, useStopEvent, useEventsHistory, Event } from '@/hooks/useApi';
-import { EventDetailDialog } from './EventDetailDialog';
 
 export const AdrControls = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [reductionTarget, setReductionTarget] = useState('5.0'); // MW
   const [eventDuration, setEventDuration] = useState('60'); // minutes
@@ -30,12 +31,9 @@ export const AdrControls = () => {
   const createEvent = useCreateEvent();
   const stopEvent = useStopEvent();
   const { data: eventsHistory } = useEventsHistory();
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [eventDetailOpen, setEventDetailOpen] = useState(false);
 
   const openEventDetail = (eventId: string) => {
-    setSelectedEventId(eventId);
-    setEventDetailOpen(true);
+    navigate(`/events/${eventId}`);
   };
 
   const isEventActive = !!currentEvent && currentEvent.status !== 'completed' && currentEvent.status !== 'cancelled';
@@ -239,15 +237,6 @@ export const AdrControls = () => {
             )}
           </div>
         </div>
-
-        <EventDetailDialog 
-          eventId={selectedEventId}
-          open={eventDetailOpen}
-          onOpenChange={(open) => {
-            setEventDetailOpen(open);
-            if (!open) setSelectedEventId(null);
-          }}
-        />
       </CardContent>
     </Card>
   );

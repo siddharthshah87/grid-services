@@ -21,7 +21,7 @@
 
 **Features**:
 - ✅ MQTT connection to AWS IoT Core with auto-reconnect
-- 🌐 Web UI at `http://localhost:8080`
+- 🌐 Web UI at `http://localhost:8888`
 - 📱 AWS IoT Device Shadow sync
 - ⚡ DR event handling with intelligent load curtailment
 - 🎛️ Circuit-level control (HVAC, EV, lights, etc.)
@@ -35,7 +35,7 @@ The VEN runs with:
 - **Thing Name**: `volttron_thing` (matches AWS IoT certificates)
 - **Telemetry Topic**: `volttron/metering` (shared topic for all VENs)
 - **Command Topic**: `ven/cmd/volttron_thing`
-- **Web UI Port**: 8080
+- **Web UI Port**: 8888
 
 **Important**: Thing name is fixed to `volttron_thing` because certificates are pre-registered to this AWS IoT Thing.
 
