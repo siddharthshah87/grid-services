@@ -206,6 +206,12 @@ def aggregate_network_stats(
     for ven in vens:
         status = statuses.get(ven.ven_id)
         telemetry = telemetries.get(ven.ven_id)
+        
+        # Check if VEN is online
+        is_online = (status and status.status.lower() == "online") or ven.status.lower() == "online"
+        if is_online:
+            online += 1
+        
         if status and status.current_power_kw is not None:
             household += status.current_power_kw
         elif telemetry and telemetry.used_power_kw is not None:
@@ -218,11 +224,9 @@ def aggregate_network_stats(
             controllable += telemetry.shed_power_kw
             potential += telemetry.shed_power_kw
 
-        if telemetry and telemetry.shed_power_kw is not None:
+        # Only count current reduction from online VENs
+        if is_online and telemetry and telemetry.shed_power_kw is not None:
             current_reduction += telemetry.shed_power_kw
-
-        if (status and status.status.lower() == "online") or ven.status.lower() == "online":
-            online += 1
 
     return NetworkStats(
         venCount=len(vens),
