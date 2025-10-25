@@ -284,6 +284,6 @@ async def get_load_snapshots(
         stmt = stmt.where(VenTelemetry.timestamp >= start)
     if end is not None:
         stmt = stmt.where(VenTelemetry.timestamp <= end)
-    stmt = stmt.order_by(VenTelemetry.timestamp.desc()).limit(limit)
+    stmt = stmt.order_by(VenTelemetry.timestamp.asc()).limit(limit)
     result = await session.execute(stmt)
     return list(result.all())

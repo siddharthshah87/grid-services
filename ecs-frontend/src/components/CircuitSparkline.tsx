@@ -1,5 +1,6 @@
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { useVenCircuitHistory } from '@/hooks/useApi';
+import { useMemo } from 'react';
 
 interface CircuitSparklineProps {
   venId: string;
@@ -8,15 +9,22 @@ interface CircuitSparklineProps {
 }
 
 export const CircuitSparkline = ({ venId, loadId, currentPowerKw }: CircuitSparklineProps) => {
-  const { data: history } = useVenCircuitHistory(venId, { loadId, limit: 20 });
+  // Get last hour of data for sparkline - memoize to prevent query key changes on every render
+  const startTime = useMemo(() => new Date(Date.now() - 60 * 60 * 1000).toISOString(), []);
+  
+  const { data: history } = useVenCircuitHistory(venId, { loadId, start: startTime, limit: 100 });
 
   const chartData = history?.snapshots?.map(snap => ({
     value: snap.currentPowerKw || 0,
   })) || [];
 
-  // If no data yet, show current value as single point
-  if (chartData.length === 0) {
-    chartData.push({ value: currentPowerKw });
+  // If no data or insufficient data points, show a placeholder
+  if (chartData.length < 2) {
+    return (
+      <div className="w-24 h-8 flex items-center justify-center">
+        <span className="text-xs text-muted-foreground">—</span>
+      </div>
+    );
   }
 
   return (

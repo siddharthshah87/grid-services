@@ -202,7 +202,7 @@ export default function VenDetailPage() {
                     iconType="rect"
                   />
                   <Bar dataKey="current" fill="#8884d8" name="Current Power" activeBar={{ opacity: 0.8 }} />
-                  <Bar dataKey="capacity" fill="#82ca9d" name="Capacity" activeBar={{ opacity: 0.8 }} />
+                  <Bar dataKey="capacity" fill="#82ca9d" name="Rated Power" activeBar={{ opacity: 0.8 }} />
                   <Bar dataKey="shedCapability" fill="#ffc658" name="Shed Capability" activeBar={{ opacity: 0.8 }} />
                 </BarChart>
               </ResponsiveContainer>
@@ -222,7 +222,7 @@ export default function VenDetailPage() {
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Current Power</TableHead>
-                    <TableHead className="text-right">Capacity</TableHead>
+                    <TableHead className="text-right">Rated Power</TableHead>
                     <TableHead className="text-right">Shed Capability</TableHead>
                     <TableHead className="text-center">Trend</TableHead>
                   </TableRow>

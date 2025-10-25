@@ -176,6 +176,8 @@ export function useVenCircuitHistory(venId: string | null, params?: { loadId?: s
     queryKey: ["venCircuitHistory", venId, params],
     queryFn: () => apiGet<CircuitHistoryResponse>(`/api/vens/${venId}/circuits/history${qs}`),
     enabled: !!venId,
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    retry: 1, // Only retry once on failure
   });
 }
 

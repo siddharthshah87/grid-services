@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { useVenCircuitHistory } from '@/hooks/useApi';
 import { Zap, Activity, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
+import { useMemo } from 'react';
 
 interface CircuitDetailDialogProps {
   venId: string;
@@ -29,14 +30,17 @@ export const CircuitDetailDialog = ({
   open,
   onOpenChange
 }: CircuitDetailDialogProps) => {
-  const { data: history, isLoading } = useVenCircuitHistory(
+  // Get data for the last 24 hours - memoize to prevent query key changes on every render
+  const startTime = useMemo(() => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), []);
+  
+  const { data: history, isLoading, isError } = useVenCircuitHistory(
     open ? venId : null,
-    { loadId, limit: 100 }
+    { loadId, start: startTime, limit: 5000 }
   );
 
   // Prepare chart data
   const chartData = history?.snapshots?.map(snap => ({
-    time: format(new Date(snap.timestamp), 'HH:mm:ss'),
+    time: format(new Date(snap.timestamp), 'MMM dd HH:mm'),
     power: snap.currentPowerKw || 0,
     capacity: capacityKw,
     shed: shedCapabilityKw,
@@ -73,59 +77,54 @@ export const CircuitDetailDialog = ({
           </div>
         </DialogHeader>
 
-        {isLoading && (
-          <div className="p-8 text-center text-muted-foreground">Loading circuit details...</div>
-        )}
+        <div className="space-y-6">
+          {/* Current Metrics - Always show these */}
+          <div className="grid grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-muted-foreground">Current Power</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-success">{currentPowerKw.toFixed(2)} kW</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {utilizationPercent.toFixed(1)}% utilization
+                </div>
+              </CardContent>
+            </Card>
 
-        {!isLoading && (
-          <div className="space-y-6">
-            {/* Current Metrics */}
-            <div className="grid grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Current Power</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-success">{currentPowerKw.toFixed(2)} kW</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {utilizationPercent.toFixed(1)}% utilization
-                  </div>
-                </CardContent>
-              </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-muted-foreground">Rated Power</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{capacityKw.toFixed(2)} kW</div>
+                <div className="text-xs text-muted-foreground mt-1">Maximum rated</div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Capacity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{capacityKw.toFixed(2)} kW</div>
-                  <div className="text-xs text-muted-foreground mt-1">Maximum rated</div>
-                </CardContent>
-              </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-muted-foreground">Shed Capability</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-primary">{shedCapabilityKw.toFixed(2)} kW</div>
+                <div className="text-xs text-muted-foreground mt-1">Available to shed</div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Shed Capability</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-primary">{shedCapabilityKw.toFixed(2)} kW</div>
-                  <div className="text-xs text-muted-foreground mt-1">Available to shed</div>
-                </CardContent>
-              </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-muted-foreground">Data Points</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-accent">{history?.totalCount || 0}</div>
+                <div className="text-xs text-muted-foreground mt-1">Historical records</div>
+              </CardContent>
+            </Card>
+          </div>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Data Points</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-accent">{history?.totalCount || 0}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Historical records</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Statistics */}
-            {history?.snapshots && history.snapshots.length > 0 && (
+          {/* Statistics - Show when data is available */}
+          {!isLoading && !isError && history?.snapshots && history.snapshots.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -172,7 +171,13 @@ export const CircuitDetailDialog = ({
                 <CardDescription>Last {history?.snapshots?.length || 0} readings</CardDescription>
               </CardHeader>
               <CardContent>
-                {chartData.length > 0 ? (
+                {isLoading && (
+                  <div className="p-8 text-center text-muted-foreground">Loading historical data...</div>
+                )}
+                {isError && (
+                  <div className="p-8 text-center text-destructive">Failed to load circuit history</div>
+                )}
+                {!isLoading && !isError && chartData.length > 0 && (
                   <ResponsiveContainer width="100%" height={350}>
                     <AreaChart data={chartData}>
                       <defs>
@@ -224,7 +229,7 @@ export const CircuitDetailDialog = ({
                         strokeWidth={1.5}
                         strokeDasharray="5 5"
                         dot={false}
-                        name="Capacity"
+                        name="Rated Power"
                       />
                       <Line 
                         type="monotone" 
@@ -237,7 +242,8 @@ export const CircuitDetailDialog = ({
                       />
                     </AreaChart>
                   </ResponsiveContainer>
-                ) : (
+                )}
+                {!isLoading && !isError && chartData.length === 0 && (
                   <div className="p-8 text-center text-muted-foreground">
                     No historical data available for this circuit
                   </div>
@@ -245,7 +251,6 @@ export const CircuitDetailDialog = ({
               </CardContent>
             </Card>
           </div>
-        )}
       </DialogContent>
     </Dialog>
   );
