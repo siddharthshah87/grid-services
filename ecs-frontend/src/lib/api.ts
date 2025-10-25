@@ -1,6 +1,6 @@
-// Default to backend ALB, but allow override via VITE_API_BASE_URL environment variable
+// Default to relative URL (proxied by nginx in production)
 // For local development, set VITE_API_BASE_URL=http://localhost:8000 in .env file
-const DEFAULT_BACKEND_URL = "http://backend-alb-948465488.us-west-2.elb.amazonaws.com";
+const DEFAULT_BACKEND_URL = ""; // Empty string = relative URL, nginx will proxy to backend
 export const API_BASE: string = import.meta.env.VITE_API_BASE_URL || DEFAULT_BACKEND_URL;
 
 // Debug: print which backend URL the frontend resolved
