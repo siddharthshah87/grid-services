@@ -67,10 +67,10 @@ export const VenList = () => {
 
   return (
     <>
-      <div className="p-4 space-y-3">
+      <div className="p-3 md:p-4 space-y-3">
         {(sortedVens || []).map((ven) => (
           <Card key={ven.id} className="transition-all duration-200 hover:shadow-energy border-l-4 border-l-primary/30">
-            <CardContent className="p-4">
+            <CardContent className="p-5 md:p-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h3 className="font-semibold text-foreground">{ven.name}</h3>

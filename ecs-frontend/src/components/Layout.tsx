@@ -73,7 +73,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main Content */}
-      <main className="container py-6">{children}</main>
+      <main className="container py-4 md:py-6">{children}</main>
     </div>
   );
 }
