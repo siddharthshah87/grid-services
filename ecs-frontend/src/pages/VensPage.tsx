@@ -4,7 +4,7 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useVens } from "@/hooks/useApi";
-import { Loader2, Zap, MapPin, Gauge } from "lucide-react";
+import { Loader2, Zap, Clock, Gauge } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -13,10 +13,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDistanceToNow } from "date-fns";
 
 export default function VensPage() {
   const navigate = useNavigate();
   const { data: vens, isLoading } = useVens();
+
+  const formatLastSeen = (dateString: string | undefined) => {
+    if (!dateString) return "Never";
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch {
+      return "Unknown";
+    }
+  };
 
   // Sort VENs by lastSeen timestamp (most recent first), fall back to createdAt
   const sortedVens = [...(vens || [])].sort((a, b) => {
@@ -61,7 +71,7 @@ export default function VensPage() {
                   <TableHead>VEN ID</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Location</TableHead>
+                  <TableHead>Last Seen</TableHead>
                   <TableHead className="text-right">Power Usage</TableHead>
                   <TableHead className="text-right">Shed Capability</TableHead>
                   <TableHead className="text-right">Circuits</TableHead>
@@ -83,10 +93,8 @@ export default function VensPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <MapPin className="h-3 w-3" />
-                        {ven.location?.lat && ven.location?.lon
-                          ? `${ven.location.lat.toFixed(4)}, ${ven.location.lon.toFixed(4)}`
-                          : "N/A"}
+                        <Clock className="h-3 w-3" />
+                        {formatLastSeen(ven.lastSeen)}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
