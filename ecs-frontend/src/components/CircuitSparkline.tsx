@@ -9,8 +9,8 @@ interface CircuitSparklineProps {
 }
 
 export const CircuitSparkline = ({ venId, loadId, currentPowerKw }: CircuitSparklineProps) => {
-  // Get last hour of data for sparkline - memoize to prevent query key changes on every render
-  const startTime = useMemo(() => new Date(Date.now() - 60 * 60 * 1000).toISOString(), []);
+  // Get last 24 hours of data for sparkline - memoize to prevent query key changes on every render
+  const startTime = useMemo(() => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), []);
   
   const { data: history } = useVenCircuitHistory(venId, { loadId, start: startTime, limit: 100 });
 

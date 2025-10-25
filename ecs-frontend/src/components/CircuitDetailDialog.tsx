@@ -65,16 +65,11 @@ export const CircuitDetailDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-primary" />
-                {loadName || loadType}
-              </DialogTitle>
-              <DialogDescription className="font-mono text-xs mt-1">{loadId}</DialogDescription>
-            </div>
-            <Badge variant="outline" className="text-sm">{loadType}</Badge>
-          </div>
+          <DialogTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-primary" />
+            {loadName || loadType}
+          </DialogTitle>
+          <DialogDescription className="font-mono text-xs mt-1">{loadId}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
