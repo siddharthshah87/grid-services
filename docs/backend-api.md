@@ -201,6 +201,20 @@ GET /api/vens/volttron_thing/events?start=2025-10-20T00:00:00Z&limit=10
 
 Returns time-series power data for specific circuits or all circuits.
 
+**Query Parameters:**
+- `load_id` (optional): Filter by specific circuit/load ID. Omit to get all circuits.
+- `start` (optional): ISO 8601 timestamp for range start
+- `end` (optional): ISO 8601 timestamp for range end
+- `limit` (optional): Maximum number of snapshots to return (default: 100)
+
+**Examples:**
+
+Get all circuits for a VEN:
+```http
+GET /api/vens/volttron_thing/circuits/history?start=2025-10-20T15:00:00Z&limit=50
+```
+
+Get specific circuit history:
 ```http
 GET /api/vens/volttron_thing/circuits/history?load_id=circuit_3&start=2025-10-20T15:00:00Z&limit=20
 ```
@@ -213,6 +227,7 @@ GET /api/vens/volttron_thing/circuits/history?load_id=circuit_3&start=2025-10-20
     {
       "timestamp": "2025-10-20T15:30:05Z",
       "loadId": "circuit_3",
+      "name": "Pool Pump",
       "currentPowerKw": 0.0,
       "shedCapabilityKw": 3.5,
       "enabled": false
@@ -220,6 +235,7 @@ GET /api/vens/volttron_thing/circuits/history?load_id=circuit_3&start=2025-10-20
     {
       "timestamp": "2025-10-20T15:30:10Z",
       "loadId": "circuit_3",
+      "name": "Pool Pump",
       "currentPowerKw": 0.0,
       "shedCapabilityKw": 3.5,
       "enabled": false
@@ -228,9 +244,16 @@ GET /api/vens/volttron_thing/circuits/history?load_id=circuit_3&start=2025-10-20
 }
 ```
 
+**Note:** Snapshots are returned in descending timestamp order (newest first). The response includes circuit metadata (`name`) along with power measurements.
+
 ### Get VEN Telemetry
 
 Returns aggregate telemetry time-series for a VEN.
+
+**Query Parameters:**
+- `start` (optional): ISO 8601 timestamp for range start
+- `end` (optional): ISO 8601 timestamp for range end
+- `limit` (optional): Maximum number of records to return (default: 100)
 
 ```http
 GET /api/vens/volttron_thing/telemetry?start=2025-10-20T15:00:00Z&limit=10
@@ -247,11 +270,18 @@ GET /api/vens/volttron_thing/telemetry?start=2025-10-20T15:00:00Z&limit=10
       "shedPowerKw": 4.8,
       "requestedReductionKw": 5.0,
       "eventId": "evt-abc123",
-      "batterySoc": 85.5
+      "batterySoc": 85.5,
+      "panelAmperageRating": 200,
+      "panelVoltage": 240,
+      "panelMaxKw": 48.0,
+      "currentAmps": 34.2,
+      "panelUtilizationPercent": 17.1
     }
   ]
 }
 ```
+
+**Note:** Panel information fields (`panelAmperageRating`, `panelVoltage`, `panelMaxKw`, `currentAmps`, `panelUtilizationPercent`) are included for US electrical panel-based VENs.
 
 ### Get Device Shadow
 
