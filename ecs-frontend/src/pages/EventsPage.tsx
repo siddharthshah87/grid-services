@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useEventsHistory } from "@/hooks/useApi";
 import { Loader2, Calendar, Clock } from "lucide-react";
 import { format } from "date-fns";
+import { AdrControls } from "@/components/AdrControls";
 import {
   Table,
   TableBody,
@@ -36,6 +37,12 @@ export default function EventsPage() {
     <Layout>
       <Breadcrumbs items={[{ label: "Dashboard", path: "/dashboard" }, { label: "Events" }]} />
 
+      {/* ADR Event Control */}
+      <div className="mb-6">
+        <AdrControls />
+      </div>
+
+      {/* Events History Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
