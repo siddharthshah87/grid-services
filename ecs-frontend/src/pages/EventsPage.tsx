@@ -92,13 +92,14 @@ export default function EventsPage() {
                   <TableHead>Start Time</TableHead>
                   <TableHead>End Time</TableHead>
                   <TableHead className="text-right">Target Reduction</TableHead>
+                  <TableHead className="text-right">Actual Reduction</TableHead>
                   <TableHead className="text-right">Duration</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredEvents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       {searchQuery ? "No events found matching your search." : "No events available."}
                     </TableCell>
                   </TableRow>
@@ -130,8 +131,11 @@ export default function EventsPage() {
                     <TableCell className="text-right font-mono">
                       {event.requestedReductionKw.toFixed(2)} kW
                     </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {event.actualReductionKw?.toFixed(2) || '0.00'} kW
+                    </TableCell>
                     <TableCell className="text-right">
-                      {Math.round((new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 60000)} min
+                      {Math.round((new Date(event.endTime.endsWith('Z') ? event.endTime : event.endTime + 'Z').getTime() - new Date(event.startTime.endsWith('Z') ? event.startTime : event.startTime + 'Z').getTime()) / 60000)} min
                     </TableCell>
                   </TableRow>
                   ))
