@@ -149,9 +149,16 @@ export interface VenEventAck {
   venId: string;
   timestamp: string;
   status: string;
-  circuits: Array<{
-    loadId: string;
-    curtailedKw: number;
+  requestedShedKw?: number;
+  actualShedKw?: number;
+  circuitsCurtailed?: Array<{
+    id: string;
+    name: string;
+    breaker_amps: number;
+    original_kw: number;
+    curtailed_kw: number;
+    final_kw: number;
+    critical: boolean;
   }>;
 }
 

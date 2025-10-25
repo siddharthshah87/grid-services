@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useVenDetail, useVenCircuitHistory, useVenEventHistory } from "@/hooks/useApi";
+import { useVenDetail, useVenCircuitHistory, useVenEventHistory, type VenEventAck } from "@/hooks/useApi";
 import { Loader2, ArrowLeft, Zap, MapPin, Gauge, Clock } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { CircuitSparkline } from "@/components/CircuitSparkline";
 import { CircuitDetailDialog } from "@/components/CircuitDetailDialog";
+import { VenEventDetailDialog } from "@/components/VenEventDetailDialog";
 
 export default function VenDetailPage() {
   const { venId } = useParams<{ venId: string }>();
@@ -36,6 +37,8 @@ export default function VenDetailPage() {
     capacityKw: number;
     shedCapabilityKw: number;
   } | null>(null);
+
+  const [selectedEvent, setSelectedEvent] = useState<VenEventAck | null>(null);
 
   if (isLoading) {
     return (
@@ -320,33 +323,57 @@ export default function VenDetailPage() {
                     <TableHead>Event ID</TableHead>
                     <TableHead>Timestamp</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Circuits Curtailed</TableHead>
+                    <TableHead>Loads Shed</TableHead>
+                    <TableHead className="text-right">Total Shed (kW)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {eventHistory?.map((evt) => (
-                    <TableRow
-                      key={`${evt.eventId}-${evt.timestamp}`}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/events/${evt.eventId}`)}
-                    >
-                      <TableCell className="font-mono text-sm">{evt.eventId}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          {evt.timestamp ? format(new Date(evt.timestamp), 'PPpp') : 'N/A'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={evt.status === 'accepted' ? 'default' : 'secondary'}>
-                          {evt.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant="outline">{evt.circuits?.length || 0}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {eventHistory?.map((evt) => {
+                    const totalShed = evt.circuitsCurtailed?.reduce((sum, c) => sum + c.curtailed_kw, 0) || 0;
+                    const loadTypes = evt.circuitsCurtailed?.map(c => {
+                      // Extract type from name or ID (e.g., "HVAC" from name, or "hvac" from "hvac1")
+                      const type = c.name.split(' ')[0] || c.id.replace(/\d+$/, '');
+                      return type;
+                    }) || [];
+                    const uniqueTypes = Array.from(new Set(loadTypes));
+                    
+                    return (
+                      <TableRow
+                        key={`${evt.eventId}-${evt.timestamp}`}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setSelectedEvent(evt)}
+                      >
+                        <TableCell className="font-mono text-sm">{evt.eventId}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            {evt.timestamp ? format(new Date(evt.timestamp), 'PPpp') : 'N/A'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={evt.status === 'accepted' ? 'default' : 'secondary'}>
+                            {evt.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {uniqueTypes.length > 0 ? (
+                              uniqueTypes.map((type, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {type}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-sm text-muted-foreground">None</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {totalShed > 0 ? `${totalShed.toFixed(2)} kW` : '-'}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -366,6 +393,20 @@ export default function VenDetailPage() {
           shedCapabilityKw={selectedCircuit.shedCapabilityKw}
           open={!!selectedCircuit}
           onOpenChange={(open) => !open && setSelectedCircuit(null)}
+        />
+      )}
+
+      {/* VEN Event Detail Modal */}
+      {selectedEvent && (
+        <VenEventDetailDialog
+          event={selectedEvent}
+          venName={ven.name || ven.id}
+          open={!!selectedEvent}
+          onOpenChange={(open) => !open && setSelectedEvent(null)}
+          onViewEvent={() => {
+            setSelectedEvent(null);
+            navigate(`/events/${selectedEvent.eventId}`);
+          }}
         />
       )}
     </Layout>
