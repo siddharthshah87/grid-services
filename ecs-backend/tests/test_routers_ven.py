@@ -242,6 +242,67 @@ async def test_list_ven_loads_with_telemetry(client: AsyncClient, test_session: 
 
 
 @pytest.mark.asyncio
+async def test_ven_last_seen_field(client: AsyncClient, test_session: AsyncSession):
+    """Test that lastSeen field is populated from telemetry timestamp."""
+    from app import crud
+    from app.models.telemetry import VenTelemetry
+    
+    # Create VEN
+    ven = await crud.create_ven(
+        test_session,
+        ven_id="ven-lastseen-test",
+        name="VEN LastSeen Test",
+        status="active",
+        registration_id="lastseen-reg",
+        latitude=37.0,
+        longitude=-122.0,
+    )
+    
+    # Create telemetry
+    now = datetime.now(UTC)
+    telemetry = VenTelemetry(
+        ven_id=ven.ven_id,
+        timestamp=now,
+        used_power_kw=5.0,
+        shed_power_kw=2.0,
+    )
+    test_session.add(telemetry)
+    await test_session.commit()
+    
+    # Get VEN and verify lastSeen is set
+    response = await client.get(f"/api/vens/{ven.ven_id}")
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert "lastSeen" in data
+    assert data["lastSeen"] is not None
+    # Verify it's a valid ISO datetime string
+    last_seen_dt = datetime.fromisoformat(data["lastSeen"].replace('Z', '+00:00'))
+    assert isinstance(last_seen_dt, datetime)
+
+
+@pytest.mark.asyncio
+async def test_ven_last_seen_none_without_telemetry(client: AsyncClient):
+    """Test that lastSeen is None when VEN has no telemetry."""
+    payload = {
+        "name": "No Telemetry VEN",
+        "location": {"lat": 37.0, "lon": -122.0},
+        "registrationId": "no-telem-reg",
+    }
+    
+    create_response = await client.post("/api/vens/", json=payload)
+    ven_id = create_response.json()["id"]
+    
+    response = await client.get(f"/api/vens/{ven_id}")
+    assert response.status_code == 200
+    data = response.json()
+    
+    # lastSeen should be None when no telemetry exists
+    assert "lastSeen" in data
+    assert data["lastSeen"] is None
+
+
+@pytest.mark.asyncio
 async def test_get_ven_load(client: AsyncClient, test_session: AsyncSession):
     """Test getting a specific load for a VEN."""
     from app import crud
