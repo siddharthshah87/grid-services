@@ -149,16 +149,28 @@ export default function VenDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-sm font-medium">
-              {ven.lastSeen 
-                ? formatDistanceToNow(new Date(ven.lastSeen), { addSuffix: true })
-                : "less than a minute ago"}
-            </div>
-            {ven.lastSeen && (
-              <div className="text-xs text-muted-foreground mt-1">
-                {format(new Date(ven.lastSeen), "yyyy/MM/dd - HH:mm:ss")}
-              </div>
-            )}
+            {!ven.lastSeen ? (
+              <div className="text-sm font-medium">Never</div>
+            ) : (() => {
+              const date = new Date(ven.lastSeen);
+              const now = new Date();
+              const isFuture = date > now;
+              
+              return (
+                <>
+                  <div className="text-sm font-medium">
+                    {isFuture 
+                      ? `Future: ${format(date, "yyyy/MM/dd - HH:mm:ss")}`
+                      : formatDistanceToNow(date, { addSuffix: true })}
+                  </div>
+                  {!isFuture && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {format(date, "yyyy/MM/dd - HH:mm:ss")}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
 

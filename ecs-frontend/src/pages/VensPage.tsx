@@ -13,25 +13,46 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 
 export default function VensPage() {
   const navigate = useNavigate();
   const { data: vens, isLoading } = useVens();
 
   const formatLastSeen = (dateString: string | undefined) => {
-    if (!dateString) return "less than a minute ago";
+    if (!dateString) return "Never";
+    
     try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+      const date = new Date(dateString);
+      const now = new Date();
+      
+      // If timestamp is in the future, show the actual timestamp
+      if (date > now) {
+        return format(date, "yyyy/MM/dd - HH:mm:ss");
+      }
+      
+      return formatDistanceToNow(date, { addSuffix: true });
     } catch {
-      return "less than a minute ago";
+      // If parsing fails, show the raw string
+      return dateString;
     }
   };
 
-  // Sort VENs by lastSeen timestamp (most recent first), fall back to createdAt
+  // Sort VENs by lastSeen timestamp (most recent first, push invalid/missing to bottom)
   const sortedVens = [...(vens || [])].sort((a, b) => {
-    const dateA = new Date(a.lastSeen || a.createdAt).getTime();
-    const dateB = new Date(b.lastSeen || b.createdAt).getTime();
+    // Handle missing timestamps - push to bottom
+    if (!a.lastSeen && !b.lastSeen) return 0;
+    if (!a.lastSeen) return 1;
+    if (!b.lastSeen) return -1;
+    
+    const dateA = new Date(a.lastSeen).getTime();
+    const dateB = new Date(b.lastSeen).getTime();
+    
+    // Handle invalid dates - push to bottom
+    if (isNaN(dateA) && isNaN(dateB)) return 0;
+    if (isNaN(dateA)) return 1;
+    if (isNaN(dateB)) return -1;
+    
     return dateB - dateA; // Most recent first
   });
 

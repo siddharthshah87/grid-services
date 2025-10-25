@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Activity } from 'lucide-react';
 import { useVenSummary } from '@/hooks/useApi';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 
 export const VenList = () => {
   const navigate = useNavigate();
@@ -14,18 +14,40 @@ export const VenList = () => {
     navigate(`/vens/${id}`);
   };
 
-  const formatLastSeen = (dateString: string) => {
+  const formatLastSeen = (dateString: string | undefined) => {
+    if (!dateString) return "Never";
+    
     try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+      const date = new Date(dateString);
+      const now = new Date();
+      
+      // If timestamp is in the future, show the actual timestamp
+      if (date > now) {
+        return format(date, "yyyy/MM/dd - HH:mm:ss");
+      }
+      
+      return formatDistanceToNow(date, { addSuffix: true });
     } catch {
+      // If parsing fails, show the raw string
       return dateString;
     }
   };
 
-  // Sort VENs by lastSeen timestamp (most recent first)
+  // Sort VENs by lastSeen timestamp (most recent first, push invalid/missing to bottom)
   const sortedVens = [...(vens || [])].sort((a, b) => {
+    // Handle missing timestamps - push to bottom
+    if (!a.lastSeen && !b.lastSeen) return 0;
+    if (!a.lastSeen) return 1;
+    if (!b.lastSeen) return -1;
+    
     const dateA = new Date(a.lastSeen).getTime();
     const dateB = new Date(b.lastSeen).getTime();
+    
+    // Handle invalid dates - push to bottom
+    if (isNaN(dateA) && isNaN(dateB)) return 0;
+    if (isNaN(dateA)) return 1;
+    if (isNaN(dateB)) return -1;
+    
     return dateB - dateA; // Most recent first
   });
 
