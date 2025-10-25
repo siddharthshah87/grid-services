@@ -52,7 +52,7 @@ async def list_vens_v2(session: AsyncSession = Depends(get_session)):
     statuses = await crud.latest_status_map(session, ven_ids)
     telemetry = await crud.latest_telemetry_map(session, ven_ids)
     return [
-        build_ven_payload(ven, statuses.get(ven.ven_id), telemetry.get(ven.ven_id))
+        build_ven_payload(ven, statuses.get(ven.ven_id), telemetry.get(ven.ven_id), include_loads=True)
         for ven in vens
     ]
 

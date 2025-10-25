@@ -63,8 +63,8 @@ export default function VensPage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead className="text-right">Power Usage</TableHead>
-                  <TableHead className="text-right">Capacity</TableHead>
-                  <TableHead className="text-right">Loads</TableHead>
+                  <TableHead className="text-right">Shed Capability</TableHead>
+                  <TableHead className="text-right">Circuits</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
