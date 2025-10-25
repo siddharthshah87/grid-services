@@ -12,10 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   Play, 
   Square, 
-  AlertTriangle, 
   CheckCircle,
   Clock,
-  Zap,
+  Calendar,
   Target
 } from 'lucide-react';
 import { useCreateEvent, useCurrentEvent, useStopEvent, useEventsHistory, Event } from '@/hooks/useApi';
@@ -300,60 +299,47 @@ export const AdrControls = ({ compact = false }: AdrControlsProps) => {
         {/* Control Buttons */}
         <div className="space-y-2">
           {!isEventActive ? (
-            <Button 
-              onClick={handleStartAdrEvent}
-              className="w-full h-9 bg-gradient-primary"
-              disabled={!reductionTarget || parseFloat(reductionTarget) <= 0 || createEvent.isPending}
-            >
-              <Play className="h-4 w-4 mr-2" />
-              {createEvent.isPending ? 'Starting…' : 'Start ADR Event'}
-            </Button>
+            <>
+              <Button 
+                onClick={handleStartAdrEvent}
+                className="w-full h-9 bg-gradient-primary"
+                disabled={!reductionTarget || parseFloat(reductionTarget) <= 0 || createEvent.isPending}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                {createEvent.isPending ? 'Starting…' : 'Start ADR Event'}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full h-8 text-xs"
+                onClick={() => navigate('/events')}
+              >
+                <Calendar className="h-3 w-3 mr-2" />
+                View All Events
+              </Button>
+            </>
           ) : (
-            <Button 
-              onClick={handleStopAdrEvent}
-              variant="destructive"
-              className="w-full h-9"
-              disabled={stopEvent.isPending}
-            >
-              <Square className="h-4 w-4 mr-2" />
-              {stopEvent.isPending ? 'Stopping…' : 'Stop Event'}
-            </Button>
+            <>
+              <Button 
+                onClick={handleStopAdrEvent}
+                variant="destructive"
+                className="w-full h-9"
+                disabled={stopEvent.isPending}
+              >
+                <Square className="h-4 w-4 mr-2" />
+                {stopEvent.isPending ? 'Stopping…' : 'Stop Event'}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full h-8 text-xs"
+                onClick={() => navigate('/events')}
+              >
+                <Calendar className="h-3 w-3 mr-2" />
+                View All Events
+              </Button>
+            </>
           )}
-          
-          <Button variant="outline" size="sm" className="w-full h-8 text-xs opacity-50 cursor-not-allowed" disabled>
-            Schedule Event (coming soon)
-          </Button>
-        </div>
-
-        {/* Recent Events */}
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">Recent Events</Label>
-          <div className="space-y-1">
-            {(eventsHistory || []).slice(0, 5).map((evt) => {
-              const isCompleted = evt.status === 'completed';
-              const isOngoing = evt.status === 'active';
-              const icon = isCompleted ? <CheckCircle className="h-3 w-3 text-success" /> : <Zap className="h-3 w-3 text-warning" />;
-              const start = new Date(evt.startTime);
-              return (
-                <button
-                  key={evt.id}
-                  className="w-full text-left flex justify-between items-center text-xs bg-muted/20 hover:bg-muted/30 p-2 rounded transition-colors cursor-pointer"
-                  onClick={() => openEventDetail(evt.id)}
-                >
-                  <span className="flex items-center gap-1">
-                    {icon}
-                    <span className="text-muted-foreground">{start.toLocaleString()}</span>
-                  </span>
-                  <span className={isCompleted ? 'text-success' : 'text-warning'}>
-                    {(evt.requestedReductionKw / 1000).toFixed(1)} MW
-                  </span>
-                </button>
-              );
-            })}
-            {(!eventsHistory || eventsHistory.length === 0) && (
-              <div className="text-xs text-muted-foreground bg-muted/20 p-2 rounded">No recent events</div>
-            )}
-          </div>
         </div>
       </CardContent>
     </Card>

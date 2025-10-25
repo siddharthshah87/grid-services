@@ -52,8 +52,14 @@ export const MapView = ({ focusId, onFocused }: { focusId?: string; onFocused?: 
 
   const center = useMemo(() => {
     if (vens && vens.length > 0) {
-      const first = vens[0];
-      return { lat: first.location.lat, lng: first.location.lon };
+      // Filter out VENs with 0,0 coordinates
+      const validVens = vens.filter(v => 
+        v.location.lat !== 0 || v.location.lon !== 0
+      );
+      if (validVens.length > 0) {
+        const first = validVens[0];
+        return { lat: first.location.lat, lng: first.location.lon };
+      }
     }
     return { lat: 37.42, lng: -122.08 };
   }, [vens]);
@@ -78,7 +84,11 @@ export const MapView = ({ focusId, onFocused }: { focusId?: string; onFocused?: 
     markers.current.forEach((m) => m.setMap(null));
     markers.current = [];
     markerMap.current = {};
-    (vens || []).forEach((v) => {
+    // Filter out VENs with 0,0 coordinates
+    const validVens = (vens || []).filter(v => 
+      v.location.lat !== 0 || v.location.lon !== 0
+    );
+    validVens.forEach((v) => {
       const color = v.status === 'online' ? '#22c55e' : v.status === 'offline' ? '#ef4444' : '#f59e0b';
       const m = new google.maps.Marker({
         map: mapInstance.current!,
