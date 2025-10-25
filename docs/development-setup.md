@@ -279,13 +279,13 @@ alembic downgrade -1
 # Run all tests
 pytest
 
-# Run specific test files
-pytest tests/test_api.py
-pytest volttron-ven/tests/
-pytest grid-event-gateway/tests/
+# Run specific test suites
+pytest ecs-backend/tests/test_routers_ven.py  # VEN API tests
+pytest ecs-backend/tests/test_service_*.py     # Service layer tests
+pytest tests/test_contract_*.py                # MQTT contract tests
 
 # Run with coverage
-pytest --cov=app tests/
+PYTHONPATH=ecs-backend pytest ecs-backend/tests/ --cov=app --cov-report=html
 
 # Run tests in parallel
 pytest -n auto

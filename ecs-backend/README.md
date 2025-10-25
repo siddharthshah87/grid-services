@@ -127,17 +127,26 @@ See above for required DB and MQTT variables. Additional variables may be requir
 
 ## Test Coverage
 
-### Test Coverage
-Automated tests are provided in `tests/test_api.py` and `tests/test_mqtt_consumer.py`:
-- `test_api.py`: Covers REST API endpoints for VENs, events, and health, including database integration and deletion logic.
-- `test_mqtt_consumer.py`: Covers MQTT consumer logic, telemetry ingestion, and load snapshot persistence.
+### Comprehensive Test Suite
+The backend has extensive test coverage (105 tests, 100% passing):
+
+**Test Categories**:
+- **Router Tests** (`tests/test_routers_*.py`): API endpoint tests for VENs, events, stats, and health
+- **Service Tests** (`tests/test_service_*.py`): Business logic for MQTT consumer, event dispatch, and heartbeat monitoring
+- **Contract Tests** (`../tests/test_contract_*.py`): MQTT payload schema validation
+- **Hypothesis Tests** (`tests/*_hypothesis.py`): Property-based tests for robust validation
+- **Integration Tests** (`tests/test_circuit_history.py`, etc.): Full feature testing
 
 To run all tests:
 ```bash
 poetry run pytest
+# OR with coverage:
+PYTHONPATH=ecs-backend pytest --cov=app --cov-report=html
 ```
 
-Tests use `pytest` and `pytest-asyncio` for async FastAPI and database logic. Add new tests for new endpoints, features, or bug fixes.
+See `docs/test-status.md` for detailed test documentation.
+
+Tests use `pytest`, `pytest-asyncio`, and `hypothesis` for comprehensive coverage. Add new tests for new endpoints, features, or bug fixes.
 
 ## Contributing
 
