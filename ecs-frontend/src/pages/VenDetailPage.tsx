@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import Layout from "@/components/Layout";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CircuitSparkline } from "@/components/CircuitSparkline";
+import { CircuitDetailDialog } from "@/components/CircuitDetailDialog";
 
 export default function VenDetailPage() {
   const { venId } = useParams<{ venId: string }>();
@@ -24,6 +27,15 @@ export default function VenDetailPage() {
   const { data: ven, isLoading } = useVenDetail(venId || null);
   const { data: circuitHistory } = useVenCircuitHistory(venId || null, { limit: 100 });
   const { data: eventHistory } = useVenEventHistory(venId || null);
+  
+  const [selectedCircuit, setSelectedCircuit] = useState<{
+    loadId: string;
+    loadName: string;
+    loadType: string;
+    currentPowerKw: number;
+    capacityKw: number;
+    shedCapabilityKw: number;
+  } | null>(null);
 
   if (isLoading) {
     return (
@@ -175,11 +187,23 @@ export default function VenDetailPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis label={{ value: 'Power (kW)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="current" fill="#8884d8" name="Current Power" />
-                  <Bar dataKey="capacity" fill="#82ca9d" name="Capacity" />
-                  <Bar dataKey="shedCapability" fill="#ffc658" name="Shed Capability" />
+                  <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--popover))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '0.5rem',
+                      backdropFilter: 'blur(8px)'
+                    }}
+                    labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                    cursor={{ fill: 'hsl(var(--muted) / 0.2)' }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ color: 'hsl(var(--foreground))' }}
+                    iconType="rect"
+                  />
+                  <Bar dataKey="current" fill="#8884d8" name="Current Power" activeBar={{ opacity: 0.8 }} />
+                  <Bar dataKey="capacity" fill="#82ca9d" name="Capacity" activeBar={{ opacity: 0.8 }} />
+                  <Bar dataKey="shedCapability" fill="#ffc658" name="Shed Capability" activeBar={{ opacity: 0.8 }} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -200,11 +224,23 @@ export default function VenDetailPage() {
                     <TableHead className="text-right">Current Power</TableHead>
                     <TableHead className="text-right">Capacity</TableHead>
                     <TableHead className="text-right">Shed Capability</TableHead>
+                    <TableHead className="text-center">Trend</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {ven.loads?.map((load) => (
-                    <TableRow key={load.id}>
+                    <TableRow 
+                      key={load.id}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => setSelectedCircuit({
+                        loadId: load.id,
+                        loadName: load.name || load.type || 'Unknown',
+                        loadType: load.type || 'Unknown',
+                        currentPowerKw: load.currentPowerKw || 0,
+                        capacityKw: load.capacityKw || 0,
+                        shedCapabilityKw: load.shedCapabilityKw || 0,
+                      })}
+                    >
                       <TableCell className="font-mono text-sm">{load.id}</TableCell>
                       <TableCell>{load.name || "N/A"}</TableCell>
                       <TableCell>
@@ -223,6 +259,13 @@ export default function VenDetailPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {(load.shedCapabilityKw || 0).toFixed(2)} kW
+                      </TableCell>
+                      <TableCell className="flex justify-center">
+                        <CircuitSparkline 
+                          venId={venId!}
+                          loadId={load.id}
+                          currentPowerKw={load.currentPowerKw || 0}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -243,10 +286,22 @@ export default function VenDetailPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="time" />
                   <YAxis label={{ value: 'Power (kW)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="power" stroke="#8884d8" name="Current Power" />
-                  <Line type="monotone" dataKey="capacity" stroke="#82ca9d" name="Shed Capability" />
+                  <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--popover))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '0.5rem',
+                      backdropFilter: 'blur(8px)'
+                    }}
+                    labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                    cursor={{ stroke: 'hsl(var(--muted))', strokeWidth: 1, strokeDasharray: '5 5' }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ color: 'hsl(var(--foreground))' }}
+                    iconType="line"
+                  />
+                  <Line type="monotone" dataKey="power" stroke="#8884d8" name="Current Power" activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="capacity" stroke="#82ca9d" name="Shed Capability" activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -298,6 +353,21 @@ export default function VenDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Circuit Detail Modal */}
+      {selectedCircuit && (
+        <CircuitDetailDialog
+          venId={venId!}
+          loadId={selectedCircuit.loadId}
+          loadName={selectedCircuit.loadName}
+          loadType={selectedCircuit.loadType}
+          currentPowerKw={selectedCircuit.currentPowerKw}
+          capacityKw={selectedCircuit.capacityKw}
+          shedCapabilityKw={selectedCircuit.shedCapabilityKw}
+          open={!!selectedCircuit}
+          onOpenChange={(open) => !open && setSelectedCircuit(null)}
+        />
+      )}
     </Layout>
   );
 }

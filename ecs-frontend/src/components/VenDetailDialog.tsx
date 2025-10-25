@@ -6,6 +6,8 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { useVenDetail, useVenCircuitHistory, useVenEventHistory } from '@/hooks/useApi';
 import { Zap, Activity, MapPin, Clock, AlertTriangle, CheckCircle, Settings } from 'lucide-react';
 import { format } from 'date-fns';
+import { useState } from 'react';
+import { CircuitDetailDialog } from './CircuitDetailDialog';
 
 interface VenDetailDialogProps {
   venId: string | null;
@@ -17,6 +19,15 @@ export const VenDetailDialog = ({ venId, open, onOpenChange }: VenDetailDialogPr
   const { data: ven, isLoading } = useVenDetail(venId);
   const { data: circuitHistory } = useVenCircuitHistory(venId, { limit: 50 });
   const { data: eventHistory } = useVenEventHistory(venId);
+  
+  const [selectedCircuit, setSelectedCircuit] = useState<{
+    loadId: string;
+    loadName: string;
+    loadType: string;
+    currentPowerKw: number;
+    capacityKw: number;
+    shedCapabilityKw: number;
+  } | null>(null);
 
   if (!venId) return null;
 
@@ -165,13 +176,22 @@ export const VenDetailDialog = ({ venId, open, onOpenChange }: VenDetailDialogPr
                         <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                         <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} label={{ value: 'kW', angle: -90, position: 'insideLeft' }} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                          labelStyle={{ color: 'hsl(var(--foreground))' }}
+                          contentStyle={{ 
+                            backgroundColor: 'hsl(var(--popover))', 
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '0.5rem',
+                            backdropFilter: 'blur(8px)'
+                          }}
+                          labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                          cursor={{ fill: 'hsl(var(--muted) / 0.2)' }}
                         />
-                        <Legend />
-                        <Bar dataKey="current" fill="hsl(var(--success))" name="Current" />
-                        <Bar dataKey="shedCapability" fill="hsl(var(--primary))" name="Shed Capability" />
-                        <Bar dataKey="capacity" fill="hsl(var(--muted))" name="Capacity" />
+                        <Legend 
+                          wrapperStyle={{ color: 'hsl(var(--foreground))' }}
+                          iconType="rect"
+                        />
+                        <Bar dataKey="current" fill="hsl(var(--success))" name="Current Power" activeBar={{ opacity: 0.8 }} />
+                        <Bar dataKey="shedCapability" fill="hsl(var(--primary))" name="Shed Capability" activeBar={{ opacity: 0.8 }} />
+                        <Bar dataKey="capacity" fill="hsl(var(--muted))" name="Capacity" activeBar={{ opacity: 0.8 }} />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -182,7 +202,18 @@ export const VenDetailDialog = ({ venId, open, onOpenChange }: VenDetailDialogPr
             <TabsContent value="loads" className="space-y-3">
               {ven.loads && ven.loads.length > 0 ? (
                 ven.loads.map((load) => (
-                  <Card key={load.id}>
+                  <Card 
+                    key={load.id}
+                    className="cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => setSelectedCircuit({
+                      loadId: load.id,
+                      loadName: load.name || load.type || 'Unknown',
+                      loadType: load.type || 'Unknown',
+                      currentPowerKw: load.currentPowerKw || 0,
+                      capacityKw: load.capacityKw || 0,
+                      shedCapabilityKw: load.shedCapabilityKw || 0,
+                    })}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
@@ -227,12 +258,21 @@ export const VenDetailDialog = ({ venId, open, onOpenChange }: VenDetailDialogPr
                         <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={11} />
                         <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} label={{ value: 'kW', angle: -90, position: 'insideLeft' }} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                          labelStyle={{ color: 'hsl(var(--foreground))' }}
+                          contentStyle={{ 
+                            backgroundColor: 'hsl(var(--popover))', 
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '0.5rem',
+                            backdropFilter: 'blur(8px)'
+                          }}
+                          labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                          cursor={{ stroke: 'hsl(var(--muted))', strokeWidth: 1, strokeDasharray: '5 5' }}
                         />
-                        <Legend />
-                        <Line type="monotone" dataKey="power" stroke="hsl(var(--success))" name="Power Usage" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="capacity" stroke="hsl(var(--primary))" name="Shed Capacity" strokeWidth={2} dot={false} strokeDasharray="5 5" />
+                        <Legend 
+                          wrapperStyle={{ color: 'hsl(var(--foreground))' }}
+                          iconType="line"
+                        />
+                        <Line type="monotone" dataKey="power" stroke="hsl(var(--success))" name="Power Usage" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                        <Line type="monotone" dataKey="capacity" stroke="hsl(var(--primary))" name="Shed Capacity" strokeWidth={2} dot={false} strokeDasharray="5 5" activeDot={{ r: 6 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
@@ -282,6 +322,21 @@ export const VenDetailDialog = ({ venId, open, onOpenChange }: VenDetailDialogPr
           </Tabs>
         )}
       </DialogContent>
+
+      {/* Circuit Detail Modal - Nested dialog */}
+      {selectedCircuit && venId && (
+        <CircuitDetailDialog
+          venId={venId}
+          loadId={selectedCircuit.loadId}
+          loadName={selectedCircuit.loadName}
+          loadType={selectedCircuit.loadType}
+          currentPowerKw={selectedCircuit.currentPowerKw}
+          capacityKw={selectedCircuit.capacityKw}
+          shedCapabilityKw={selectedCircuit.shedCapabilityKw}
+          open={!!selectedCircuit}
+          onOpenChange={(open) => !open && setSelectedCircuit(null)}
+        />
+      )}
     </Dialog>
   );
 };

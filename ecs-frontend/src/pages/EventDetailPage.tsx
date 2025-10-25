@@ -208,9 +208,21 @@ export default function EventDetailPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis label={{ value: 'Shed Power (kW)', angle: -90, position: 'insideLeft' }} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="shedKw" fill="#8884d8" name="Shed Power (kW)" />
+                <Tooltip
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--popover))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '0.5rem',
+                    backdropFilter: 'blur(8px)'
+                  }}
+                  labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                  cursor={{ fill: 'hsl(var(--muted) / 0.2)' }}
+                />
+                <Legend 
+                  wrapperStyle={{ color: 'hsl(var(--foreground))' }}
+                  iconType="rect"
+                />
+                <Bar dataKey="shedKw" fill="#8884d8" name="Shed Power (kW)" activeBar={{ opacity: 0.8 }} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -237,7 +249,16 @@ export default function EventDetailPage() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--popover))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '0.5rem',
+                    backdropFilter: 'blur(8px)'
+                  }}
+                  labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                  itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>

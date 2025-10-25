@@ -169,10 +169,16 @@ export const EventDetailDialog = ({ eventId, open, onOpenChange }: EventDetailDi
                         <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={11} label={{ value: 'kW', position: 'insideRight', offset: -5 }} />
                         <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} width={100} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                          labelStyle={{ color: 'hsl(var(--foreground))' }}
+                          contentStyle={{ 
+                            backgroundColor: 'hsl(var(--popover))', 
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '0.5rem',
+                            backdropFilter: 'blur(8px)'
+                          }}
+                          labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                          cursor={{ fill: 'hsl(var(--muted) / 0.2)' }}
                         />
-                        <Bar dataKey="shed" fill="hsl(var(--success))" name="Shed (kW)" />
+                        <Bar dataKey="shed" fill="hsl(var(--success))" name="Shed (kW)" activeBar={{ opacity: 0.8 }} />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -201,7 +207,16 @@ export const EventDetailDialog = ({ eventId, open, onOpenChange }: EventDetailDi
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--popover))', 
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '0.5rem',
+                              backdropFilter: 'blur(8px)'
+                            }}
+                            labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                            itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                     </CardContent>
