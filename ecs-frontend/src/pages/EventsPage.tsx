@@ -37,9 +37,9 @@ export default function EventsPage() {
     <Layout>
       <Breadcrumbs items={[{ label: "Dashboard", path: "/dashboard" }, { label: "Events" }]} />
 
-      {/* ADR Event Control */}
+      {/* ADR Event Control - Compact */}
       <div className="mb-6">
-        <AdrControls />
+        <AdrControls compact />
       </div>
 
       {/* Events History Table */}

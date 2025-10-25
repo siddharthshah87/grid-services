@@ -20,7 +20,11 @@ import {
 } from 'lucide-react';
 import { useCreateEvent, useCurrentEvent, useStopEvent, useEventsHistory, Event } from '@/hooks/useApi';
 
-export const AdrControls = () => {
+interface AdrControlsProps {
+  compact?: boolean;
+}
+
+export const AdrControls = ({ compact = false }: AdrControlsProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [reductionTarget, setReductionTarget] = useState('5.0'); // MW
@@ -76,6 +80,120 @@ export const AdrControls = () => {
     });
   };
 
+  // Compact horizontal layout for Events page
+  if (compact) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Title and Status */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                <span className="font-semibold">ADR Event Control</span>
+              </div>
+              <Badge 
+                variant="outline" 
+                className={isEventActive ? 'border-warning text-warning' : 'border-success text-success'}
+              >
+                {isEventActive ? (
+                  <>
+                    <Clock className="h-3 w-3 mr-1" />
+                    {currentEvent?.status || 'Active'}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Ready
+                  </>
+                )}
+              </Badge>
+            </div>
+
+            <Separator orientation="vertical" className="h-8" />
+
+            {/* Controls */}
+            {!isEventActive ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="compact-reduction-target" className="text-sm whitespace-nowrap">
+                    Target (MW):
+                  </Label>
+                  <Input
+                    id="compact-reduction-target"
+                    type="number"
+                    value={reductionTarget}
+                    onChange={(e) => setReductionTarget(e.target.value)}
+                    className="h-9 w-24"
+                    min="0"
+                    max="15.8"
+                    step="0.1"
+                  />
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="compact-duration" className="text-sm whitespace-nowrap">
+                    Duration:
+                  </Label>
+                  <Select value={eventDuration} onValueChange={setEventDuration}>
+                    <SelectTrigger className="h-9 w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">15 min</SelectItem>
+                      <SelectItem value="30">30 min</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                      <SelectItem value="240">4 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button 
+                  onClick={handleStartAdrEvent}
+                  className="h-9 bg-gradient-primary"
+                  disabled={!reductionTarget || parseFloat(reductionTarget) <= 0 || createEvent.isPending}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  {createEvent.isPending ? 'Starting…' : 'Start Event'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Progress: </span>
+                    <span className="font-medium">
+                      {currentReductionMw.toFixed(1)} / {targetReductionMw.toFixed(1)} MW
+                    </span>
+                    <span className="text-muted-foreground ml-2">
+                      ({reductionPercentage.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">VENs: </span>
+                    <span className="font-medium text-success">{currentEvent?.vensResponding ?? 0}</span>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleStopAdrEvent}
+                  variant="destructive"
+                  className="h-9"
+                  disabled={stopEvent.isPending}
+                >
+                  <Square className="h-4 w-4 mr-2" />
+                  {stopEvent.isPending ? 'Stopping…' : 'Stop Event'}
+                </Button>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Original full layout for Dashboard
   return (
     <Card>
       <CardHeader>
