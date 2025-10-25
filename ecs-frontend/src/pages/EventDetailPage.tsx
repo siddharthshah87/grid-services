@@ -93,19 +93,19 @@ export default function EventDetailPage() {
         ]}
       />
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Event Details</h1>
-          <p className="text-muted-foreground font-mono text-sm">{event.id}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Event Details</h1>
+          <p className="text-muted-foreground font-mono text-sm truncate">{event.id}</p>
         </div>
-        <Button variant="outline" onClick={() => navigate("/events")}>
+        <Button variant="outline" onClick={() => navigate("/events")} className="w-full sm:w-auto">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Events
         </Button>
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle>
@@ -201,29 +201,30 @@ export default function EventDetailPage() {
       </Card>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
         <Card>
           <CardHeader>
-            <CardTitle>Shed Power by VEN</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Shed Power by VEN</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={window.innerWidth < 768 ? 250 : 300}>
               <BarChart data={shedByVen}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis label={{ value: 'Shed Power (kW)', angle: -90, position: 'insideLeft' }} />
+                <XAxis dataKey="name" tick={{ fontSize: window.innerWidth < 768 ? 10 : 12 }} />
+                <YAxis label={{ value: 'Shed Power (kW)', angle: -90, position: 'insideLeft', style: { fontSize: window.innerWidth < 768 ? 10 : 12 } }} tick={{ fontSize: window.innerWidth < 768 ? 10 : 12 }} />
                 <Tooltip
                   contentStyle={{ 
                     backgroundColor: 'hsl(var(--popover))', 
                     border: '1px solid hsl(var(--border))',
                     borderRadius: '0.5rem',
-                    backdropFilter: 'blur(8px)'
+                    backdropFilter: 'blur(8px)',
+                    fontSize: window.innerWidth < 768 ? '12px' : '14px'
                   }}
                   labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
                   cursor={{ fill: 'hsl(var(--muted) / 0.2)' }}
                 />
                 <Legend 
-                  wrapperStyle={{ color: 'hsl(var(--foreground))' }}
+                  wrapperStyle={{ color: 'hsl(var(--foreground))', fontSize: window.innerWidth < 768 ? '10px' : '12px' }}
                   iconType="rect"
                 />
                 <Bar dataKey="shedKw" fill="#8884d8" name="Shed Power (kW)" activeBar={{ opacity: 0.8 }} />
@@ -234,10 +235,10 @@ export default function EventDetailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>VEN Status Distribution</CardTitle>
+            <CardTitle className="text-base sm:text-lg">VEN Status Distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={window.innerWidth < 768 ? 250 : 300}>
               <PieChart>
                 <Pie
                   data={statusPieData}
@@ -245,7 +246,7 @@ export default function EventDetailPage() {
                   cy="50%"
                   labelLine={false}
                   label={(entry) => `${entry.name}: ${entry.value}`}
-                  outerRadius={80}
+                  outerRadius={window.innerWidth < 768 ? 60 : 80}
                   fill="#8884d8"
                   dataKey="value"
                 >

@@ -88,12 +88,12 @@ export default function VensPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <CardTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5" />
               Virtual End Nodes (VENs)
             </CardTitle>
-            <div className="relative w-72">
+            <div className="relative w-full md:w-72">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by VEN ID or Name..."
@@ -110,64 +110,133 @@ export default function VensPage() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>VEN ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Seen</TableHead>
-                  <TableHead className="text-right">Power Usage</TableHead>
-                  <TableHead className="text-right">Shed Capability</TableHead>
-                  <TableHead className="text-right">Circuits</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-3">
                 {filteredVens.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      {searchQuery ? "No VENs found matching your search." : "No VENs available."}
-                    </TableCell>
-                  </TableRow>
+                  <div className="text-center py-8 text-muted-foreground">
+                    {searchQuery ? "No VENs found matching your search." : "No VENs available."}
+                  </div>
                 ) : (
                   filteredVens.map((ven) => (
-                    <TableRow
+                    <Card 
                       key={ven.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => navigate(`/vens/${ven.id}`)}
                     >
-                    <TableCell className="font-mono text-sm">{ven.id}</TableCell>
-                    <TableCell className="font-medium">{ven.name}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(ven.status)}>
-                        {ven.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        {formatLastSeen(ven.lastSeen)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Gauge className="h-3 w-3 text-muted-foreground" />
-                        <span className="font-mono">
-                          {(ven.metrics?.currentPowerKw || 0).toFixed(2)} kW
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {(ven.metrics?.shedAvailabilityKw || 0).toFixed(2)} kW
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="outline">{ven.loads?.length || 0}</Badge>
-                    </TableCell>
-                  </TableRow>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold truncate">{ven.name}</h3>
+                            <p className="text-xs text-muted-foreground font-mono truncate">{ven.id}</p>
+                          </div>
+                          <Badge variant={getStatusVariant(ven.status)} className="ml-2 shrink-0">
+                            {ven.status}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                              <Clock className="h-3 w-3" />
+                              <span className="text-xs">Last Seen</span>
+                            </div>
+                            <div className="font-medium text-xs">{formatLastSeen(ven.lastSeen)}</div>
+                          </div>
+                          
+                          <div>
+                            <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                              <Gauge className="h-3 w-3" />
+                              <span className="text-xs">Power</span>
+                            </div>
+                            <div className="font-mono text-xs font-medium">
+                              {(ven.metrics?.currentPowerKw || 0).toFixed(2)} kW
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                              <Zap className="h-3 w-3" />
+                              <span className="text-xs">Shed Cap.</span>
+                            </div>
+                            <div className="font-mono text-xs font-medium">
+                              {(ven.metrics?.shedAvailabilityKw || 0).toFixed(2)} kW
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="text-muted-foreground mb-1 text-xs">Circuits</div>
+                            <Badge variant="outline">{ven.loads?.length || 0}</Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))
                 )}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>VEN ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Seen</TableHead>
+                      <TableHead className="text-right">Power Usage</TableHead>
+                      <TableHead className="text-right">Shed Capability</TableHead>
+                      <TableHead className="text-right">Circuits</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredVens.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          {searchQuery ? "No VENs found matching your search." : "No VENs available."}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredVens.map((ven) => (
+                        <TableRow
+                          key={ven.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => navigate(`/vens/${ven.id}`)}
+                        >
+                        <TableCell className="font-mono text-sm">{ven.id}</TableCell>
+                        <TableCell className="font-medium">{ven.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusVariant(ven.status)}>
+                            {ven.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {formatLastSeen(ven.lastSeen)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Gauge className="h-3 w-3 text-muted-foreground" />
+                            <span className="font-mono">
+                              {(ven.metrics?.currentPowerKw || 0).toFixed(2)} kW
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {(ven.metrics?.shedAvailabilityKw || 0).toFixed(2)} kW
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="outline">{ven.loads?.length || 0}</Badge>
+                        </TableCell>
+                      </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

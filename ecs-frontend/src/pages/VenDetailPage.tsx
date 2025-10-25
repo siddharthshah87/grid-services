@@ -119,19 +119,19 @@ export default function VenDetailPage() {
         ]}
       />
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">{ven.name}</h1>
-          <p className="text-muted-foreground font-mono text-sm">{ven.id}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold truncate">{ven.name}</h1>
+          <p className="text-muted-foreground font-mono text-sm truncate">{ven.id}</p>
         </div>
-        <Button variant="outline" onClick={() => navigate("/vens")}>
+        <Button variant="outline" onClick={() => navigate("/vens")} className="w-full sm:w-auto">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to VENs
         </Button>
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle>
@@ -221,35 +221,36 @@ export default function VenDetailPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="loads" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="loads">Loads & Circuits</TabsTrigger>
-          <TabsTrigger value="power">Power History</TabsTrigger>
-          <TabsTrigger value="events">Event History</TabsTrigger>
+        <TabsList className="w-full grid grid-cols-3">
+          <TabsTrigger value="loads" className="text-xs sm:text-sm">Loads</TabsTrigger>
+          <TabsTrigger value="power" className="text-xs sm:text-sm">Power</TabsTrigger>
+          <TabsTrigger value="events" className="text-xs sm:text-sm">Events</TabsTrigger>
         </TabsList>
 
         <TabsContent value="loads" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Load Distribution</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Load Distribution</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={window.innerWidth < 768 ? 250 : 300}>
                 <BarChart data={loadBreakdown}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis label={{ value: 'Power (kW)', angle: -90, position: 'insideLeft' }} />
+                  <XAxis dataKey="name" tick={{ fontSize: window.innerWidth < 768 ? 10 : 12 }} />
+                  <YAxis label={{ value: 'Power (kW)', angle: -90, position: 'insideLeft', style: { fontSize: window.innerWidth < 768 ? 10 : 12 } }} tick={{ fontSize: window.innerWidth < 768 ? 10 : 12 }} />
                   <Tooltip
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--popover))', 
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '0.5rem',
-                      backdropFilter: 'blur(8px)'
+                      backdropFilter: 'blur(8px)',
+                      fontSize: window.innerWidth < 768 ? '12px' : '14px'
                     }}
                     labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
                     cursor={{ fill: 'hsl(var(--muted) / 0.2)' }}
                   />
                   <Legend 
-                    wrapperStyle={{ color: 'hsl(var(--foreground))' }}
+                    wrapperStyle={{ color: 'hsl(var(--foreground))', fontSize: window.innerWidth < 768 ? '10px' : '12px' }}
                     iconType="rect"
                   />
                   <Bar dataKey="current" fill="#8884d8" name="Current Power" activeBar={{ opacity: 0.8 }} />
@@ -329,10 +330,10 @@ export default function VenDetailPage() {
         <TabsContent value="power">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <CardTitle>Power Usage Over Time</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-base sm:text-lg">Power Usage Over Time</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
                     Showing {powerChartData.length} data points • {historyDays} day{historyDays > 1 ? 's' : ''} of history
                   </CardDescription>
                 </div>
@@ -341,6 +342,7 @@ export default function VenDetailPage() {
                     variant={historyDays === 1 ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setHistoryDays(1)}
+                    className="text-xs"
                   >
                     1 Day
                   </Button>
@@ -348,6 +350,7 @@ export default function VenDetailPage() {
                     variant={historyDays === 3 ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setHistoryDays(3)}
+                    className="text-xs"
                   >
                     3 Days
                   </Button>
@@ -355,6 +358,7 @@ export default function VenDetailPage() {
                     variant={historyDays === 7 ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setHistoryDays(7)}
+                    className="text-xs"
                   >
                     7 Days
                   </Button>
@@ -363,33 +367,34 @@ export default function VenDetailPage() {
             </CardHeader>
             <CardContent>
               {isHistoryLoading ? (
-                <div className="flex items-center justify-center h-[450px] text-muted-foreground">
+                <div className="flex items-center justify-center h-[300px] sm:h-[450px] text-muted-foreground">
                   <Loader2 className="h-8 w-8 animate-spin" />
-                  <span className="ml-2">Loading power history...</span>
+                  <span className="ml-2 text-sm">Loading power history...</span>
                 </div>
               ) : powerChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={450}>
+                <ResponsiveContainer width="100%" height={window.innerWidth < 640 ? 300 : 450}>
                   <LineChart data={powerChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis 
                       dataKey="time" 
                       stroke="hsl(var(--muted-foreground))"
-                      fontSize={11}
+                      fontSize={window.innerWidth < 640 ? 9 : 11}
                       angle={historyDays > 1 ? -45 : 0}
                       textAnchor={historyDays > 1 ? "end" : "middle"}
                       height={historyDays > 1 ? 70 : 50}
                     />
                     <YAxis 
                       stroke="hsl(var(--muted-foreground))"
-                      fontSize={11}
-                      label={{ value: 'Power (kW)', angle: -90, position: 'insideLeft' }}
+                      fontSize={window.innerWidth < 640 ? 9 : 11}
+                      label={{ value: 'Power (kW)', angle: -90, position: 'insideLeft', style: { fontSize: window.innerWidth < 640 ? 10 : 12 } }}
                     />
                     <Tooltip
                       contentStyle={{ 
                         backgroundColor: 'hsl(var(--popover))', 
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '0.5rem',
-                        backdropFilter: 'blur(8px)'
+                        backdropFilter: 'blur(8px)',
+                        fontSize: window.innerWidth < 640 ? '11px' : '13px'
                       }}
                       labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
                       cursor={{ stroke: 'hsl(var(--muted))', strokeWidth: 1, strokeDasharray: '5 5' }}
