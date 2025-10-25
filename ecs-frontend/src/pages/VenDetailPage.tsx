@@ -154,6 +154,11 @@ export default function VenDetailPage() {
                 ? formatDistanceToNow(new Date(ven.lastSeen), { addSuffix: true })
                 : "less than a minute ago"}
             </div>
+            {ven.lastSeen && (
+              <div className="text-xs text-muted-foreground mt-1">
+                {format(new Date(ven.lastSeen), "yyyy/MM/dd - HH:mm:ss")}
+              </div>
+            )}
           </CardContent>
         </Card>
 
