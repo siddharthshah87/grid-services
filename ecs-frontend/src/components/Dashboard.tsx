@@ -68,7 +68,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {isLoading ? '…' : formatPowerKw(stats?.controllablePowerKw)}
+              {isLoading ? '…' : onlineCount === 0 ? '0.0 kW' : formatPowerKw(stats?.controllablePowerKw)}
             </div>
             <p className="text-xs text-muted-foreground">
               Available for load shedding
@@ -83,7 +83,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">
-              {isLoading ? '…' : formatPowerKw(stats?.currentLoadReductionKw)}
+              {isLoading ? '…' : onlineCount === 0 ? '0.0 kW' : formatPowerKw(stats?.currentLoadReductionKw)}
             </div>
             <p className="text-xs text-muted-foreground">
               Current load reduction
@@ -93,7 +93,7 @@ export const Dashboard = () => {
 
         <Card className="border-accent/20 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg House Power</CardTitle>
+            <CardTitle className="text-sm font-medium">Average VEN Power</CardTitle>
             <Power className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
