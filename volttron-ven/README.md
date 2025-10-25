@@ -33,7 +33,7 @@ This is a **production-ready** Virtual End Node (VEN) for Demand Response (DR) e
 ```
 
 ### View Web UI
-Open browser to: `http://localhost:8080`
+Open browser to: `http://localhost:8888`
 
 **Full command reference:** [docs/VEN_OPERATIONS.md](docs/VEN_OPERATIONS.md)
 

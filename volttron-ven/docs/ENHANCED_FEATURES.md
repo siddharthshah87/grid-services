@@ -21,7 +21,7 @@ cd volttron-ven
 
 The VEN will start with:
 - MQTT connection to AWS IoT Core
-- Web UI at `http://localhost:8080`
+- Web UI at `http://localhost:8888`
 - Thing name: `volttron_thing`
 
 ## 1. Device Shadow Sync
@@ -108,12 +108,12 @@ The VEN will receive the delta and automatically disable the HVAC circuit.
 
 Once the VEN is running, open your browser to:
 ```
-http://localhost:8080
+http://localhost:8888
 ```
 
 **Note for Codespaces**: Use port forwarding to access the UI:
 1. In VS Code, go to the "PORTS" tab
-2. Port 8080 should be auto-forwarded
+2. Port 8888 should be auto-forwarded
 3. Click the globe icon to open in browser
 4. Or click "Forward Port" if it's not listed
 
@@ -209,7 +209,7 @@ EV:         0.0 kW (already off)
 
 ### 2. Open Web UI
 
-Forward port 8080 in Codespaces, then open browser
+Forward port 8888 in Codespaces, then open browser
 
 ### 3. Monitor Telemetry
 
@@ -281,7 +281,7 @@ python3 ../scripts/ven_cmd_publish.py \
    - Subscribes to commands and shadow delta
 
 2. **Web Server Thread** (`Flask`)
-   - Serves web UI on port 8080
+   - Serves web UI on port 8888
    - Provides REST API for UI
    - Runs independently from MQTT
 
@@ -314,7 +314,7 @@ python3 ../scripts/ven_cmd_publish.py \
                                                         ▼
                                                   ┌──────────┐
                                                   │  Web UI  │
-                                                  │ :8080    │
+                                                  │ :8888    │
                                                   └──────────┘
 ```
 
@@ -337,11 +337,11 @@ python3 ../scripts/ven_cmd_publish.py \
 
 ## Troubleshooting
 
-### Port 8080 in Use
+### Port 8888 in Use
 
 ```bash
-# Check what's using port 8080
-lsof -i :8080
+# Check what's using port 8888
+lsof -i :8888
 
 # Kill the process
 kill -9 <PID>
@@ -366,7 +366,7 @@ aws iot get-policy --policy-name dev-volttron-policy | jq '.policyDocument'
 ### Web UI Not Accessible in Codespaces
 
 1. Open "PORTS" tab in VS Code
-2. Find port 8080
+2. Find port 8888
 3. Right-click → "Port Visibility" → "Public"
 4. Click the globe icon to open
 

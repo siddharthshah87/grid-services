@@ -17,6 +17,7 @@ from app.schemas.api_models import Ven, Location, VenMetrics, Load
     st.one_of(st.none(), st.text(min_size=0, max_size=20)),  # activeEventId
     st.lists(st.text(min_size=1, max_size=10), max_size=10),  # shedLoadIds
     st.datetimes(),  # createdAt
+    st.one_of(st.none(), st.datetimes()),  # lastSeen
     st.lists(
         st.builds(
             Load,
@@ -30,7 +31,7 @@ from app.schemas.api_models import Ven, Location, VenMetrics, Load
     )
 )
 def test_ven_model_property(
-    ven_id, name, status, lat, lon, current, shed, event_id, shed_load_ids, created_at, loads
+    ven_id, name, status, lat, lon, current, shed, event_id, shed_load_ids, created_at, last_seen, loads
 ):
     location = Location(lat=lat, lon=lon)
     metrics = VenMetrics(
@@ -46,6 +47,7 @@ def test_ven_model_property(
         location=location,
         metrics=metrics,
         createdAt=created_at,
+        lastSeen=last_seen,
         loads=loads
     )
     assert isinstance(ven.id, str)
@@ -54,6 +56,7 @@ def test_ven_model_property(
     assert isinstance(ven.location, Location)
     assert isinstance(ven.metrics, VenMetrics)
     assert isinstance(ven.createdAt, datetime)
+    assert ven.lastSeen is None or isinstance(ven.lastSeen, datetime)
     assert ven.loads is None or all(isinstance(l, Load) for l in ven.loads)
     d = ven.dict()
     assert d["id"] == ven_id
@@ -66,6 +69,7 @@ def test_ven_model_property(
     assert d["metrics"]["activeEventId"] == event_id
     assert d["metrics"]["shedLoadIds"] == shed_load_ids
     assert d["createdAt"] == created_at
+    assert d["lastSeen"] == last_seen
     if ven.loads is not None:
         for i, l in enumerate(ven.loads):
             assert d["loads"][i]["id"] == l.id

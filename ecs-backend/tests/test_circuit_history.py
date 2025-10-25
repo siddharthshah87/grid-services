@@ -369,7 +369,7 @@ async def test_circuit_history_hypothesis(
 
 @pytest.mark.asyncio
 async def test_get_circuit_history_descending_order(client: AsyncClient, test_session: AsyncSession):
-    """Test that circuit history is returned in descending timestamp order (newest first)."""
+    """Test that circuit history is returned in ascending timestamp order (oldest first)."""
     # Create VEN
     ven = await crud.create_ven(
         test_session,
@@ -415,9 +415,9 @@ async def test_get_circuit_history_descending_order(client: AsyncClient, test_se
     assert response.status_code == 200
     data = response.json()
     
-    # Verify descending order (newest first)
+    # Verify ascending order (oldest first) for proper chart display
     snapshots = data["snapshots"]
     for i in range(len(snapshots) - 1):
         current_time = datetime.fromisoformat(snapshots[i]["timestamp"].replace('Z', '+00:00'))
         next_time = datetime.fromisoformat(snapshots[i + 1]["timestamp"].replace('Z', '+00:00'))
-        assert current_time >= next_time, "Circuit history should be in descending timestamp order"
+        assert current_time <= next_time, "Circuit history should be in ascending timestamp order for chart display"

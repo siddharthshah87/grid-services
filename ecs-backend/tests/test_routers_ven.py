@@ -54,6 +54,84 @@ async def test_list_vens_with_data(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_list_vens_includes_loads(client: AsyncClient, test_session: AsyncSession):
+    """Test that list VENs endpoint includes loads array when telemetry exists."""
+    from app import crud
+    from app.models.telemetry import VenTelemetry, VenLoadSample
+    
+    # Create VEN
+    ven = await crud.create_ven(
+        test_session,
+        ven_id="ven-list-loads",
+        name="VEN with Loads",
+        status="active",
+        registration_id="list-loads-reg",
+        latitude=37.0,
+        longitude=-122.0,
+    )
+    
+    # Create telemetry with loads
+    now = datetime.now(UTC)
+    telemetry = VenTelemetry(
+        ven_id=ven.ven_id,
+        timestamp=now,
+        used_power_kw=5.0,
+        shed_power_kw=2.0,
+    )
+    test_session.add(telemetry)
+    await test_session.flush()
+    
+    # Add two loads
+    load1 = VenLoadSample(
+        telemetry_id=telemetry.id,
+        load_id="load-1",
+        name="HVAC",
+        type="hvac",
+        capacity_kw=10.0,
+        shed_capability_kw=3.0,
+        current_power_kw=4.0,
+    )
+    load2 = VenLoadSample(
+        telemetry_id=telemetry.id,
+        load_id="load-2",
+        name="Water Heater",
+        type="water_heater",
+        capacity_kw=5.0,
+        shed_capability_kw=2.0,
+        current_power_kw=1.0,
+    )
+    test_session.add_all([load1, load2])
+    await test_session.commit()
+    
+    # List all VENs
+    response = await client.get("/api/vens/")
+    assert response.status_code == 200
+    vens = response.json()
+    
+    # Find our VEN in the list
+    test_ven = next((v for v in vens if v["id"] == "ven-list-loads"), None)
+    assert test_ven is not None
+    
+    # Verify loads are included
+    assert "loads" in test_ven
+    assert test_ven["loads"] is not None
+    assert len(test_ven["loads"]) == 2
+    
+    # Verify load details
+    load_ids = {load["id"] for load in test_ven["loads"]}
+    assert "load-1" in load_ids
+    assert "load-2" in load_ids
+    
+    # Verify load data structure
+    hvac_load = next((l for l in test_ven["loads"] if l["id"] == "load-1"), None)
+    assert hvac_load is not None
+    assert hvac_load["type"] == "hvac"
+    assert hvac_load["capacityKw"] == 10.0
+    assert hvac_load["shedCapabilityKw"] == 3.0
+    assert hvac_load["currentPowerKw"] == 4.0
+
+
+@pytest.mark.asyncio
 async def test_get_ven(client: AsyncClient):
     """Test getting a specific VEN by ID."""
     payload = {
@@ -239,6 +317,67 @@ async def test_list_ven_loads_with_telemetry(client: AsyncClient, test_session: 
     assert loads[0]["id"] == "load-1"
     assert loads[0]["type"] == "hvac"
     assert loads[0]["capacityKw"] == 10.0
+
+
+@pytest.mark.asyncio
+async def test_ven_last_seen_field(client: AsyncClient, test_session: AsyncSession):
+    """Test that lastSeen field is populated from telemetry timestamp."""
+    from app import crud
+    from app.models.telemetry import VenTelemetry
+    
+    # Create VEN
+    ven = await crud.create_ven(
+        test_session,
+        ven_id="ven-lastseen-test",
+        name="VEN LastSeen Test",
+        status="active",
+        registration_id="lastseen-reg",
+        latitude=37.0,
+        longitude=-122.0,
+    )
+    
+    # Create telemetry
+    now = datetime.now(UTC)
+    telemetry = VenTelemetry(
+        ven_id=ven.ven_id,
+        timestamp=now,
+        used_power_kw=5.0,
+        shed_power_kw=2.0,
+    )
+    test_session.add(telemetry)
+    await test_session.commit()
+    
+    # Get VEN and verify lastSeen is set
+    response = await client.get(f"/api/vens/{ven.ven_id}")
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert "lastSeen" in data
+    assert data["lastSeen"] is not None
+    # Verify it's a valid ISO datetime string
+    last_seen_dt = datetime.fromisoformat(data["lastSeen"].replace('Z', '+00:00'))
+    assert isinstance(last_seen_dt, datetime)
+
+
+@pytest.mark.asyncio
+async def test_ven_last_seen_none_without_telemetry(client: AsyncClient):
+    """Test that lastSeen is None when VEN has no telemetry."""
+    payload = {
+        "name": "No Telemetry VEN",
+        "location": {"lat": 37.0, "lon": -122.0},
+        "registrationId": "no-telem-reg",
+    }
+    
+    create_response = await client.post("/api/vens/", json=payload)
+    ven_id = create_response.json()["id"]
+    
+    response = await client.get(f"/api/vens/{ven_id}")
+    assert response.status_code == 200
+    data = response.json()
+    
+    # lastSeen should be None when no telemetry exists
+    assert "lastSeen" in data
+    assert data["lastSeen"] is None
 
 
 @pytest.mark.asyncio

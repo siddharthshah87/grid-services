@@ -38,3 +38,6 @@ flake8==7.3.0
 
 # Additional MQTT client
 gmqtt==0.7.0
+
+# Flask
+flask=3.0.0

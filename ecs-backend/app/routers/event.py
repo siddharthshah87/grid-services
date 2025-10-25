@@ -11,7 +11,7 @@ from app import crud
 from app.dependencies import get_session
 from app.models.event import Event as EventModel
 from app.models.telemetry import VenTelemetry
-from app.schemas.api_models import Event, EventCreate, EventMetrics, EventWithMetrics
+from app.schemas.api_models import Event, EventCreate, EventMetrics, EventWithMetrics, EventDetail, VenParticipation
 
 router = APIRouter()
 
@@ -61,6 +61,42 @@ async def _event_metrics(session: AsyncSession, event_id: str) -> EventMetrics:
         vensResponding=int(responding or 0),
         avgResponseMs=0,
     )
+
+
+async def _ven_participation(session: AsyncSession, event_id: str) -> list[VenParticipation]:
+    """Get VEN participation details for an event."""
+    from app.models.ven import VEN as VenModel
+    
+    # Aggregate shed power per VEN for this event
+    stmt = (
+        select(
+            VenTelemetry.ven_id,
+            func.coalesce(func.sum(VenTelemetry.shed_power_kw), 0.0).label('total_shed'),
+        )
+        .where(VenTelemetry.event_id == event_id)
+        .group_by(VenTelemetry.ven_id)
+    )
+    result = await session.execute(stmt)
+    shed_map = {row[0]: float(row[1]) for row in result.all()}
+    
+    # Get VEN details
+    if not shed_map:
+        return []
+    
+    ven_stmt = select(VenModel).where(VenModel.ven_id.in_(list(shed_map.keys())))
+    ven_result = await session.execute(ven_stmt)
+    vens = ven_result.scalars().all()
+    
+    participation = []
+    for ven in vens:
+        participation.append(VenParticipation(
+            venId=ven.ven_id,
+            venName=ven.name,
+            shedKw=shed_map.get(ven.ven_id, 0.0),
+            status="responded",  # Could be enhanced with actual status tracking
+        ))
+    
+    return participation
 
 
 @router.get("/", response_model=list[Event])
@@ -130,11 +166,29 @@ async def create_event_v2(payload: EventCreate, session: AsyncSession = Depends(
     return _event_to_api(event, reduction)
 
 
-@router.get("/{event_id}", response_model=Event)
+@router.get("/{event_id}", response_model=EventDetail)
 async def get_event_v2(event_id: str, session: AsyncSession = Depends(get_session)):
-    event = await _ensure_event(session, event_id)
-    reduction = (await _reduction_map(session, [event.event_id])).get(event.event_id, 0.0)
-    return _event_to_api(event, reduction)
+    try:
+        event = await _ensure_event(session, event_id)
+        metrics = await _event_metrics(session, event.event_id)
+        ven_participation = await _ven_participation(session, event.event_id)
+        base = _event_to_api(event, metrics.currentReductionKw)
+        return EventDetail(
+            **base.model_dump(),
+            currentReductionKw=metrics.currentReductionKw,
+            vensResponding=metrics.vensResponding,
+            avgResponseMs=metrics.avgResponseMs,
+            vens=ven_participation if ven_participation else [],
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching event details: {str(e)}"
+        )
 
 
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)

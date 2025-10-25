@@ -34,6 +34,7 @@ class Ven(BaseModel):
     location: Location
     metrics: VenMetrics
     createdAt: datetime
+    lastSeen: Optional[datetime] = None
     loads: list[Load] | None = None
 
 
@@ -124,6 +125,22 @@ class EventWithMetrics(Event):
     currentReductionKw: Optional[float] = None
     vensResponding: Optional[int] = None
     avgResponseMs: Optional[int] = None
+
+
+class VenParticipation(BaseModel):
+    """VEN participation in an event."""
+    venId: str
+    venName: str
+    shedKw: float
+    status: str
+
+
+class EventDetail(Event):
+    """Detailed event information with VEN participation."""
+    currentReductionKw: Optional[float] = None
+    vensResponding: Optional[int] = None
+    avgResponseMs: Optional[int] = None
+    vens: Optional[list[VenParticipation]] = None
 
 
 class CircuitCurtailment(BaseModel):

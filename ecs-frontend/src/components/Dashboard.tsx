@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { VenList } from './VenList';
 import { MapView } from './MapView';
 import { PowerMetrics } from './PowerMetrics';
@@ -44,29 +44,6 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background p-6 space-y-6">
-      {/* Header */}
-      <div className="border-b border-border pb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Smart Grid Control Center
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              OpenADR VTN Management Dashboard
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-online animate-pulse-energy"></div>
-              <span className="text-sm text-success font-medium">System Online</span>
-            </div>
-            <Badge variant="outline" className="border-primary text-primary">
-              VTN Status: Active
-            </Badge>
-          </div>
-        </div>
-      </div>
-
       {/* Key Metrics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="border-primary/20 bg-gradient-to-br from-card to-card/50">
@@ -91,7 +68,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {isLoading ? '…' : formatPowerKw(stats?.controllablePowerKw)}
+              {isLoading ? '…' : onlineCount === 0 ? '0.0 kW' : formatPowerKw(stats?.controllablePowerKw)}
             </div>
             <p className="text-xs text-muted-foreground">
               Available for load shedding
@@ -106,7 +83,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">
-              {isLoading ? '…' : formatPowerKw(stats?.currentLoadReductionKw)}
+              {isLoading ? '…' : onlineCount === 0 ? '0.0 kW' : formatPowerKw(stats?.currentLoadReductionKw)}
             </div>
             <p className="text-xs text-muted-foreground">
               Current load reduction
@@ -116,7 +93,7 @@ export const Dashboard = () => {
 
         <Card className="border-accent/20 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg House Power</CardTitle>
+            <CardTitle className="text-sm font-medium">Average VEN Power</CardTitle>
             <Power className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
@@ -134,7 +111,7 @@ export const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* VEN Management */}
         <div className="lg:col-span-2">
-          <Card className="h-full">
+          <Card className="h-[calc(100vh-22rem)] flex flex-col">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -160,16 +137,26 @@ export const Dashboard = () => {
                 </Tabs>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              {activeView === 'list' ? <VenList /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
+            <CardContent className="p-0 flex-1 overflow-hidden">
+              <ScrollArea className="h-full">
+                {activeView === 'list' ? <VenList /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
+              </ScrollArea>
             </CardContent>
           </Card>
         </div>
 
         {/* Sidebar Controls */}
-        <div className="space-y-6">
-          <PowerMetrics networkStats={stats} />
-          <AdrControls />
+        <div>
+          <Card className="h-[calc(100vh-22rem)] flex flex-col">
+            <CardContent className="p-4 flex-1 overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="space-y-6 pr-4">
+                  <PowerMetrics networkStats={stats} />
+                  <AdrControls />
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

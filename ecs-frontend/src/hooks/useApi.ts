@@ -56,6 +56,7 @@ export interface Ven {
   location: VenLocation;
   metrics: VenMetrics;
   createdAt: string;
+  lastSeen?: string;
   loads?: Load[];
 }
 
@@ -120,5 +121,122 @@ export function useStopEvent() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["currentEvent"] });
     },
+  });
+}
+
+// VEN Details
+export interface CircuitSnapshot {
+  timestamp: string;
+  loadId: string;
+  name?: string;
+  type?: string;
+  capacityKw?: number;
+  currentPowerKw: number;
+  shedCapabilityKw: number;
+  enabled: boolean;
+  priority?: number;
+}
+
+export interface CircuitHistoryResponse {
+  venId: string;
+  loadId?: string;
+  snapshots: CircuitSnapshot[];
+  totalCount: number;
+}
+
+export interface VenEventAck {
+  eventId: string;
+  venId: string;
+  timestamp: string;
+  status: string;
+  requestedShedKw?: number;
+  actualShedKw?: number;
+  circuitsCurtailed?: Array<{
+    id: string;
+    name: string;
+    breaker_amps: number;
+    original_kw: number;
+    curtailed_kw: number;
+    final_kw: number;
+    critical: boolean;
+  }>;
+}
+
+export function useVenDetail(venId: string | null) {
+  return useQuery({
+    queryKey: ["ven", venId],
+    queryFn: () => apiGet<Ven>(`/api/vens/${venId}`),
+    enabled: !!venId,
+    refetchInterval: 10000,
+  });
+}
+
+export function useVenCircuitHistory(venId: string | null, params?: { loadId?: string; start?: string; end?: string; limit?: number }) {
+  const qp: string[] = [];
+  if (params?.loadId) qp.push(`load_id=${encodeURIComponent(params.loadId)}`);
+  if (params?.start) qp.push(`start=${encodeURIComponent(params.start)}`);
+  if (params?.end) qp.push(`end=${encodeURIComponent(params.end)}`);
+  if (params?.limit) qp.push(`limit=${params.limit}`);
+  const qs = qp.length ? `?${qp.join("&")}` : "";
+  
+  return useQuery({
+    queryKey: ["venCircuitHistory", venId, params],
+    queryFn: () => apiGet<CircuitHistoryResponse>(`/api/vens/${venId}/circuits/history${qs}`),
+    enabled: !!venId,
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    retry: 1, // Only retry once on failure
+  });
+}
+
+export function useVenEventHistory(venId: string | null) {
+  return useQuery({
+    queryKey: ["venEventHistory", venId],
+    queryFn: () => apiGet<VenEventAck[]>(`/api/vens/${venId}/events`),
+    enabled: !!venId,
+  });
+}
+
+export interface VenHistoryResponse {
+  points: Array<{
+    timestamp: string;
+    usedPowerKw: number;
+    shedPowerKw: number;
+    eventId: string | null;
+    requestedReductionKw: number;
+  }>;
+}
+
+export function useVenHistory(venId: string | null, params?: { start?: string; end?: string; granularity?: string }) {
+  const qp: string[] = [];
+  if (params?.start) qp.push(`start=${encodeURIComponent(params.start)}`);
+  if (params?.end) qp.push(`end=${encodeURIComponent(params.end)}`);
+  if (params?.granularity) qp.push(`granularity=${encodeURIComponent(params.granularity)}`);
+  const qs = qp.length ? `?${qp.join("&")}` : "";
+  
+  return useQuery({
+    queryKey: ["venHistory", venId, params?.start, params?.end, params?.granularity],
+    queryFn: () => apiGet<VenHistoryResponse>(`/api/vens/${venId}/history${qs}`),
+    enabled: !!venId,
+    staleTime: 60000, // Consider data fresh for 60 seconds
+    retry: 2,
+  });
+}
+
+// Event Details
+export interface EventDetail extends Event {
+  vens?: Array<{
+    venId: string;
+    venName: string;
+    shedKw: number;
+    status: string;
+  }>;
+}
+
+export function useEventDetail(eventId: string | null) {
+  return useQuery({
+    queryKey: ["event", eventId],
+    queryFn: () => apiGet<EventDetail>(`/api/events/${eventId}`),
+    enabled: !!eventId,
+    refetchInterval: 10000,
   });
 }

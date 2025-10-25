@@ -71,12 +71,18 @@ async def test_get_event(client: AsyncClient):
     create_response = await client.post("/api/events/", json=payload)
     event_id = create_response.json()["id"]
     
-    # Get event
+    # Get event - should return EventDetail with extended fields
     response = await client.get(f"/api/events/{event_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == event_id
     assert data["requestedReductionKw"] == 30.0
+    
+    # Check EventDetail-specific fields
+    assert "currentReductionKw" in data
+    assert "vensResponding" in data
+    assert "avgResponseMs" in data
+    assert "vens" in data
 
 
 @pytest.mark.asyncio
@@ -85,6 +91,103 @@ async def test_get_event_not_found(client: AsyncClient):
     response = await client.get("/api/events/nonexistent")
     assert response.status_code == 404
     assert response.json()["detail"] == "Event not found"
+
+
+@pytest.mark.asyncio
+async def test_get_event_with_ven_participation(client: AsyncClient, test_session: AsyncSession):
+    """Test EventDetail includes VEN participation data."""
+    from app import crud
+    from app.models.telemetry import VenTelemetry
+    
+    # Create VENs
+    ven1 = await crud.create_ven(
+        test_session,
+        ven_id="ven-event-1",
+        name="Test VEN 1",
+        status="active",
+        registration_id="evt-reg-1",
+        latitude=37.0,
+        longitude=-122.0,
+    )
+    
+    ven2 = await crud.create_ven(
+        test_session,
+        ven_id="ven-event-2",
+        name="Test VEN 2",
+        status="active",
+        registration_id="evt-reg-2",
+        latitude=37.1,
+        longitude=-122.1,
+    )
+    
+    # Create event
+    now = datetime.now(UTC)
+    event = await crud.create_event(
+        test_session,
+        event_id="test-evt-123",
+        start_time=now,
+        end_time=now + timedelta(hours=1),
+        requested_reduction_kw=50.0,
+        status="active",
+    )
+    
+    # Create telemetry data showing VENs participating in the event
+    telemetry1 = VenTelemetry(
+        ven_id=ven1.ven_id,
+        timestamp=now,
+        used_power_kw=10.0,
+        shed_power_kw=23.0,  # VEN 1 shed 23 kW
+        event_id=event.event_id,
+    )
+    test_session.add(telemetry1)
+    
+    telemetry2 = VenTelemetry(
+        ven_id=ven2.ven_id,
+        timestamp=now,
+        used_power_kw=12.0,
+        shed_power_kw=22.0,  # VEN 2 shed 22 kW
+        event_id=event.event_id,
+    )
+    test_session.add(telemetry2)
+    await test_session.commit()
+    
+    # Get event details
+    response = await client.get(f"/api/events/{event.event_id}")
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Verify EventDetail structure
+    assert data["id"] == event.event_id
+    assert data["requestedReductionKw"] == 50.0
+    assert "currentReductionKw" in data
+    assert "vensResponding" in data
+    assert "avgResponseMs" in data
+    
+    # Verify VEN participation list
+    assert "vens" in data
+    assert data["vens"] is not None
+    assert len(data["vens"]) == 2
+    
+    # Check VenParticipation structure
+    ven_ids = {v["venId"] for v in data["vens"]}
+    assert "ven-event-1" in ven_ids
+    assert "ven-event-2" in ven_ids
+    
+    for ven_participation in data["vens"]:
+        assert "venId" in ven_participation
+        assert "venName" in ven_participation
+        assert "shedKw" in ven_participation
+        assert "status" in ven_participation
+        
+        # Verify data
+        if ven_participation["venId"] == "ven-event-1":
+            assert ven_participation["venName"] == "Test VEN 1"
+            assert ven_participation["shedKw"] == 23.0
+            assert ven_participation["status"] == "responded"
+        elif ven_participation["venId"] == "ven-event-2":
+            assert ven_participation["venName"] == "Test VEN 2"
+            assert ven_participation["shedKw"] == 22.0
+            assert ven_participation["status"] == "responded"
 
 
 @pytest.mark.asyncio
