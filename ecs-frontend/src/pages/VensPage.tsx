@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import Layout from "@/components/Layout";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useVens } from "@/hooks/useApi";
-import { Loader2, Zap, Clock, Gauge } from "lucide-react";
+import { Loader2, Zap, Clock, Gauge, Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -18,6 +20,7 @@ import { formatDistanceToNow, format } from "date-fns";
 export default function VensPage() {
   const navigate = useNavigate();
   const { data: vens, isLoading } = useVens();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const formatLastSeen = (dateString: string | undefined) => {
     if (!dateString) return "Never";
@@ -56,6 +59,16 @@ export default function VensPage() {
     return dateB - dateA; // Most recent first
   });
 
+  // Filter VENs by search query (ID or Name)
+  const filteredVens = sortedVens.filter((ven) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      ven.id.toLowerCase().includes(query) ||
+      ven.name.toLowerCase().includes(query)
+    );
+  });
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "online":
@@ -75,10 +88,21 @@ export default function VensPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            Virtual End Nodes (VENs)
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Virtual End Nodes (VENs)
+            </CardTitle>
+            <div className="relative w-72">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by VEN ID or Name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -99,12 +123,19 @@ export default function VensPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedVens?.map((ven) => (
-                  <TableRow
-                    key={ven.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/vens/${ven.id}`)}
-                  >
+                {filteredVens.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      {searchQuery ? "No VENs found matching your search." : "No VENs available."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredVens.map((ven) => (
+                    <TableRow
+                      key={ven.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/vens/${ven.id}`)}
+                    >
                     <TableCell className="font-mono text-sm">{ven.id}</TableCell>
                     <TableCell className="font-medium">{ven.name}</TableCell>
                     <TableCell>
@@ -133,7 +164,8 @@ export default function VensPage() {
                       <Badge variant="outline">{ven.loads?.length || 0}</Badge>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           )}
