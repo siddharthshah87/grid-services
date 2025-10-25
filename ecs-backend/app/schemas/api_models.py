@@ -34,6 +34,7 @@ class Ven(BaseModel):
     location: Location
     metrics: VenMetrics
     createdAt: datetime
+    lastSeen: Optional[datetime] = None
     loads: list[Load] | None = None
 
 

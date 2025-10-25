@@ -18,10 +18,10 @@ export default function VensPage() {
   const navigate = useNavigate();
   const { data: vens, isLoading } = useVens();
 
-  // Sort VENs by createdAt timestamp (most recent first)
+  // Sort VENs by lastSeen timestamp (most recent first), fall back to createdAt
   const sortedVens = [...(vens || [])].sort((a, b) => {
-    const dateA = new Date(a.createdAt).getTime();
-    const dateB = new Date(b.createdAt).getTime();
+    const dateA = new Date(a.lastSeen || a.createdAt).getTime();
+    const dateB = new Date(b.lastSeen || b.createdAt).getTime();
     return dateB - dateA; // Most recent first
   });
 
