@@ -1,12 +1,12 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Layout from "@/components/Layout";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useVenDetail, useVenCircuitHistory, useVenEventHistory, type VenEventAck } from "@/hooks/useApi";
+import { useVenDetail, useVenEventHistory, useVenHistory, type VenEventAck } from "@/hooks/useApi";
 import { Loader2, ArrowLeft, Zap, MapPin, Gauge, Clock } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
@@ -26,8 +26,23 @@ export default function VenDetailPage() {
   const { venId } = useParams<{ venId: string }>();
   const navigate = useNavigate();
   const { data: ven, isLoading } = useVenDetail(venId || null);
-  const { data: circuitHistory } = useVenCircuitHistory(venId || null, { limit: 100 });
   const { data: eventHistory } = useVenEventHistory(venId || null);
+  
+  // State for power history time range (default to last 1 day for faster loading)
+  const [historyDays, setHistoryDays] = useState(1);
+  
+  // Calculate start time only when historyDays changes, using a stable calculation
+  const historyStartTime = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - historyDays);
+    date.setHours(0, 0, 0, 0); // Normalize to start of day for cache stability
+    return date.toISOString();
+  }, [historyDays]);
+  
+  const { data: venHistory, isLoading: isHistoryLoading } = useVenHistory(
+    venId || null, 
+    historyDays > 0 ? { start: historyStartTime } : undefined
+  );
   
   const [selectedCircuit, setSelectedCircuit] = useState<{
     loadId: string;
@@ -73,18 +88,18 @@ export default function VenDetailPage() {
     }
   };
 
-  // Prepare power history chart data
-  const powerChartData = circuitHistory?.snapshots?.map(ch => {
-    try {
-      return {
-        time: format(new Date(ch.timestamp), 'HH:mm:ss'),
-        power: ch.currentPowerKw || 0,
-        capacity: ch.shedCapabilityKw || 0,
-      };
-    } catch (error) {
-      return null;
-    }
-  }).filter(Boolean) || [];
+  // Prepare power history chart data with smart date formatting
+  const powerChartData = venHistory?.points?.map((point, idx, arr) => {
+    const date = new Date(point.timestamp);
+    // Show date + time for multi-day view, or just time for single day
+    const timeFormat = historyDays > 1 ? 'MMM dd HH:mm' : 'HH:mm';
+    return {
+      time: format(date, timeFormat),
+      power: point.usedPowerKw || 0,
+      shedCapability: point.shedPowerKw || 0,
+      fullTimestamp: point.timestamp, // Keep for tooltip
+    };
+  }) || [];
 
   // Prepare load breakdown chart data
   const loadBreakdown = ven?.loads?.map(load => ({
@@ -281,32 +296,107 @@ export default function VenDetailPage() {
         <TabsContent value="power">
           <Card>
             <CardHeader>
-              <CardTitle>Power Usage Over Time</CardTitle>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Power Usage Over Time</CardTitle>
+                  <CardDescription>
+                    Showing {powerChartData.length} data points • {historyDays} day{historyDays > 1 ? 's' : ''} of history
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={historyDays === 1 ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setHistoryDays(1)}
+                  >
+                    1 Day
+                  </Button>
+                  <Button
+                    variant={historyDays === 3 ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setHistoryDays(3)}
+                  >
+                    3 Days
+                  </Button>
+                  <Button
+                    variant={historyDays === 7 ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setHistoryDays(7)}
+                  >
+                    7 Days
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={powerChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis label={{ value: 'Power (kW)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--popover))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '0.5rem',
-                      backdropFilter: 'blur(8px)'
-                    }}
-                    labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
-                    cursor={{ stroke: 'hsl(var(--muted))', strokeWidth: 1, strokeDasharray: '5 5' }}
-                  />
-                  <Legend 
-                    wrapperStyle={{ color: 'hsl(var(--foreground))' }}
-                    iconType="line"
-                  />
-                  <Line type="monotone" dataKey="power" stroke="#8884d8" name="Current Power" activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="capacity" stroke="#82ca9d" name="Shed Capability" activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
+              {isHistoryLoading ? (
+                <div className="flex items-center justify-center h-[450px] text-muted-foreground">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <span className="ml-2">Loading power history...</span>
+                </div>
+              ) : powerChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={450}>
+                  <LineChart data={powerChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="time" 
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      angle={historyDays > 1 ? -45 : 0}
+                      textAnchor={historyDays > 1 ? "end" : "middle"}
+                      height={historyDays > 1 ? 70 : 50}
+                    />
+                    <YAxis 
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      label={{ value: 'Power (kW)', angle: -90, position: 'insideLeft' }}
+                    />
+                    <Tooltip
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--popover))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '0.5rem',
+                        backdropFilter: 'blur(8px)'
+                      }}
+                      labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                      cursor={{ stroke: 'hsl(var(--muted))', strokeWidth: 1, strokeDasharray: '5 5' }}
+                      labelFormatter={(label, payload) => {
+                        if (payload && payload[0] && payload[0].payload.fullTimestamp) {
+                          return format(new Date(payload[0].payload.fullTimestamp), 'PPpp');
+                        }
+                        return label;
+                      }}
+                    />
+                    <Legend 
+                      wrapperStyle={{ color: 'hsl(var(--foreground))' }}
+                      iconType="line"
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="power" 
+                      stroke="hsl(var(--success))" 
+                      strokeWidth={2}
+                      name="Current Power" 
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="shedCapability" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      name="Shed Capability" 
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[450px] text-muted-foreground">
+                  No power history data available
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

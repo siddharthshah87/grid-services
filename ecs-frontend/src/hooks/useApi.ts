@@ -196,6 +196,32 @@ export function useVenEventHistory(venId: string | null) {
   });
 }
 
+export interface VenHistoryResponse {
+  points: Array<{
+    timestamp: string;
+    usedPowerKw: number;
+    shedPowerKw: number;
+    eventId: string | null;
+    requestedReductionKw: number;
+  }>;
+}
+
+export function useVenHistory(venId: string | null, params?: { start?: string; end?: string; granularity?: string }) {
+  const qp: string[] = [];
+  if (params?.start) qp.push(`start=${encodeURIComponent(params.start)}`);
+  if (params?.end) qp.push(`end=${encodeURIComponent(params.end)}`);
+  if (params?.granularity) qp.push(`granularity=${encodeURIComponent(params.granularity)}`);
+  const qs = qp.length ? `?${qp.join("&")}` : "";
+  
+  return useQuery({
+    queryKey: ["venHistory", venId, params?.start, params?.end, params?.granularity],
+    queryFn: () => apiGet<VenHistoryResponse>(`/api/vens/${venId}/history${qs}`),
+    enabled: !!venId,
+    staleTime: 60000, // Consider data fresh for 60 seconds
+    retry: 2,
+  });
+}
+
 // Event Details
 export interface EventDetail extends Event {
   vens?: Array<{

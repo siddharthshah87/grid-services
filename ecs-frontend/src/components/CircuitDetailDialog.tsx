@@ -1,11 +1,11 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { useVenCircuitHistory } from '@/hooks/useApi';
 import { Zap, Activity, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 
 interface CircuitDetailDialogProps {
   venId: string;
@@ -30,8 +30,8 @@ export const CircuitDetailDialog = ({
   open,
   onOpenChange
 }: CircuitDetailDialogProps) => {
-  // Get data for the last 24 hours - memoize to prevent query key changes on every render
-  const startTime = useMemo(() => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), []);
+  // Calculate start time when dialog opens
+  const [startTime] = useState(() => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
   
   const { data: history, isLoading, isError } = useVenCircuitHistory(
     open ? venId : null,
