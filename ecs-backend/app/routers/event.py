@@ -168,17 +168,27 @@ async def create_event_v2(payload: EventCreate, session: AsyncSession = Depends(
 
 @router.get("/{event_id}", response_model=EventDetail)
 async def get_event_v2(event_id: str, session: AsyncSession = Depends(get_session)):
-    event = await _ensure_event(session, event_id)
-    metrics = await _event_metrics(session, event.event_id)
-    ven_participation = await _ven_participation(session, event.event_id)
-    base = _event_to_api(event, metrics.currentReductionKw)
-    return EventDetail(
-        **base.model_dump(),
-        currentReductionKw=metrics.currentReductionKw,
-        vensResponding=metrics.vensResponding,
-        avgResponseMs=metrics.avgResponseMs,
-        vens=ven_participation if ven_participation else None,
-    )
+    try:
+        event = await _ensure_event(session, event_id)
+        metrics = await _event_metrics(session, event.event_id)
+        ven_participation = await _ven_participation(session, event.event_id)
+        base = _event_to_api(event, metrics.currentReductionKw)
+        return EventDetail(
+            **base.model_dump(),
+            currentReductionKw=metrics.currentReductionKw,
+            vensResponding=metrics.vensResponding,
+            avgResponseMs=metrics.avgResponseMs,
+            vens=ven_participation if ven_participation else [],
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching event details: {str(e)}"
+        )
 
 
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
