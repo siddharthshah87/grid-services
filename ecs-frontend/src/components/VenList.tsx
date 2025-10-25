@@ -20,6 +20,13 @@ export const VenList = () => {
     navigate(`/vens/${id}`);
   };
 
+  // Sort VENs by lastSeen timestamp (most recent first)
+  const sortedVens = [...(vens || [])].sort((a, b) => {
+    const dateA = new Date(a.lastSeen).getTime();
+    const dateB = new Date(b.lastSeen).getTime();
+    return dateB - dateA; // Most recent first
+  });
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'online':
@@ -50,7 +57,7 @@ export const VenList = () => {
   return (
     <>
       <div className="p-4 space-y-3">
-        {(vens || []).map((ven) => (
+        {(sortedVens || []).map((ven) => (
           <Card key={ven.id} className="transition-all duration-200 hover:shadow-energy border-l-4 border-l-primary/30">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">

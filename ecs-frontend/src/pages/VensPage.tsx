@@ -18,6 +18,13 @@ export default function VensPage() {
   const navigate = useNavigate();
   const { data: vens, isLoading } = useVens();
 
+  // Sort VENs by createdAt timestamp (most recent first)
+  const sortedVens = [...(vens || [])].sort((a, b) => {
+    const dateA = new Date(a.createdAt).getTime();
+    const dateB = new Date(b.createdAt).getTime();
+    return dateB - dateA; // Most recent first
+  });
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "online":
@@ -61,7 +68,7 @@ export default function VensPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {vens?.map((ven) => (
+                {sortedVens?.map((ven) => (
                   <TableRow
                     key={ven.id}
                     className="cursor-pointer hover:bg-muted/50"
