@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVenDetail, useVenEventHistory, useVenHistory, type VenEventAck } from "@/hooks/useApi";
 import { Loader2, ArrowLeft, Zap, MapPin, Gauge, Clock } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
   Table,
   TableBody,
@@ -131,13 +131,46 @@ export default function VenDetailPage() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle>
           </CardHeader>
           <CardContent>
             <Badge variant={getStatusVariant(ven.status)}>{ven.status}</Badge>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Last Seen
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!ven.lastSeen ? (
+              <div className="text-sm font-medium">Never</div>
+            ) : (() => {
+              const date = new Date(ven.lastSeen);
+              const now = new Date();
+              const isFuture = date > now;
+              
+              return (
+                <>
+                  <div className="text-sm font-medium">
+                    {isFuture 
+                      ? `Future: ${format(date, "yyyy/MM/dd - HH:mm:ss")}`
+                      : formatDistanceToNow(date, { addSuffix: true })}
+                  </div>
+                  {!isFuture && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {format(date, "yyyy/MM/dd - HH:mm:ss")}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
 

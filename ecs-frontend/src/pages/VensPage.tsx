@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import Layout from "@/components/Layout";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useVens } from "@/hooks/useApi";
-import { Loader2, Zap, MapPin, Gauge } from "lucide-react";
+import { Loader2, Zap, Clock, Gauge, Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -13,16 +15,58 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDistanceToNow, format } from "date-fns";
 
 export default function VensPage() {
   const navigate = useNavigate();
   const { data: vens, isLoading } = useVens();
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Sort VENs by lastSeen timestamp (most recent first), fall back to createdAt
+  const formatLastSeen = (dateString: string | undefined) => {
+    if (!dateString) return "Never";
+    
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      
+      // If timestamp is in the future, show the actual timestamp
+      if (date > now) {
+        return format(date, "yyyy/MM/dd - HH:mm:ss");
+      }
+      
+      return formatDistanceToNow(date, { addSuffix: true });
+    } catch {
+      // If parsing fails, show the raw string
+      return dateString;
+    }
+  };
+
+  // Sort VENs by lastSeen timestamp (most recent first, push invalid/missing to bottom)
   const sortedVens = [...(vens || [])].sort((a, b) => {
-    const dateA = new Date(a.lastSeen || a.createdAt).getTime();
-    const dateB = new Date(b.lastSeen || b.createdAt).getTime();
+    // Handle missing timestamps - push to bottom
+    if (!a.lastSeen && !b.lastSeen) return 0;
+    if (!a.lastSeen) return 1;
+    if (!b.lastSeen) return -1;
+    
+    const dateA = new Date(a.lastSeen).getTime();
+    const dateB = new Date(b.lastSeen).getTime();
+    
+    // Handle invalid dates - push to bottom
+    if (isNaN(dateA) && isNaN(dateB)) return 0;
+    if (isNaN(dateA)) return 1;
+    if (isNaN(dateB)) return -1;
+    
     return dateB - dateA; // Most recent first
+  });
+
+  // Filter VENs by search query (ID or Name)
+  const filteredVens = sortedVens.filter((ven) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      ven.id.toLowerCase().includes(query) ||
+      ven.name.toLowerCase().includes(query)
+    );
   });
 
   const getStatusVariant = (status: string) => {
@@ -44,10 +88,21 @@ export default function VensPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            Virtual End Nodes (VENs)
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Virtual End Nodes (VENs)
+            </CardTitle>
+            <div className="relative w-72">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by VEN ID or Name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -61,19 +116,26 @@ export default function VensPage() {
                   <TableHead>VEN ID</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Location</TableHead>
+                  <TableHead>Last Seen</TableHead>
                   <TableHead className="text-right">Power Usage</TableHead>
                   <TableHead className="text-right">Shed Capability</TableHead>
                   <TableHead className="text-right">Circuits</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedVens?.map((ven) => (
-                  <TableRow
-                    key={ven.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/vens/${ven.id}`)}
-                  >
+                {filteredVens.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      {searchQuery ? "No VENs found matching your search." : "No VENs available."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredVens.map((ven) => (
+                    <TableRow
+                      key={ven.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/vens/${ven.id}`)}
+                    >
                     <TableCell className="font-mono text-sm">{ven.id}</TableCell>
                     <TableCell className="font-medium">{ven.name}</TableCell>
                     <TableCell>
@@ -83,10 +145,8 @@ export default function VensPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <MapPin className="h-3 w-3" />
-                        {ven.location?.lat && ven.location?.lon
-                          ? `${ven.location.lat.toFixed(4)}, ${ven.location.lon.toFixed(4)}`
-                          : "N/A"}
+                        <Clock className="h-3 w-3" />
+                        {formatLastSeen(ven.lastSeen)}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -104,7 +164,8 @@ export default function VensPage() {
                       <Badge variant="outline">{ven.loads?.length || 0}</Badge>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           )}

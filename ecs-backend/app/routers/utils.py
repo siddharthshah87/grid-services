@@ -94,12 +94,17 @@ def build_ven_payload(
         created_at = created_at.replace(tzinfo=UTC)
 
     # Get last seen timestamp from telemetry (most recent data)
+    # Fall back to created_at if no telemetry exists
     last_seen = None
     if telemetry:
         ts = telemetry.timestamp
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=UTC)
         last_seen = ts
+    
+    # If no telemetry, use created_at as last_seen
+    if last_seen is None:
+        last_seen = created_at
 
     loads = None
     if include_loads and telemetry:

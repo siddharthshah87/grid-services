@@ -2,15 +2,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import {
-  MapPin, 
-  Zap, 
-  CheckCircle, 
-  AlertTriangle, 
-  Settings,
-  Activity
-} from 'lucide-react';
+import { Zap, Activity } from 'lucide-react';
 import { useVenSummary } from '@/hooks/useApi';
+import { formatDistanceToNow, format } from 'date-fns';
 
 export const VenList = () => {
   const navigate = useNavigate();
@@ -20,25 +14,42 @@ export const VenList = () => {
     navigate(`/vens/${id}`);
   };
 
-  // Sort VENs by lastSeen timestamp (most recent first)
-  const sortedVens = [...(vens || [])].sort((a, b) => {
-    const dateA = new Date(a.lastSeen).getTime();
-    const dateB = new Date(b.lastSeen).getTime();
-    return dateB - dateA; // Most recent first
-  });
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'online':
-        return <CheckCircle className="h-4 w-4 text-online" />;
-      case 'offline':
-        return <AlertTriangle className="h-4 w-4 text-offline" />;
-      case 'maintenance':
-        return <Settings className="h-4 w-4 text-warning" />;
-      default:
-        return <AlertTriangle className="h-4 w-4 text-muted-foreground" />;
+  const formatLastSeen = (dateString: string | undefined) => {
+    if (!dateString) return "Never";
+    
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      
+      // If timestamp is in the future, show the actual timestamp
+      if (date > now) {
+        return format(date, "yyyy/MM/dd - HH:mm:ss");
+      }
+      
+      return formatDistanceToNow(date, { addSuffix: true });
+    } catch {
+      // If parsing fails, show the raw string
+      return dateString;
     }
   };
+
+  // Sort VENs by lastSeen timestamp (most recent first, push invalid/missing to bottom)
+  const sortedVens = [...(vens || [])].sort((a, b) => {
+    // Handle missing timestamps - push to bottom
+    if (!a.lastSeen && !b.lastSeen) return 0;
+    if (!a.lastSeen) return 1;
+    if (!b.lastSeen) return -1;
+    
+    const dateA = new Date(a.lastSeen).getTime();
+    const dateB = new Date(b.lastSeen).getTime();
+    
+    // Handle invalid dates - push to bottom
+    if (isNaN(dateA) && isNaN(dateB)) return 0;
+    if (isNaN(dateA)) return 1;
+    if (isNaN(dateB)) return -1;
+    
+    return dateB - dateA; // Most recent first
+  });
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -61,12 +72,9 @@ export const VenList = () => {
           <Card key={ven.id} className="transition-all duration-200 hover:shadow-energy border-l-4 border-l-primary/30">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(ven.status)}
-                  <div>
-                    <h3 className="font-semibold text-foreground">{ven.name}</h3>
-                    <p className="text-sm text-muted-foreground">{ven.id}</p>
-                  </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">{ven.name}</h3>
+                  <p className="text-sm text-muted-foreground">{ven.id}</p>
                 </div>
                 {getStatusBadge(ven.status)}
               </div>
@@ -85,25 +93,15 @@ export const VenList = () => {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
                     <span className="text-muted-foreground">Location:</span>
-                    <div className="font-medium">{ven.location}</div>
+                    <span className="font-medium">{ven.location}</span>
                   </div>
-                  <div className="text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
                     <span className="text-muted-foreground">Last Seen:</span>
-                    <div className="font-medium">{ven.lastSeen}</div>
+                    <span className="font-medium">{formatLastSeen(ven.lastSeen)}</span>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-                <div className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  <span>{ven.address}</span>
-                </div>
-                {ven.responseTime > 0 && (
-                  <span>Response: {ven.responseTime}ms</span>
-                )}
               </div>
 
               <div className="flex gap-2">
