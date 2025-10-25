@@ -101,10 +101,10 @@ export default function EventsPage() {
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs text-muted-foreground font-mono truncate mb-1">{event.id}</p>
+                            <p className="text-xs text-muted-foreground font-mono truncate mb-1.5 leading-relaxed">{event.id}</p>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <Clock className="h-3 w-3" />
-                              {format(new Date(event.startTime), 'MMM dd, HH:mm')}
+                              <span className="leading-relaxed">{format(new Date(event.startTime), 'MMM dd, HH:mm')}</span>
                             </div>
                           </div>
                           <Badge variant={getStatusVariant(event.status)} className="ml-2 shrink-0">
@@ -112,31 +112,31 @@ export default function EventsPage() {
                           </Badge>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="grid grid-cols-2 gap-3 text-sm leading-relaxed">
                           <div>
                             <div className="text-muted-foreground mb-1 text-xs">Target</div>
-                            <div className="font-mono text-xs font-medium">
+                            <div className="font-mono text-sm font-medium">
                               {event.requestedReductionKw.toFixed(2)} kW
                             </div>
                           </div>
                           
                           <div>
                             <div className="text-muted-foreground mb-1 text-xs">Actual</div>
-                            <div className="font-mono text-xs font-medium">
+                            <div className="font-mono text-sm font-medium">
                               {event.actualReductionKw?.toFixed(2) || '0.00'} kW
                             </div>
                           </div>
                           
                           <div>
                             <div className="text-muted-foreground mb-1 text-xs">Duration</div>
-                            <div className="font-medium text-xs">
+                            <div className="font-medium text-sm">
                               {Math.round((new Date(event.endTime.endsWith('Z') ? event.endTime : event.endTime + 'Z').getTime() - new Date(event.startTime.endsWith('Z') ? event.startTime : event.startTime + 'Z').getTime()) / 60000)} min
                             </div>
                           </div>
                           
                           <div>
                             <div className="text-muted-foreground mb-1 text-xs">End Time</div>
-                            <div className="text-xs">
+                            <div className="text-sm leading-relaxed">
                               {format(new Date(event.endTime), 'MMM dd, HH:mm')}
                             </div>
                           </div>

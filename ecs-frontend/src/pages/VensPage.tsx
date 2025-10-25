@@ -127,21 +127,21 @@ export default function VensPage() {
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold truncate">{ven.name}</h3>
-                            <p className="text-xs text-muted-foreground font-mono truncate">{ven.id}</p>
+                            <h3 className="font-semibold truncate text-base leading-tight">{ven.name}</h3>
+                            <p className="text-xs text-muted-foreground font-mono truncate mt-1">{ven.id}</p>
                           </div>
                           <Badge variant={getStatusVariant(ven.status)} className="ml-2 shrink-0">
                             {ven.status}
                           </Badge>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="grid grid-cols-2 gap-3 text-sm leading-relaxed">
                           <div>
                             <div className="flex items-center gap-1 text-muted-foreground mb-1">
                               <Clock className="h-3 w-3" />
                               <span className="text-xs">Last Seen</span>
                             </div>
-                            <div className="font-medium text-xs">{formatLastSeen(ven.lastSeen)}</div>
+                            <div className="font-medium text-sm">{formatLastSeen(ven.lastSeen)}</div>
                           </div>
                           
                           <div>
@@ -149,7 +149,7 @@ export default function VensPage() {
                               <Gauge className="h-3 w-3" />
                               <span className="text-xs">Power</span>
                             </div>
-                            <div className="font-mono text-xs font-medium">
+                            <div className="font-mono text-sm font-medium">
                               {(ven.metrics?.currentPowerKw || 0).toFixed(2)} kW
                             </div>
                           </div>
@@ -159,14 +159,14 @@ export default function VensPage() {
                               <Zap className="h-3 w-3" />
                               <span className="text-xs">Shed Cap.</span>
                             </div>
-                            <div className="font-mono text-xs font-medium">
+                            <div className="font-mono text-sm font-medium">
                               {(ven.metrics?.shedAvailabilityKw || 0).toFixed(2)} kW
                             </div>
                           </div>
                           
                           <div>
                             <div className="text-muted-foreground mb-1 text-xs">Circuits</div>
-                            <Badge variant="outline">{ven.loads?.length || 0}</Badge>
+                            <Badge variant="outline" className="text-sm">{ven.loads?.length || 0}</Badge>
                           </div>
                         </div>
                       </CardContent>

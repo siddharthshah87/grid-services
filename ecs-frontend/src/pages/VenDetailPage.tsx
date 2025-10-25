@@ -137,7 +137,7 @@ export default function VenDetailPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge variant={getStatusVariant(ven.status)}>{ven.status}</Badge>
+            <Badge variant={getStatusVariant(ven.status)} className="text-sm">{ven.status}</Badge>
           </CardContent>
         </Card>
 
@@ -150,7 +150,7 @@ export default function VenDetailPage() {
           </CardHeader>
           <CardContent>
             {!ven.lastSeen ? (
-              <div className="text-sm font-medium">Never</div>
+              <div className="text-sm font-medium leading-relaxed">Never</div>
             ) : (() => {
               const date = new Date(ven.lastSeen);
               const now = new Date();
@@ -158,13 +158,13 @@ export default function VenDetailPage() {
               
               return (
                 <>
-                  <div className="text-sm font-medium">
+                  <div className="text-sm font-medium leading-relaxed">
                     {isFuture 
                       ? `Future: ${format(date, "yyyy/MM/dd - HH:mm:ss")}`
                       : formatDistanceToNow(date, { addSuffix: true })}
                   </div>
                   {!isFuture && (
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
                       {format(date, "yyyy/MM/dd - HH:mm:ss")}
                     </div>
                   )}
@@ -182,7 +182,7 @@ export default function VenDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold leading-tight">
               {(ven.metrics?.currentPowerKw || 0).toFixed(2)} kW
             </div>
           </CardContent>
@@ -196,7 +196,7 @@ export default function VenDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold leading-tight">
               {(ven.metrics?.shedAvailabilityKw || 0).toFixed(2)} kW
             </div>
           </CardContent>
@@ -210,7 +210,7 @@ export default function VenDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-sm">
+            <div className="text-sm leading-relaxed">
               {ven.location?.lat && ven.location?.lon
                 ? `${ven.location.lat.toFixed(4)}, ${ven.location.lon.toFixed(4)}`
                 : "N/A"}

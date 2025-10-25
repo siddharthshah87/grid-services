@@ -111,7 +111,7 @@ export default function EventDetailPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge variant={getStatusVariant(event.status)}>{event.status}</Badge>
+            <Badge variant={getStatusVariant(event.status)} className="text-sm">{event.status}</Badge>
           </CardContent>
         </Card>
 
@@ -123,7 +123,7 @@ export default function EventDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold leading-tight">
               {event.requestedReductionKw.toFixed(2)} kW
             </div>
           </CardContent>
@@ -137,10 +137,10 @@ export default function EventDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold leading-tight">
               {totalShed.toFixed(2)} kW
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground leading-relaxed mt-1">
               {((totalShed / event.requestedReductionKw) * 100).toFixed(1)}% of target
             </div>
           </CardContent>
@@ -154,7 +154,7 @@ export default function EventDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold leading-tight">
               {duration} min
             </div>
           </CardContent>
@@ -165,7 +165,7 @@ export default function EventDetailPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Participating VENs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold leading-tight">
               {participatingVens}
             </div>
           </CardContent>
@@ -175,25 +175,25 @@ export default function EventDetailPage() {
       {/* Timeline */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Calendar className="h-5 w-5" />
             Event Timeline
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center gap-3">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <div>
-                <div className="font-medium">Start Time</div>
-                <div className="text-sm text-muted-foreground">{format(new Date(event.startTime), 'PPpp')}</div>
+                <div className="font-medium text-sm leading-relaxed">Start Time</div>
+                <div className="text-sm text-muted-foreground leading-relaxed">{format(new Date(event.startTime), 'PPpp')}</div>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <div>
-                <div className="font-medium">End Time</div>
-                <div className="text-sm text-muted-foreground">{format(new Date(event.endTime), 'PPpp')}</div>
+                <div className="font-medium text-sm leading-relaxed">End Time</div>
+                <div className="text-sm text-muted-foreground leading-relaxed">{format(new Date(event.endTime), 'PPpp')}</div>
               </div>
             </div>
           </div>

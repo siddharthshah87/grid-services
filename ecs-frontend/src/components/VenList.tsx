@@ -73,31 +73,31 @@ export const VenList = () => {
             <CardContent className="p-5 md:p-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="font-semibold text-foreground">{ven.name}</h3>
-                  <p className="text-sm text-muted-foreground">{ven.id}</p>
+                  <h3 className="font-semibold text-foreground leading-tight">{ven.name}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{ven.id}</p>
                 </div>
                 {getStatusBadge(ven.status)}
               </div>
               
               <div className="grid grid-cols-2 gap-4 mb-3">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-sm leading-relaxed">
                     <Zap className="h-3 w-3 text-primary" />
                     <span className="text-muted-foreground">Controllable:</span>
                     <span className="font-medium text-primary">{ven.controllablePower} kW</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-sm leading-relaxed">
                     <Activity className="h-3 w-3 text-success" />
                     <span className="text-muted-foreground">Current:</span>
                     <span className="font-medium text-success">{ven.currentPower} kW</span>
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm leading-relaxed">
                     <span className="text-muted-foreground">Location:</span>
                     <span className="font-medium">{ven.location}</span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm leading-relaxed">
                     <span className="text-muted-foreground">Last Seen:</span>
                     <span className="font-medium">{formatLastSeen(ven.lastSeen)}</span>
                   </div>
