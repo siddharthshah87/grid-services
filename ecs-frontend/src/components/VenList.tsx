@@ -2,11 +2,15 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Activity } from 'lucide-react';
+import { Zap, Activity, ArrowRight } from 'lucide-react';
 import { useVenSummary } from '@/hooks/useApi';
 import { formatDistanceToNow, format } from 'date-fns';
 
-export const VenList = () => {
+interface VenListProps {
+  limit?: number; // Optional limit on number of VENs to display
+}
+
+export const VenList = ({ limit }: VenListProps) => {
   const navigate = useNavigate();
   const { data: vens, isLoading } = useVenSummary();
 
@@ -51,6 +55,10 @@ export const VenList = () => {
     return dateB - dateA; // Most recent first
   });
 
+  // Apply limit if specified
+  const displayedVens = limit ? sortedVens.slice(0, limit) : sortedVens;
+  const hasMore = limit && sortedVens.length > limit;
+
   const getStatusBadge = (status: string) => {
     const variants = {
       online: 'bg-online/10 text-online border-online/20',
@@ -67,37 +75,37 @@ export const VenList = () => {
 
   return (
     <>
-      <div className="p-4 space-y-3">
-        {(sortedVens || []).map((ven) => (
+      <div className="p-3 md:p-4 space-y-3">
+        {(displayedVens || []).map((ven) => (
           <Card key={ven.id} className="transition-all duration-200 hover:shadow-energy border-l-4 border-l-primary/30">
-            <CardContent className="p-4">
+            <CardContent className="p-5 md:p-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="font-semibold text-foreground">{ven.name}</h3>
-                  <p className="text-sm text-muted-foreground">{ven.id}</p>
+                  <h3 className="font-semibold text-foreground leading-tight">{ven.name}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{ven.id}</p>
                 </div>
                 {getStatusBadge(ven.status)}
               </div>
               
               <div className="grid grid-cols-2 gap-4 mb-3">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-sm leading-relaxed">
                     <Zap className="h-3 w-3 text-primary" />
                     <span className="text-muted-foreground">Controllable:</span>
                     <span className="font-medium text-primary">{ven.controllablePower} kW</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-sm leading-relaxed">
                     <Activity className="h-3 w-3 text-success" />
                     <span className="text-muted-foreground">Current:</span>
                     <span className="font-medium text-success">{ven.currentPower} kW</span>
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm leading-relaxed">
                     <span className="text-muted-foreground">Location:</span>
                     <span className="font-medium">{ven.location}</span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm leading-relaxed">
                     <span className="text-muted-foreground">Last Seen:</span>
                     <span className="font-medium">{formatLastSeen(ven.lastSeen)}</span>
                   </div>
@@ -127,6 +135,18 @@ export const VenList = () => {
         ))}
         {isLoading && (
           <div className="p-4 text-sm text-muted-foreground">Loading VENs…</div>
+        )}
+        {hasMore && (
+          <div className="pt-2">
+            <Button 
+              variant="outline" 
+              className="w-full h-10"
+              onClick={() => navigate('/vens')}
+            >
+              View All {sortedVens.length} VENs
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
         )}
       </div>
     </>

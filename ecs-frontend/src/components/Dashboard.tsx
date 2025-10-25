@@ -43,9 +43,9 @@ export const Dashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background p-6 space-y-6">
+    <div className="min-h-screen bg-background p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Key Metrics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <Card className="border-primary/20 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Network Status</CardTitle>
@@ -108,30 +108,30 @@ export const Dashboard = () => {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* VEN Management */}
-        <div className="lg:col-span-2">
-          <Card className="h-[calc(100vh-22rem)] flex flex-col">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
+        {/* VEN Management - Desktop Only */}
+        <div className="hidden md:block xl:col-span-2">
+          <Card className="min-h-[400px] xl:h-[calc(100vh-22rem)] flex flex-col">
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-primary" />
                     VEN Management
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="hidden sm:block">
                     Monitor and control virtual end nodes
                   </CardDescription>
                 </div>
                 <Tabs value={activeView} onValueChange={setActiveView}>
                   <TabsList className="grid w-32 grid-cols-2">
                     <TabsTrigger value="list" className="text-xs">
-                      <List className="h-3 w-3 mr-1" />
-                      List
+                      <List className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">List</span>
                     </TabsTrigger>
                     <TabsTrigger value="map" className="text-xs">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      Map
+                      <MapPin className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Map</span>
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -139,18 +139,41 @@ export const Dashboard = () => {
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-hidden">
               <ScrollArea className="h-full">
-                {activeView === 'list' ? <VenList /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
+                {activeView === 'list' ? <VenList limit={10} /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
               </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Mobile VEN Management - Quick Link */}
+        <div className="md:hidden">
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground leading-tight">VEN Management</h3>
+                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                    View and manage all your virtual end nodes
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => window.location.href = '/vens'}
+                  className="w-full h-10"
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Go to VENs Page
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Sidebar Controls */}
         <div>
-          <Card className="h-[calc(100vh-22rem)] flex flex-col">
+          <Card className="min-h-[400px] xl:h-[calc(100vh-22rem)] flex flex-col">
             <CardContent className="p-4 flex-1 overflow-hidden">
               <ScrollArea className="h-full">
-                <div className="space-y-6 pr-4">
+                <div className="space-y-4 md:space-y-6 pr-2 md:pr-4">
                   <PowerMetrics networkStats={stats} />
                   <AdrControls />
                 </div>
