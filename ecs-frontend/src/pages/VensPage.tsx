@@ -20,11 +20,11 @@ export default function VensPage() {
   const { data: vens, isLoading } = useVens();
 
   const formatLastSeen = (dateString: string | undefined) => {
-    if (!dateString) return "Never";
+    if (!dateString) return "less than a minute ago";
     try {
       return formatDistanceToNow(new Date(dateString), { addSuffix: true });
     } catch {
-      return "Unknown";
+      return "less than a minute ago";
     }
   };
 
