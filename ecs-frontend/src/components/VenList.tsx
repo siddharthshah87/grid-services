@@ -2,14 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import {
-  MapPin, 
-  Zap, 
-  CheckCircle, 
-  AlertTriangle, 
-  Settings,
-  Activity
-} from 'lucide-react';
+import { Zap, Activity } from 'lucide-react';
 import { useVenSummary } from '@/hooks/useApi';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -36,19 +29,6 @@ export const VenList = () => {
     return dateB - dateA; // Most recent first
   });
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'online':
-        return <CheckCircle className="h-4 w-4 text-online" />;
-      case 'offline':
-        return <AlertTriangle className="h-4 w-4 text-offline" />;
-      case 'maintenance':
-        return <Settings className="h-4 w-4 text-warning" />;
-      default:
-        return <AlertTriangle className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const variants = {
       online: 'bg-online/10 text-online border-online/20',
@@ -70,12 +50,9 @@ export const VenList = () => {
           <Card key={ven.id} className="transition-all duration-200 hover:shadow-energy border-l-4 border-l-primary/30">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(ven.status)}
-                  <div>
-                    <h3 className="font-semibold text-foreground">{ven.name}</h3>
-                    <p className="text-sm text-muted-foreground">{ven.id}</p>
-                  </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">{ven.name}</h3>
+                  <p className="text-sm text-muted-foreground">{ven.id}</p>
                 </div>
                 {getStatusBadge(ven.status)}
               </div>
@@ -94,13 +71,13 @@ export const VenList = () => {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
                     <span className="text-muted-foreground">Location:</span>
-                    <div className="font-medium">{ven.location}</div>
+                    <span className="font-medium">{ven.location}</span>
                   </div>
-                  <div className="text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
                     <span className="text-muted-foreground">Last Seen:</span>
-                    <div className="font-medium">{formatLastSeen(ven.lastSeen)}</div>
+                    <span className="font-medium">{formatLastSeen(ven.lastSeen)}</span>
                   </div>
                 </div>
               </div>
