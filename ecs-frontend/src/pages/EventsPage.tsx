@@ -20,6 +20,13 @@ export default function EventsPage() {
   const navigate = useNavigate();
   const { data: events, isLoading } = useEventsHistory();
 
+  // Sort events by startTime (most recent first)
+  const sortedEvents = [...(events || [])].sort((a, b) => {
+    const dateA = new Date(a.startTime).getTime();
+    const dateB = new Date(b.startTime).getTime();
+    return dateB - dateA; // Most recent first
+  });
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "active":
@@ -68,7 +75,7 @@ export default function EventsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events?.map((event) => (
+                {sortedEvents?.map((event) => (
                   <TableRow
                     key={event.id}
                     className="cursor-pointer hover:bg-muted/50"
