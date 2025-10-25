@@ -11,6 +11,7 @@ import {
   Activity
 } from 'lucide-react';
 import { useVenSummary } from '@/hooks/useApi';
+import { formatDistanceToNow } from 'date-fns';
 
 export const VenList = () => {
   const navigate = useNavigate();
@@ -18,6 +19,14 @@ export const VenList = () => {
 
   const handleDetails = (id: string) => {
     navigate(`/vens/${id}`);
+  };
+
+  const formatLastSeen = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch {
+      return dateString;
+    }
   };
 
   // Sort VENs by lastSeen timestamp (most recent first)
@@ -91,7 +100,7 @@ export const VenList = () => {
                   </div>
                   <div className="text-sm">
                     <span className="text-muted-foreground">Last Seen:</span>
-                    <div className="font-medium">{ven.lastSeen}</div>
+                    <div className="font-medium">{formatLastSeen(ven.lastSeen)}</div>
                   </div>
                 </div>
               </div>
