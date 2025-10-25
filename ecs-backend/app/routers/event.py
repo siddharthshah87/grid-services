@@ -65,7 +65,7 @@ async def _event_metrics(session: AsyncSession, event_id: str) -> EventMetrics:
 
 async def _ven_participation(session: AsyncSession, event_id: str) -> list[VenParticipation]:
     """Get VEN participation details for an event."""
-    from app.models.ven import Ven as VenModel
+    from app.models.ven import VEN as VenModel
     
     # Aggregate shed power per VEN for this event
     stmt = (
