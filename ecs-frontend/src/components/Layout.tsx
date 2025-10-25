@@ -36,18 +36,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-          <div className="mr-4 flex">
+        <div className="container flex h-14 items-center justify-between">
+          <div className="flex items-center">
             <Link to="/dashboard" className="mr-6 flex items-center space-x-2">
               <Zap className="h-6 w-6" />
               <span className="font-bold">Grid Services</span>
             </Link>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-2">
+              <NavLinks />
+            </nav>
           </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-2 flex-1">
-            <NavLinks />
-          </nav>
+          {/* Right side - Subtitle */}
+          <div className="hidden md:block text-right">
+            <div className="text-xs text-muted-foreground leading-tight max-w-[140px]">
+              OpenADR VTN Management Dashboard
+            </div>
+          </div>
 
           {/* Mobile Navigation */}
           <Sheet>

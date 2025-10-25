@@ -45,27 +45,15 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background p-6 space-y-6">
-      {/* Header */}
-      <div className="border-b border-border pb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Smart Grid Control Center
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              OpenADR VTN Management Dashboard
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-online animate-pulse-energy"></div>
-              <span className="text-sm text-success font-medium">System Online</span>
-            </div>
-            <Badge variant="outline" className="border-primary text-primary">
-              VTN Status: Active
-            </Badge>
-          </div>
+      {/* Status Bar */}
+      <div className="flex items-center justify-end gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-online animate-pulse-energy"></div>
+          <span className="text-sm text-success font-medium">System Online</span>
         </div>
+        <Badge variant="outline" className="border-primary text-primary">
+          VTN Status: Active
+        </Badge>
       </div>
 
       {/* Key Metrics Overview */}
