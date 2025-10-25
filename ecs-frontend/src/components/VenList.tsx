@@ -96,16 +96,6 @@ export const VenList = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-                <div className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  <span>{ven.address}</span>
-                </div>
-                {ven.responseTime > 0 && (
-                  <span>Response: {ven.responseTime}ms</span>
-                )}
-              </div>
-
               <div className="flex gap-2">
                 <Button 
                   size="sm" 
