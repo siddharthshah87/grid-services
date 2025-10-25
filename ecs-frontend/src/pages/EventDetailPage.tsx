@@ -58,9 +58,13 @@ export default function EventDetailPage() {
   };
 
   // Calculate metrics
-  const totalShed = event.vens?.reduce((sum, ven) => sum + (ven.shedKw || 0), 0) || 0;
+  // Use actualReductionKw from API rather than summing vens (more accurate)
+  const totalShed = event.actualReductionKw || 0;
   const participatingVens = event.vens?.length || 0;
-  const duration = Math.round((new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 60000);
+  // Parse dates carefully - ensure both are treated as UTC to avoid timezone issues
+  const startTime = new Date(event.startTime.endsWith('Z') ? event.startTime : event.startTime + 'Z');
+  const endTime = new Date(event.endTime.endsWith('Z') ? event.endTime : event.endTime + 'Z');
+  const duration = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
 
   // Prepare chart data
   const shedByVen = event.vens?.map(ven => ({
