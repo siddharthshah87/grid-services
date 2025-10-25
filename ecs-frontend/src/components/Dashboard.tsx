@@ -109,8 +109,8 @@ export const Dashboard = () => {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
-        {/* VEN Management */}
-        <div className="xl:col-span-2">
+        {/* VEN Management - Desktop Only */}
+        <div className="hidden md:block xl:col-span-2">
           <Card className="min-h-[400px] xl:h-[calc(100vh-22rem)] flex flex-col">
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -139,8 +139,31 @@ export const Dashboard = () => {
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-hidden">
               <ScrollArea className="h-full">
-                {activeView === 'list' ? <VenList /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
+                {activeView === 'list' ? <VenList limit={10} /> : <MapView focusId={mapFocusId} onFocused={() => setMapFocusId(undefined)} />}
               </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Mobile VEN Management - Quick Link */}
+        <div className="md:hidden">
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground leading-tight">VEN Management</h3>
+                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                    View and manage all your virtual end nodes
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => window.location.href = '/vens'}
+                  className="w-full h-10"
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Go to VENs Page
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
